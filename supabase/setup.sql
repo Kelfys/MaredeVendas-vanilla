@@ -14,6 +14,7 @@
 --   011_product_engagement.sql
 --   012_demo_stores.sql
 --   013_admin_only_bruno.sql
+--   014_admin_email_trigger.sql
 --
 -- Após rodar as migrations (recomendado via CLI):
 --   npx supabase login
