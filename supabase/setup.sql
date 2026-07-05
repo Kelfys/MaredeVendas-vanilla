@@ -1,0 +1,20 @@
+-- MaredeVendas — Setup completo do banco
+-- Execute os arquivos em migrations/ NA ORDEM NUMÉRICA no SQL Editor do Supabase:
+--
+--   001_initial_schema.sql
+--   002_storage_and_policies.sql
+--   003_customer_profile.sql
+--   004_store_subscriptions.sql
+--   005_fix_signup_and_admin_bruno.sql
+--   006_store_theme_color.sql
+--   007_admin_user_passwords.sql
+--   008_product_price_cooldown.sql
+--   009_marketplace_visibility.sql
+--   010_store_ads.sql
+--
+-- Após rodar as migrations:
+-- 1. Authentication → URL Configuration → adicione sua URL do tiiny.host
+-- 2. Edite js/config.js com VITE_SUPABASE_URL e chave anon/publishable
+-- 3. Crie usuários admin/lojista no Auth ou use os seeds da migration 005
+
+SELECT 'Rode cada arquivo em supabase/migrations/ no SQL Editor do Supabase.' AS instrucao;
