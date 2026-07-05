@@ -124,6 +124,44 @@ export function renderStoreCard(store) {
   `
 }
 
+/** Card horizontal de produto no feed da home. */
+export function renderFeedProductCard(product, options = {}) {
+  const { badge = 'new' } = options
+  const oos = product.stock <= 0
+  const likesCount = product.likes_count ?? 0
+  const badgeLabel = badge === 'liked' ? 'Mais curtido' : 'Novo produto'
+  const badgeClass = badge === 'liked' ? 'feed-product-card__badge--liked' : 'feed-product-card__badge--new'
+  const store = product.store
+
+  return `
+    <article class="feed-product-card ${oos ? 'out-of-stock' : ''}">
+      <div class="feed-product-card__badge ${badgeClass}">${badgeLabel}</div>
+      <div class="feed-product-card__inner">
+        <a href="#/loja/${escapeHtml(store?.slug ?? '')}" class="feed-product-card__media">
+          ${product.image
+            ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
+            : '<div class="feed-product-card__placeholder">📦</div>'}
+          ${oos ? '<span class="product-card__oos">Indisponível</span>' : ''}
+        </a>
+        <div class="feed-product-card__body">
+          <a href="#/loja/${escapeHtml(store?.slug ?? '')}" class="feed-product-card__name">${escapeHtml(product.name)}</a>
+          ${store ? `<p class="feed-product-card__store">🏪 ${escapeHtml(store.name)}</p>` : ''}
+          ${product.description ? `<p class="feed-product-card__desc">${escapeHtml(product.description)}</p>` : ''}
+          <div class="feed-product-card__footer">
+            <div class="feed-product-card__meta">
+              <span class="feed-product-card__price">${formatCurrency(product.price)}</span>
+              ${likesCount > 0 ? `<span class="feed-product-card__likes">❤️ ${likesCount}</span>` : ''}
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" data-feed-add-product="${product.id}" ${oos ? 'disabled' : ''}>
+              + Carrinho
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  `
+}
+
 export function renderProductCard(product, options = {}) {
   const {
     user = null,

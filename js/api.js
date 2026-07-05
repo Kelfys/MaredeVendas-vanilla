@@ -5,8 +5,8 @@
  * getSupabase() diretamente. Erros do Supabase são propagados para
  * quem chamou tratar na UI.
  *
- * Domínios: Auth, Categories, Stores, Products, Orders, Reviews,
- * Favorites, Admin.
+ * Domínios: Auth, Categories, Stores, Products (incl. feed marketplace),
+ * Orders, Reviews, Favorites, Admin.
  *
  * Melhorias futuras:
  * - Paginação em fetchStores / fetchOrdersByStore
@@ -253,6 +253,96 @@ async function attachProductEngagement(products, userId = null) {
     comments_count: commentCounts[product.id] ?? 0,
     liked_by_user: userLikes.has(product.id),
   }))
+}
+
+function normalizeMarketplaceProduct(row) {
+  const store = row.store ?? {}
+  return {
+    ...row,
+    store: {
+      id: store.id,
+      name: store.name,
+      slug: store.slug,
+      whatsapp: store.whatsapp,
+      theme_color: store.theme_color,
+      city: store.city,
+      state: store.state,
+      plan_id: store.plan_id,
+      category_id: store.category_id,
+      category: store.category ?? null,
+    },
+  }
+}
+
+function filterMarketplaceProducts(rows, filters = {}) {
+  let products = rows
+    .filter((row) => row.store && ['active', 'trialing'].includes(row.store.subscription_status))
+    .map(normalizeMarketplaceProduct)
+
+  if (filters.categoryId) {
+    products = products.filter((p) => p.store.category_id === filters.categoryId)
+  }
+
+  if (filters.search) {
+    const term = sanitizeSearch(filters.search).toLowerCase()
+    if (term) {
+      products = products.filter((p) => {
+        const haystack = [
+          p.name,
+          p.description,
+          p.store.name,
+          p.store.city,
+        ].filter(Boolean).join(' ').toLowerCase()
+        return haystack.includes(term)
+      })
+    }
+  }
+
+  return products
+}
+
+/** Produtos ativos de lojas aprovadas no marketplace. */
+export async function fetchMarketplaceProducts(filters = {}) {
+  const client = await requireClient()
+  const fetchLimit = filters.fetchLimit ?? 64
+
+  let query = client
+    .from('products')
+    .select('*, category:categories(*), store:stores!inner(id, name, slug, whatsapp, theme_color, city, state, plan_id, status, subscription_status, category_id, category:categories(id, name))')
+    .eq('active', true)
+    .eq('stores.status', 'approved')
+    .order('created_at', { ascending: false })
+    .limit(fetchLimit)
+
+  const { data, error } = await query
+  if (error) throw error
+
+  return filterMarketplaceProducts(data ?? [], filters)
+}
+
+export async function fetchNewProducts(filters = {}) {
+  const limit = filters.limit ?? 12
+  const products = await fetchMarketplaceProducts({ ...filters, fetchLimit: limit * 3 })
+  return products.slice(0, limit)
+}
+
+export async function fetchTopLikedProducts(filters = {}) {
+  const limit = filters.limit ?? 12
+  const products = await fetchMarketplaceProducts({ ...filters, fetchLimit: 80 })
+  const withEngagement = await attachProductEngagement(products, filters.userId ?? null)
+
+  const liked = withEngagement
+    .filter((p) => (p.likes_count ?? 0) > 0)
+    .sort((a, b) => (b.likes_count ?? 0) - (a.likes_count ?? 0))
+
+  if (liked.length >= limit) return liked.slice(0, limit)
+
+  const seen = new Set(liked.map((p) => p.id))
+  const fallback = withEngagement
+    .filter((p) => !seen.has(p.id))
+    .sort((a, b) => (b.likes_count ?? 0) - (a.likes_count ?? 0))
+
+  return [...liked, ...fallback].slice(0, limit)
 }
 
 export async function fetchProductsByStore(storeId, userId = null) {

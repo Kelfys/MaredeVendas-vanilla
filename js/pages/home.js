@@ -1,58 +1,99 @@
 /**
- * Página inicial — feed de lojas com busca e filtro por categoria.
- *
- * Exibe apenas lojas aprovadas com assinatura ativa (marketplaceVisible).
- *
- * Melhorias futuras:
- * - Paginação / scroll infinito no feed
- * - Ordenação (mais recentes, mais visualizadas, por cidade)
- * - Destaques patrocinados (tabela store_ads já existe no schema)
+ * Página inicial — feed misto de lojas, produtos novos e mais curtidos.
  */
-import { fetchCategories, fetchStores } from '../api.js'
-import { renderStoreCard } from '../ui.js'
-import { escapeHtml } from '../utils.js'
+import { fetchCategories, fetchStores, fetchNewProducts, fetchTopLikedProducts } from '../api.js'
+import { renderStoreCard, renderFeedProductCard, openCart } from '../ui.js'
+import { escapeHtml, buildHomeFeed } from '../utils.js'
+import { setStore, addItem, getUser } from '../state.js'
+
+const FEED_PRODUCT_LIMIT = 12
 
 export async function renderHome(main) {
   let search = ''
   let categoryId = null
   let categories = []
   let stores = []
+  let newProducts = []
+  let likedProducts = []
+  let feedItems = []
+  let productMap = new Map()
 
   async function load() {
     const feed = main.querySelector('#feed')
     if (feed) feed.innerHTML = '<div class="loading"><div class="spinner"></div></div>'
 
     try {
-      ;[categories, stores] = await Promise.all([
+      const user = getUser()
+      const productFilters = {
+        categoryId: categoryId ?? undefined,
+        search: search || undefined,
+        limit: FEED_PRODUCT_LIMIT,
+        userId: user?.id,
+      }
+
+      ;[categories, stores, newProducts, likedProducts] = await Promise.all([
         fetchCategories(),
         fetchStores({
           search: search || undefined,
           categoryId: categoryId ?? undefined,
           marketplaceVisible: true,
         }),
+        fetchNewProducts(productFilters),
+        fetchTopLikedProducts(productFilters),
       ])
+
+      feedItems = buildHomeFeed(stores, newProducts, likedProducts)
+      productMap = new Map(
+        [...newProducts, ...likedProducts].map((product) => [product.id, product])
+      )
       paint()
     } catch (err) {
-      main.querySelector('#feed').innerHTML = `
-        <div class="empty-state">
-          <h2>Erro ao conectar</h2>
-          <p>${escapeHtml(err.message)}</p>
-        </div>
-      `
+      const feedEl = main.querySelector('#feed')
+      if (feedEl) {
+        feedEl.innerHTML = `
+          <div class="empty-state">
+            <h2>Erro ao conectar</h2>
+            <p>${escapeHtml(err.message)}</p>
+          </div>
+        `
+      }
     }
   }
 
+  function bindFeedEvents() {
+    main.querySelectorAll('[data-feed-add-product]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const product = productMap.get(btn.dataset.feedAddProduct)
+        if (!product?.store) return
+
+        setStore(product.store.id, product.store.name, product.store.whatsapp)
+        addItem(product)
+        openCart()
+      })
+    })
+  }
+
+  function renderFeedItem(item) {
+    if (item.kind === 'store') return renderStoreCard(item.store)
+    return renderFeedProductCard(item.product, { badge: item.badge })
+  }
+
   function paint() {
+    const hasFilters = Boolean(search || categoryId)
     const label = search
       ? `Resultados para "${search}"`
       : categoryId
-        ? `Lojas em ${categories.find((c) => c.id === categoryId)?.name ?? ''}`
-        : 'Feed de lojas'
+        ? `${categories.find((c) => c.id === categoryId)?.name ?? 'Categoria'}`
+        : 'Feed de lojas e produtos'
+
+    const emptyMessage = hasFilters
+      ? '<div class="empty-state"><h2>Nada encontrado</h2><p>Tente outra categoria ou limpe a busca.</p></div>'
+      : '<div class="empty-state"><h2>Feed vazio</h2><p>Em breve novas lojas e produtos aparecerão aqui.</p></div>'
 
     main.innerHTML = `
       <div class="toolbar">
         <div class="container" style="display:flex;flex-direction:column;gap:0.5rem;padding:0.5rem 0">
-          <input type="search" class="search-input" id="search" placeholder="Buscar loja por nome ou cidade..." value="${escapeHtml(search)}" />
+          <input type="search" class="search-input" id="search" placeholder="Buscar loja ou produto..." value="${escapeHtml(search)}" />
           <div class="category-scroll" id="categories">
             <button type="button" class="chip ${!categoryId ? 'active' : ''}" data-cat="">Todas</button>
             ${categories.map((c) => `
@@ -63,10 +104,11 @@ export async function renderHome(main) {
       </div>
       <div class="container">
         <p class="feed-label">${escapeHtml(label)}</p>
+        ${!hasFilters && (newProducts.length > 0 || likedProducts.length > 0) ? `
+          <p class="feed-hint">Lojas intercaladas com produtos novos e mais curtidos</p>
+        ` : ''}
         <div class="feed" id="feed">
-          ${stores.length === 0
-            ? '<div class="empty-state"><h2>Nenhuma loja encontrada</h2><p>Tente outra categoria ou limpe a busca.</p></div>'
-            : stores.map(renderStoreCard).join('')}
+          ${feedItems.length === 0 ? emptyMessage : feedItems.map(renderFeedItem).join('')}
         </div>
       </div>
     `
@@ -83,6 +125,8 @@ export async function renderHome(main) {
         load()
       })
     })
+
+    bindFeedEvents()
   }
 
   paint()
