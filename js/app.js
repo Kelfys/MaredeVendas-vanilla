@@ -22,10 +22,10 @@ import { renderHome } from './pages/home.js'
 import { renderStorePage } from './pages/store-page.js'
 import {
   renderCustomerLogin, renderCustomerRegister,
-  renderMerchantLogin, renderMerchantRegister, renderAdminLogin,
+  renderMerchantLogin, renderMerchantRegister, renderAdminLogin, renderModeratorLogin,
 } from './pages/auth.js'
 import { renderMerchantDashboard } from './pages/merchant.js'
-import { renderAdminDashboard } from './pages/admin.js'
+import { renderAdminDashboard, renderModeratorDashboard } from './pages/admin.js'
 import { renderFavorites } from './pages/favorites.js'
 import { renderRules } from './pages/rules.js'
 import { getSupabase } from './db.js'
@@ -70,6 +70,14 @@ function boot() {
   registerRoute('/admin/pedidos', (main) => renderAdminDashboard(main, 'pedidos'))
   registerRoute('/admin/aprovacoes', (main) => renderAdminDashboard(main, 'approvals'))
   registerRoute('/admin/conta', (main) => renderAdminDashboard(main, 'account'))
+  registerRoute('/moderador/entrar', renderModeratorLogin)
+  registerRoute('/moderador', (main) => renderModeratorDashboard(main, 'overview'))
+  registerRoute('/moderador/aprovacoes', (main) => renderModeratorDashboard(main, 'approvals'))
+  registerRoute('/moderador/lojas', (main) => renderModeratorDashboard(main, 'stores'))
+  registerRoute('/moderador/produtos/:storeId', (main, params) => renderModeratorDashboard(main, 'products', params.storeId))
+  registerRoute('/moderador/produtos', (main) => renderModeratorDashboard(main, 'products'))
+  registerRoute('/moderador/pedidos', (main) => renderModeratorDashboard(main, 'pedidos'))
+  registerRoute('/moderador/conta', (main) => renderModeratorDashboard(main, 'account'))
   registerRoute('/dashboard', (main) => renderMerchantDashboard(main, 'overview'))
   registerRoute('/dashboard/produtos', (main) => renderMerchantDashboard(main, 'products'))
   registerRoute('/dashboard/pedidos', (main) => renderMerchantDashboard(main, 'orders'))

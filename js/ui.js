@@ -24,13 +24,13 @@ import { buildOrderMessage, buildWhatsAppUrl } from './whatsapp.js'
 import { createOrder } from './api.js'
 import { navigate, render as rerenderRoute } from './router.js'
 import { showToast } from './utils.js'
-import { ADMIN_MENU, isAdminPath, getAdminTab } from './admin-nav.js'
+import { STAFF_PANELS, getStaffMenu, isStaffPath, getStaffPanel, getStaffTab } from './staff-nav.js'
 
 let menuOpen = false
-let adminMenuOpen = false
+let staffMenuOpen = false
 
-function renderAdminMenuItems(activeTab, { compact = false } = {}) {
-  return ADMIN_MENU.map((item) => `
+function renderStaffMenuItems(panel, activeTab, { compact = false } = {}) {
+  return getStaffMenu(panel).map((item) => `
     <a href="${item.href}" class="admin-menu__item ${activeTab === item.id ? 'active' : ''} ${compact ? 'admin-menu__item--compact' : ''}">
       <span class="admin-menu__icon">${item.icon}</span>
       <span>${item.label}</span>
@@ -38,13 +38,30 @@ function renderAdminMenuItems(activeTab, { compact = false } = {}) {
   `).join('')
 }
 
+function renderStaffPanelDropdown(user, panel, activeTab) {
+  const panelConfig = STAFF_PANELS[panel]
+  const onPanel = isStaffPath() && getStaffPanel() === panel && user?.role === panel
+  return `
+    <div class="header-dropdown ${staffMenuOpen ? 'open' : ''}" id="staff-dropdown-${panel}">
+      <button type="button" class="icon-btn ${onPanel ? 'icon-btn--active' : ''}" id="staff-menu-toggle-${panel}" title="${panelConfig.label}" aria-expanded="${staffMenuOpen}" aria-haspopup="true">${panelConfig.icon}</button>
+      <div class="header-dropdown__panel admin-menu" role="menu">
+        <p class="admin-menu__title">${panelConfig.label}</p>
+        ${renderStaffMenuItems(panel, activeTab)}
+        <div class="admin-menu__divider"></div>
+        <a href="#/" class="admin-menu__item admin-menu__item--muted">← Voltar ao site</a>
+      </div>
+    </div>`
+}
+
 export function renderHeader() {
   const header = document.getElementById('header')
   if (!header) return
 
   const user = getUser()
-  const onAdmin = user?.role === 'admin' && isAdminPath()
-  const adminTab = onAdmin ? getAdminTab() : null
+  const staffPanel = getStaffPanel()
+  const onStaff = (user?.role === 'admin' && staffPanel === 'admin')
+    || (user?.role === 'moderator' && staffPanel === 'moderator')
+  const staffTab = onStaff ? getStaffTab(window.location.hash.replace(/^#/, '') || '/', staffPanel) : null
 
   header.innerHTML = `
     <div class="header__inner">
@@ -65,17 +82,8 @@ export function renderHeader() {
         ${!user ? `<a href="#/conta/entrar" class="btn btn-primary btn-sm btn-login-mobile">Entrar</a>` : ''}
         ${user?.role === 'customer' ? `<a href="#/favoritos" class="icon-btn" title="Favoritos">❤️</a>` : ''}
         ${user?.role === 'merchant' ? `<a href="#/dashboard" class="icon-btn" title="Painel">📊</a>` : ''}
-        ${user?.role === 'admin' ? `
-          <div class="header-dropdown ${adminMenuOpen ? 'open' : ''}" id="admin-dropdown">
-            <button type="button" class="icon-btn ${onAdmin ? 'icon-btn--active' : ''}" id="admin-menu-toggle" title="Painel Admin" aria-expanded="${adminMenuOpen}" aria-haspopup="true">⚙️</button>
-            <div class="header-dropdown__panel admin-menu" role="menu">
-              <p class="admin-menu__title">Painel Admin</p>
-              ${renderAdminMenuItems(adminTab)}
-              <div class="admin-menu__divider"></div>
-              <a href="#/" class="admin-menu__item admin-menu__item--muted">← Voltar ao site</a>
-            </div>
-          </div>
-        ` : ''}
+        ${user?.role === 'admin' ? renderStaffPanelDropdown(user, 'admin', staffTab) : ''}
+        ${user?.role === 'moderator' ? renderStaffPanelDropdown(user, 'moderator', staffTab) : ''}
         ${user ? `<button type="button" class="icon-btn" id="logout-btn" title="Sair">🚪</button>` : `<a href="#/conta/entrar" class="icon-btn hidden md:flex" title="Entrar">❤️</a>`}
 
         <button type="button" class="icon-btn menu-toggle" id="menu-toggle" aria-expanded="${menuOpen}">${menuOpen ? '✕' : '☰'}</button>
@@ -90,20 +98,25 @@ export function renderHeader() {
       ${user?.role === 'merchant' ? '<a href="#/dashboard">📊 Painel do Lojista</a>' : ''}
       ${user?.role === 'admin' ? `
         <p class="nav-mobile__section">Painel Admin</p>
-        ${renderAdminMenuItems(adminTab, { compact: true })}
+        ${renderStaffMenuItems('admin', staffTab, { compact: true })}
+        <a href="#/">← Voltar ao site</a>
+      ` : ''}
+      ${user?.role === 'moderator' ? `
+        <p class="nav-mobile__section">Painel Moderador</p>
+        ${renderStaffMenuItems('moderator', staffTab, { compact: true })}
         <a href="#/">← Voltar ao site</a>
       ` : ''}
       ${user ? '<button type="button" id="logout-mobile">🚪 Sair</button>' : '<a href="#/conta/entrar">🔑 Entrar</a>'}
     </nav>
 
-    ${onAdmin ? `
+    ${onStaff ? `
       <div class="admin-toolbar">
         <div class="admin-toolbar__inner">
           <div class="admin-toolbar__tabs">
-            ${ADMIN_MENU.map((item) => {
+            ${getStaffMenu(staffPanel).map((item) => {
               const pending = item.id === 'approvals' ? getAdminPendingCount() : 0
               return `
-              <a href="${item.href}" class="admin-toolbar__tab ${adminTab === item.id ? 'active' : ''}">
+              <a href="${item.href}" class="admin-toolbar__tab ${staffTab === item.id ? 'active' : ''}">
                 <span>${item.icon}</span> ${item.label}
                 ${pending > 0 ? `<span class="admin-toolbar__badge">${pending}</span>` : ''}
               </a>`
@@ -115,13 +128,15 @@ export function renderHeader() {
     ` : ''}
   `
 
-  header.classList.toggle('header--admin', onAdmin)
+  header.classList.toggle('header--admin', onStaff)
 
-  document.getElementById('admin-menu-toggle')?.addEventListener('click', (e) => {
-    e.stopPropagation()
-    adminMenuOpen = !adminMenuOpen
-    menuOpen = false
-    renderHeader()
+  ;['admin', 'moderator'].forEach((panel) => {
+    document.getElementById(`staff-menu-toggle-${panel}`)?.addEventListener('click', (e) => {
+      e.stopPropagation()
+      staffMenuOpen = !staffMenuOpen
+      menuOpen = false
+      renderHeader()
+    })
   })
 
   document.getElementById('admin-refresh')?.addEventListener('click', () => {
@@ -131,16 +146,18 @@ export function renderHeader() {
 
   header.querySelectorAll('.admin-menu__item, .admin-toolbar__tab').forEach((link) => {
     link.addEventListener('click', () => {
-      adminMenuOpen = false
+      staffMenuOpen = false
       menuOpen = false
     })
   })
 
-  if (adminMenuOpen) {
+  if (staffMenuOpen) {
     setTimeout(() => {
       const close = (ev) => {
-        if (!document.getElementById('admin-dropdown')?.contains(ev.target)) {
-          adminMenuOpen = false
+        const inside = ['admin', 'moderator'].some((panel) =>
+          document.getElementById(`staff-dropdown-${panel}`)?.contains(ev.target))
+        if (!inside) {
+          staffMenuOpen = false
           document.removeEventListener('click', close)
           renderHeader()
         }

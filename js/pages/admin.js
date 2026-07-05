@@ -1,5 +1,5 @@
 /**
- * Painel administrativo — conteúdo dinâmico; navegação no ícone ⚙️ do header.
+ * Painéis admin e moderador — conteúdo dinâmico; navegação no header.
  */
 import {
   fetchAdminMetrics, fetchAdminOrdersAnalytics, fetchAdminOrders,
@@ -17,7 +17,8 @@ import {
   formatDateTimeCsv, buildCsv, downloadTextFile,
 } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
-import { getAdminMenuItem } from '../admin-nav.js'
+import { STAFF_PANELS, staffHref, getStaffMenuItem } from '../staff-nav.js'
+import { canAccessPanel, isReadOnlyStaffTab } from '../roles.js'
 import {
   planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
   FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
@@ -29,21 +30,27 @@ import {
   validateImageFile, STORAGE_BUCKETS,
 } from '../uploads.js'
 
-function guardAdmin(main) {
+function guardStaff(main, panel = 'admin') {
   const user = getUser()
-  if (!user || user.role !== 'admin') {
-    main.innerHTML = `<div class="empty-state"><h2>Acesso restrito</h2><p><a href="#/admin/entrar">Entrar como admin</a></p></div>`
+  const panelConfig = STAFF_PANELS[panel]
+  if (!canAccessPanel(user, panel)) {
+    main.innerHTML = `<div class="empty-state"><h2>Acesso restrito</h2><p><a href="#${panelConfig.loginPath}">Entrar no ${escapeHtml(panelConfig.label.toLowerCase())}</a></p></div>`
     return null
   }
   return user
 }
 
-function adminPage(title, subtitle, content, actions = '') {
+function rerenderStaff(main, tab, selectedStoreId = null) {
+  return renderStaffDashboard(main, tab, selectedStoreId, main.dataset.staffPanel || 'admin')
+}
+
+function adminPage(title, subtitle, content, actions = '', panel = 'admin') {
+  const panelConfig = STAFF_PANELS[panel]
   return `
     <div class="admin-page">
       <div class="admin-page__head">
         <div class="admin-page__head-main">
-          <p class="admin-page__eyebrow">Painel Admin</p>
+          <p class="admin-page__eyebrow">${escapeHtml(panelConfig.label)}</p>
           <h1 class="admin-page__title">${escapeHtml(title)}</h1>
           ${subtitle ? `<p class="admin-page__subtitle">${escapeHtml(subtitle)}</p>` : ''}
         </div>
@@ -597,8 +604,9 @@ function storeBrandingFieldsHtml(planId, store = null) {
     </div>`
 }
 
-function adminProductsPath(storeId = null) {
-  return storeId ? `/admin/produtos/${storeId}` : '/admin/produtos'
+function staffProductsPath(panel, storeId = null) {
+  const base = STAFF_PANELS[panel].basePath
+  return storeId ? `${base}/produtos/${storeId}` : `${base}/produtos`
 }
 
 function productCountMap(products) {
@@ -623,7 +631,7 @@ function productImageLimitHintHtml(store, products, product = null) {
   return `<p class="form-hint">Plano Gratuito: ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}</p>`
 }
 
-function renderProductTableRows(products, categories, store = null) {
+function renderProductTableRows(products, categories, store = null, { readOnly = false } = {}) {
   if (products.length === 0) {
     return '<tr><td colspan="5">Nenhum produto nesta loja</td></tr>'
   }
@@ -645,11 +653,12 @@ function renderProductTableRows(products, categories, store = null) {
       <td>${p.stock}</td>
       <td>${p.active ? '✓' : '✗'}</td>
       <td style="white-space:nowrap">
+        ${readOnly ? '—' : `
         <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">Editar</button>
-        <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">Excluir</button>
+        <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">Excluir</button>`}
       </td>
     </tr>
-    <tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
+    ${readOnly ? '' : `<tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
       <td colspan="5">
         <form class="admin-edit-panel admin-form-grid" data-product-edit="${p.id}">
           <div class="form-group">
@@ -697,11 +706,11 @@ function renderProductTableRows(products, categories, store = null) {
           </div>
         </form>
       </td>
-    </tr>
+    </tr>`}
   `}).join('')
 }
 
-function renderStoreProductsSidebar(stores, counts, selectedStoreId) {
+function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'admin') {
   const sorted = [...stores].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 
   return `
@@ -722,7 +731,7 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId) {
           ? '<p class="admin-store-products-nav__empty">Nenhuma loja cadastrada</p>'
           : sorted.map((s) => `
             <a
-              href="#${adminProductsPath(s.id)}"
+              href="#${staffProductsPath(panel, s.id)}"
               class="admin-store-products-nav__item ${s.id === selectedStoreId ? 'active' : ''}"
               data-store-nav="${s.id}"
               data-store-name="${escapeHtml(s.name.toLowerCase())}"
@@ -737,7 +746,7 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId) {
     </aside>`
 }
 
-function renderStoreProductsPanel({ store, products, categories, canCreate }) {
+function renderStoreProductsPanel({ store, products, categories, canCreate, readOnly = false }) {
   const withImages = store ? countProductsWithImages(products) : 0
   const canAddImageOnCreate = store
     ? canAddProductImage(store.plan_id, withImages)
@@ -748,7 +757,7 @@ function renderStoreProductsPanel({ store, products, categories, canCreate }) {
       <div class="admin-store-products-main admin-store-products-main--empty">
         <div class="empty-state">
           <h2>Selecione uma loja</h2>
-          <p>Escolha uma loja na lista ao lado para ver e editar os produtos.</p>
+          <p>Escolha uma loja na lista ao lado para ver os produtos.</p>
         </div>
       </div>`
   }
@@ -824,7 +833,7 @@ function renderStoreProductsPanel({ store, products, categories, canCreate }) {
         <table>
           <thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th><th>Ativo</th><th></th></tr></thead>
           <tbody id="admin-products-tbody">
-            ${renderProductTableRows(products, categories, store)}
+            ${renderProductTableRows(products, categories, store, { readOnly })}
           </tbody>
         </table>
       </div>
@@ -855,46 +864,41 @@ function bindPlanBrandingToggle(scope) {
   })
 }
 
-function quickActions() {
+function quickActions(panel = 'admin') {
+  const cards = []
+  if (panel === 'admin') {
+    cards.push(
+      { href: staffHref(panel, 'lojas'), icon: '🏪', title: 'Nova loja', text: 'Cadastrar vitrine' },
+      { href: staffHref(panel, 'produtos'), icon: '📦', title: 'Novo produto', text: 'Adicionar ao catálogo' },
+    )
+  }
+  cards.push(
+    { href: staffHref(panel, 'pedidos'), icon: '🛒', title: 'Pedidos', text: 'Métricas e histórico' },
+    { href: staffHref(panel, 'aprovacoes'), icon: '✅', title: 'Aprovações', text: 'Revisar cadastros' },
+    { href: '#/', icon: '🌐', title: 'Ver site', text: 'Abrir marketplace', muted: true },
+  )
+
   return `
     <div class="admin-quick-actions">
-      <a href="#/admin/lojas" class="admin-quick-card">
-        <span class="admin-quick-card__icon">🏪</span>
-        <strong>Nova loja</strong>
-        <span>Cadastrar vitrine</span>
-      </a>
-      <a href="#/admin/produtos" class="admin-quick-card">
-        <span class="admin-quick-card__icon">📦</span>
-        <strong>Novo produto</strong>
-        <span>Adicionar ao catálogo</span>
-      </a>
-      <a href="#/admin/pedidos" class="admin-quick-card">
-        <span class="admin-quick-card__icon">🛒</span>
-        <strong>Pedidos</strong>
-        <span>Métricas e histórico</span>
-      </a>
-      <a href="#/admin/aprovacoes" class="admin-quick-card">
-        <span class="admin-quick-card__icon">✅</span>
-        <strong>Aprovações</strong>
-        <span>Revisar cadastros</span>
-      </a>
-      <a href="#/" class="admin-quick-card admin-quick-card--muted">
-        <span class="admin-quick-card__icon">🌐</span>
-        <strong>Ver site</strong>
-        <span>Abrir marketplace</span>
-      </a>
+      ${cards.map((card) => `
+        <a href="${card.href}" class="admin-quick-card ${card.muted ? 'admin-quick-card--muted' : ''}">
+          <span class="admin-quick-card__icon">${card.icon}</span>
+          <strong>${card.title}</strong>
+          <span>${card.text}</span>
+        </a>
+      `).join('')}
     </div>
   `
 }
 
-function metricCards(metrics, pendingCount, orderMetrics = null) {
+function metricCards(metrics, pendingCount, orderMetrics = null, panel = 'admin') {
   const items = [
-    { label: 'Lojas', value: metrics.totalStores, href: '#/admin/lojas' },
-    { label: 'Produtos', value: metrics.totalProducts, href: '#/admin/produtos' },
-    { label: 'Pedidos', value: orderMetrics?.totalOrders ?? metrics.totalOrders, href: '#/admin/pedidos' },
-    { label: 'Receita', value: formatCurrency(orderMetrics?.totalRevenue ?? 0), href: '#/admin/pedidos', compact: true },
+    { label: 'Lojas', value: metrics.totalStores, href: staffHref(panel, 'lojas') },
+    { label: 'Produtos', value: metrics.totalProducts, href: staffHref(panel, 'produtos') },
+    { label: 'Pedidos', value: orderMetrics?.totalOrders ?? metrics.totalOrders, href: staffHref(panel, 'pedidos') },
+    { label: 'Receita', value: formatCurrency(orderMetrics?.totalRevenue ?? 0), href: staffHref(panel, 'pedidos'), compact: true },
     { label: 'Visualizações', value: metrics.totalViews, href: null },
-    { label: 'Pendentes', value: pendingCount, href: '#/admin/aprovacoes', highlight: pendingCount > 0 },
+    { label: 'Pendentes', value: pendingCount, href: staffHref(panel, 'aprovacoes'), highlight: pendingCount > 0 },
   ]
 
   return `
@@ -914,11 +918,14 @@ function metricCards(metrics, pendingCount, orderMetrics = null) {
   `
 }
 
-export async function renderAdminDashboard(main, tab = 'overview', selectedStoreId = null) {
-  const user = guardAdmin(main)
+export async function renderStaffDashboard(main, tab = 'overview', selectedStoreId = null, panel = 'admin') {
+  const user = guardStaff(main, panel)
   if (!user) return
 
-  const menuItem = getAdminMenuItem(tab)
+  main.dataset.staffPanel = panel
+  const menuItem = getStaffMenuItem(tab, panel)
+  const storesReadOnly = isReadOnlyStaffTab(panel, 'stores')
+  const productsReadOnly = isReadOnlyStaffTab(panel, 'products')
 
   if (tab === 'overview') {
     const [metrics, pending, stores, orderAnalytics, recentOrders] = await Promise.all([
@@ -939,12 +946,12 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
       menuItem.label,
       'Resumo da plataforma e atalhos rápidos',
       `
-        ${quickActions()}
-        ${metricCards(metrics, pending.length, orderMetrics)}
+        ${quickActions(panel)}
+        ${metricCards(metrics, pending.length, orderMetrics, panel)}
         <section class="admin-section">
           <div class="admin-section__head">
             <h2>Pedidos</h2>
-            <a href="#/admin/pedidos" class="btn btn-outline btn-sm">Ver todos</a>
+            <a href="${staffHref(panel, 'pedidos')}" class="btn btn-outline btn-sm">Ver todos</a>
           </div>
           ${orderMetricsChips(orderMetrics)}
           ${orderAnalytics.timeline.length > 0
@@ -962,14 +969,14 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
         <section class="admin-section">
           <div class="admin-section__head">
             <h2>Status das lojas</h2>
-            <a href="#/admin/lojas" class="btn btn-outline btn-sm">Gerenciar lojas</a>
+            <a href="${staffHref(panel, 'lojas')}" class="btn btn-outline btn-sm">${storesReadOnly ? 'Ver lojas' : 'Gerenciar lojas'}</a>
           </div>
           ${storeStatusSummary(stores)}
         </section>
         <section class="admin-section">
           <div class="admin-section__head">
             <h2>Aprovações recentes</h2>
-            ${pending.length > 0 ? `<a href="#/admin/aprovacoes" class="btn btn-outline btn-sm">Ver todas (${pending.length})</a>` : ''}
+            ${pending.length > 0 ? `<a href="${staffHref(panel, 'aprovacoes')}" class="btn btn-outline btn-sm">Ver todas (${pending.length})</a>` : ''}
           </div>
           ${pendingPreview.length === 0
             ? adminEmptyState('✅', 'Tudo em dia', 'Nenhuma loja aguardando aprovação no momento.')
@@ -990,7 +997,8 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
               </div>`}
         </section>
       `,
-      `<span class="admin-user-badge">${escapeHtml(user.email)}</span>`
+      `<span class="admin-user-badge">${escapeHtml(user.email)}</span>`,
+      panel
     )
 
     bindApprovalActions(main, 'overview')
@@ -1029,7 +1037,9 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
                 </div>
               </article>
             `).join('')}
-          </div>`
+          </div>`,
+      '',
+      panel
     )
 
     bindApprovalActions(main, 'approvals')
@@ -1037,25 +1047,26 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
   }
 
   if (tab === 'stores') {
-    const [stores, merchants, categories, pending] = await Promise.all([
+    const [stores, categories, pending] = await Promise.all([
       fetchAllStoresAdmin(),
-      fetchMerchants(),
       fetchCategories(),
       fetchPendingStoreApprovals(),
     ])
+    const merchants = storesReadOnly ? [] : await fetchMerchants()
 
     setAdminPendingCount(pending.length)
     import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 
     main.innerHTML = adminPage(
       menuItem.label,
-      `${stores.length} loja(s) cadastradas`,
+      storesReadOnly ? `${stores.length} loja(s) — somente leitura` : `${stores.length} loja(s) cadastradas`,
       `
         <div id="admin-store-msg"></div>
-        ${merchants.length === 0
+        ${storesReadOnly ? '<p class="admin-readonly-hint">Moderadores podem visualizar lojas, mas não criar nem editar.</p>' : ''}
+        ${!storesReadOnly && merchants.length === 0
           ? '<div class="empty-state" style="margin-bottom:1rem"><p>Nenhum lojista cadastrado. Crie contas em <a href="#/lojista/cadastro">Área do Lojista</a> primeiro.</p></div>'
           : ''}
-        <details class="admin-form-panel" open ${merchants.length === 0 ? 'style="opacity:0.6;pointer-events:none"' : ''}>
+        ${storesReadOnly ? '' : `<details class="admin-form-panel" open ${merchants.length === 0 ? 'style="opacity:0.6;pointer-events:none"' : ''}>
           <summary>+ Nova loja</summary>
           <form id="admin-store-form" class="admin-form-grid" data-plan-branding-form>
             <div class="form-group">
@@ -1127,7 +1138,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
               <button type="submit" class="btn btn-primary">Criar loja</button>
             </div>
           </form>
-        </details>
+        </details>`}
         ${stores.length > 0 ? adminFilterBar({
           searchId: 'admin-stores-search',
           searchPlaceholder: 'Buscar loja, cidade ou lojista...',
@@ -1156,12 +1167,12 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
                   <td>${statusBadge(s.status)}</td>
                   <td>${escapeHtml(s.plan_id)}</td>
                   <td style="white-space:nowrap">
-                    <a href="#${adminProductsPath(s.id)}" class="btn btn-outline btn-sm">Produtos</a>
-                    <button type="button" class="btn btn-outline btn-sm" data-edit-store="${s.id}">Editar</button>
+                    <a href="#${staffProductsPath(panel, s.id)}" class="btn btn-outline btn-sm">Produtos</a>
+                    ${storesReadOnly ? '' : `<button type="button" class="btn btn-outline btn-sm" data-edit-store="${s.id}">Editar</button>`}
                     ${s.status === 'approved' ? `<a href="#/loja/${escapeHtml(s.slug)}" class="btn btn-outline btn-sm">Ver</a>` : ''}
                   </td>
                 </tr>
-                <tr class="admin-edit-row" id="edit-store-row-${s.id}" hidden>
+                ${storesReadOnly ? '' : `<tr class="admin-edit-row" id="edit-store-row-${s.id}" hidden>
                   <td colspan="6">
                     <form class="admin-edit-panel admin-form-grid" data-store-edit="${s.id}" data-plan-branding-form>
                       <div class="form-group">
@@ -1227,17 +1238,21 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
                       </div>
                     </form>
                   </td>
-                </tr>
+                </tr>`}
               `).join('')}
             </tbody>
           </table>
         </div>
-      `
+      `,
+      '',
+      panel
     )
 
-    bindStoreForm(main)
-    bindStoreEdits(main)
-    bindPlanBrandingToggle(main)
+    if (!storesReadOnly) {
+      bindStoreForm(main)
+      bindStoreEdits(main)
+      bindPlanBrandingToggle(main)
+    }
     bindListFilters(main, {
       searchId: 'admin-stores-search',
       rowSelector: '[data-store-row]',
@@ -1261,7 +1276,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
 
     if (!selectedStoreId && stores.length > 0) {
       const first = [...stores].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))[0]
-      navigate(adminProductsPath(first.id))
+      navigate(staffProductsPath(panel, first.id))
       return
     }
 
@@ -1274,25 +1289,29 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
     main.innerHTML = adminPage(
       menuItem.label,
       selectedStore
-        ? `Gerenciando produtos de ${selectedStore.name}`
+        ? (productsReadOnly ? `Produtos de ${selectedStore.name} — somente leitura` : `Gerenciando produtos de ${selectedStore.name}`)
         : `${allProducts.length} produto(s) em ${stores.length} loja(s)`,
       `
+        ${productsReadOnly ? '<p class="admin-readonly-hint">Moderadores podem visualizar produtos, mas não criar nem editar.</p>' : ''}
         <div id="admin-product-msg"></div>
         <div class="admin-store-products-layout">
-          ${renderStoreProductsSidebar(stores, counts, selectedStoreId)}
+          ${renderStoreProductsSidebar(stores, counts, selectedStoreId, panel)}
           ${renderStoreProductsPanel({
             store: selectedStore,
             products: storeProducts,
             categories,
-            canCreate: selectedStore?.status === 'approved',
+            canCreate: !productsReadOnly && selectedStore?.status === 'approved',
+            readOnly: productsReadOnly,
           })}
         </div>
-      `
+      `,
+      '',
+      panel
     )
 
     bindStoreProductsNav(main)
     bindProductSearch(main)
-    bindProductForm(main, selectedStoreId)
+    if (!productsReadOnly) bindProductForm(main, selectedStoreId)
     return
   }
 
@@ -1342,7 +1361,8 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
       `,
       orders.length > 0
         ? '<span class="admin-export-hint">Exporta todos os pedidos filtrados (todas as páginas)</span>'
-        : ''
+        : '',
+      panel
     )
 
     bindOrdersChart(main, orderAnalytics.timeline)
@@ -1371,11 +1391,21 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
           <button type="submit" class="btn btn-primary btn-sm">Alterar senha</button>
         </form>
         </div>
-      `
+      `,
+      '',
+      panel
     )
 
     bindPasswordForm(main)
   }
+}
+
+export async function renderAdminDashboard(main, tab = 'overview', selectedStoreId = null) {
+  return renderStaffDashboard(main, tab, selectedStoreId, 'admin')
+}
+
+export async function renderModeratorDashboard(main, tab = 'overview', selectedStoreId = null) {
+  return renderStaffDashboard(main, tab, selectedStoreId, 'moderator')
 }
 
 function bindProductSearch(main) {
@@ -1431,7 +1461,7 @@ function bindStoreForm(main) {
       }
 
       showToast(`Loja "${store.name}" criada!`)
-      navigate('/admin/lojas')
+      navigate(`${STAFF_PANELS[main.dataset.staffPanel || 'admin'].basePath}/lojas`)
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
     } finally {
@@ -1488,7 +1518,7 @@ function bindStoreEdits(main) {
           remove_banner: !bannerInput?.files?.[0] && form.remove_banner?.checked,
         })
         showToast('Loja atualizada!')
-        renderAdminDashboard(main, 'stores')
+        rerenderStaff(main, 'stores')
       } catch (err) {
         showToast(err.message)
       } finally {
@@ -1539,7 +1569,7 @@ function bindProductForm(main, selectedStoreId = null) {
         image: imageFile,
       })
       showToast('Produto criado!')
-      navigate(adminProductsPath(storeId || selectedStoreId))
+      navigate(staffProductsPath(main.dataset.staffPanel || 'admin', storeId || selectedStoreId))
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
     } finally {
@@ -1593,7 +1623,7 @@ function bindProductEdits(main, selectedStoreId = null) {
           image: imageFile,
         })
         showToast('Produto atualizado!')
-        renderAdminDashboard(main, 'products', selectedStoreId)
+        rerenderStaff(main, 'products', selectedStoreId)
       } catch (err) {
         showToast(err.message)
       } finally {
@@ -1607,7 +1637,7 @@ function bindProductEdits(main, selectedStoreId = null) {
       if (!confirm('Excluir este produto?')) return
       await deleteProduct(btn.dataset.delProduct)
       showToast('Produto excluído')
-      renderAdminDashboard(main, 'products', selectedStoreId)
+      rerenderStaff(main, 'products', selectedStoreId)
     })
   })
 }
@@ -1646,7 +1676,7 @@ function bindApprovalActions(main, tab) {
     btn.addEventListener('click', async () => {
       await approveStoreRegistration(btn.dataset.approve)
       showToast('Loja aprovada!')
-      renderAdminDashboard(main, tab)
+      rerenderStaff(main, tab)
     })
   })
 
@@ -1655,7 +1685,7 @@ function bindApprovalActions(main, tab) {
       if (!confirm('Rejeitar esta loja?')) return
       await rejectStoreRegistration(btn.dataset.reject)
       showToast('Loja rejeitada')
-      renderAdminDashboard(main, tab)
+      rerenderStaff(main, tab)
     })
   })
 }

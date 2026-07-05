@@ -181,6 +181,9 @@ export async function renderAdminLogin(main) {
       <p style="margin-top:1rem;font-size:0.875rem;text-align:center;color:var(--text-secondary)">
         <button type="button" class="btn btn-outline btn-sm" id="admin-reset-password">Esqueci minha senha</button>
       </p>
+      <p style="margin-top:0.75rem;font-size:0.8125rem;text-align:center;color:var(--text-muted)">
+        <a href="#/moderador/entrar">Acesso moderador</a>
+      </p>
     `
   )
 
@@ -216,6 +219,63 @@ export async function renderAdminLogin(main) {
         return
       }
       navigate('/admin')
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    }
+  })
+}
+
+export async function renderModeratorLogin(main) {
+  main.innerHTML = authLayout(
+    'Painel Moderador',
+    'Acesso restrito a moderadores da plataforma.',
+    `
+      <form id="login-form">
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" name="email" required /></div>
+        <div class="form-group"><label class="form-label">Senha</label><input class="form-input" type="password" name="password" required /></div>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+      <p style="margin-top:1rem;font-size:0.875rem;text-align:center;color:var(--text-secondary)">
+        <button type="button" class="btn btn-outline btn-sm" id="moderator-reset-password">Esqueci minha senha</button>
+      </p>
+      <p style="margin-top:0.75rem;font-size:0.8125rem;text-align:center;color:var(--text-muted)">
+        <a href="#/admin/entrar">Acesso admin</a>
+      </p>
+    `
+  )
+
+  main.querySelector('#moderator-reset-password')?.addEventListener('click', async () => {
+    const errEl = main.querySelector('#auth-error')
+    const email = main.querySelector('#login-form input[name="email"]')?.value?.trim()
+    if (!email) {
+      errEl.innerHTML = '<div class="alert alert-error">Informe seu email acima primeiro.</div>'
+      return
+    }
+    try {
+      const { requestPasswordReset } = await import('../api.js')
+      await requestPasswordReset(email)
+      errEl.innerHTML = '<div class="alert" style="background:var(--primary-50);color:var(--primary-700);padding:0.75rem;border-radius:var(--radius)">Link de redefinição enviado para seu email.</div>'
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    }
+  })
+
+  main.querySelector('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const errEl = main.querySelector('#auth-error')
+
+    try {
+      await signIn(form.email.value, form.password.value)
+      const { loadUser, getUser } = await import('../state.js')
+      await loadUser()
+      if (getUser()?.role !== 'moderator') {
+        const { logout } = await import('../state.js')
+        await logout()
+        errEl.innerHTML = '<div class="alert alert-error">Acesso negado.</div>'
+        return
+      }
+      navigate('/moderador')
     } catch (err) {
       errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
     }

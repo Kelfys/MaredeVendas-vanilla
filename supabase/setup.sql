@@ -16,6 +16,7 @@
 --   013_admin_only_bruno.sql
 --   014_admin_email_trigger.sql
 --   015_admin_create_stores.sql
+--   016_moderator_role.sql
 --
 -- Após rodar as migrations (recomendado via CLI):
 --   npx supabase login
