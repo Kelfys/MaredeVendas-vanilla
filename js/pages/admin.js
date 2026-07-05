@@ -107,6 +107,209 @@ function storeBrandingFieldsHtml(planId, store = null) {
     </div>`
 }
 
+function adminProductsPath(storeId = null) {
+  return storeId ? `/admin/produtos/${storeId}` : '/admin/produtos'
+}
+
+function productCountMap(products) {
+  const counts = {}
+  for (const product of products) {
+    counts[product.store_id] = (counts[product.store_id] ?? 0) + 1
+  }
+  return counts
+}
+
+function renderProductTableRows(products, categories) {
+  if (products.length === 0) {
+    return '<tr><td colspan="5">Nenhum produto nesta loja</td></tr>'
+  }
+
+  return products.map((p) => `
+    <tr>
+      <td>
+        <div class="admin-table-thumb">
+          ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<span>📦</span>'}
+        </div>
+        ${escapeHtml(p.name)}
+      </td>
+      <td>${formatCurrency(p.price)}</td>
+      <td>${p.stock}</td>
+      <td>${p.active ? '✓' : '✗'}</td>
+      <td style="white-space:nowrap">
+        <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">Editar</button>
+        <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">Excluir</button>
+      </td>
+    </tr>
+    <tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
+      <td colspan="5">
+        <form class="admin-edit-panel admin-form-grid" data-product-edit="${p.id}">
+          <div class="form-group">
+            <label class="form-label">Nome</label>
+            <input class="form-input" name="name" value="${escapeHtml(p.name)}" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Preço (R$)</label>
+            <input class="form-input" name="price" type="number" step="0.01" min="0" value="${p.price}" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Estoque</label>
+            <input class="form-input" name="stock" type="number" min="0" value="${p.stock}" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoria</label>
+            <select class="form-input" name="category_id">
+              <option value="">Sem categoria</option>
+              ${categories.map((c) => `<option value="${c.id}" ${p.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ativo</label>
+            <select class="form-input" name="active">
+              <option value="true" ${p.active ? 'selected' : ''}>Sim</option>
+              <option value="false" ${!p.active ? 'selected' : ''}>Não</option>
+            </select>
+          </div>
+          <div class="form-group admin-form-grid__full">
+            <label class="form-label">Descrição</label>
+            <textarea class="form-input" name="description" rows="2">${escapeHtml(p.description ?? '')}</textarea>
+          </div>
+          <div class="form-group admin-form-grid__full">
+            <label class="form-label">Imagem</label>
+            <div class="admin-image-field">
+              <div data-preview-product="${p.id}">${imagePreviewBlock(p.image, p.name, 'square')}</div>
+              <input class="form-input" type="file" name="image" accept="image/*" />
+              <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+            </div>
+          </div>
+          <div class="admin-form-grid__full admin-edit-panel__actions">
+            <button type="submit" class="btn btn-primary btn-sm">Salvar produto</button>
+            <button type="button" class="btn btn-outline btn-sm" data-cancel-product="${p.id}">Cancelar</button>
+          </div>
+        </form>
+      </td>
+    </tr>
+  `).join('')
+}
+
+function renderStoreProductsSidebar(stores, counts, selectedStoreId) {
+  const sorted = [...stores].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+
+  return `
+    <aside class="admin-store-products-nav">
+      <div class="admin-store-products-nav__head">
+        <h2>Lojas</h2>
+        <span class="admin-store-products-nav__count">${sorted.length}</span>
+      </div>
+      <input
+        type="search"
+        class="form-input admin-store-products-nav__search"
+        id="admin-store-products-search"
+        placeholder="Buscar loja..."
+        autocomplete="off"
+      />
+      <div class="admin-store-products-nav__list" id="admin-store-products-list">
+        ${sorted.length === 0
+          ? '<p class="admin-store-products-nav__empty">Nenhuma loja cadastrada</p>'
+          : sorted.map((s) => `
+            <a
+              href="#${adminProductsPath(s.id)}"
+              class="admin-store-products-nav__item ${s.id === selectedStoreId ? 'active' : ''}"
+              data-store-nav="${s.id}"
+              data-store-name="${escapeHtml(s.name.toLowerCase())}"
+            >
+              <span class="admin-store-products-nav__item-name">${escapeHtml(s.name)}</span>
+              <span class="admin-store-products-nav__item-meta">
+                ${counts[s.id] ?? 0} produto${(counts[s.id] ?? 0) === 1 ? '' : 's'}
+              </span>
+            </a>
+          `).join('')}
+      </div>
+    </aside>`
+}
+
+function renderStoreProductsPanel({ store, products, categories, canCreate }) {
+  if (!store) {
+    return `
+      <div class="admin-store-products-main admin-store-products-main--empty">
+        <div class="empty-state">
+          <h2>Selecione uma loja</h2>
+          <p>Escolha uma loja na lista ao lado para ver e editar os produtos.</p>
+        </div>
+      </div>`
+  }
+
+  return `
+    <div class="admin-store-products-main">
+      <div class="admin-store-products-main__head">
+        <div>
+          <h2>${escapeHtml(store.name)}</h2>
+          <p class="admin-store-products-main__meta">
+            ${escapeHtml(store.city)}, ${escapeHtml(store.state)}
+            · ${statusBadge(store.status)}
+            · ${products.length} produto${products.length === 1 ? '' : 's'}
+          </p>
+        </div>
+        <div class="admin-store-products-main__actions">
+          ${store.status === 'approved' ? `<a href="#/loja/${escapeHtml(store.slug)}" class="btn btn-outline btn-sm">Ver loja</a>` : ''}
+        </div>
+      </div>
+
+      ${canCreate ? `
+        <details class="admin-form-panel">
+          <summary>+ Novo produto em ${escapeHtml(store.name)}</summary>
+          <form id="admin-product-form" class="admin-form-grid">
+            <input type="hidden" name="store_id" value="${escapeHtml(store.id)}" />
+            <div class="form-group">
+              <label class="form-label">Nome</label>
+              <input class="form-input" name="name" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Preço (R$)</label>
+              <input class="form-input" name="price" type="number" step="0.01" min="0" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Estoque</label>
+              <input class="form-input" name="stock" type="number" min="0" value="10" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Categoria</label>
+              <select class="form-input" name="category_id">
+                <option value="">Sem categoria</option>
+                ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group admin-form-grid__full">
+              <label class="form-label">Descrição</label>
+              <textarea class="form-input" name="description" rows="2"></textarea>
+            </div>
+            <div class="form-group admin-form-grid__full">
+              <label class="form-label">Imagem do produto</label>
+              <div class="admin-image-field">
+                <div data-preview-product-create>${imagePreviewBlock(null, 'Novo produto', 'square')}</div>
+                <input class="form-input" type="file" name="image" accept="image/*" />
+                <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+              </div>
+            </div>
+            <div class="admin-form-grid__full">
+              <button type="submit" class="btn btn-primary">Criar produto</button>
+            </div>
+          </form>
+        </details>` : `
+        <div class="alert" style="margin-bottom:1rem">
+          Esta loja ainda não está aprovada. Aprove-a em Aprovações para cadastrar novos produtos.
+        </div>`}
+
+      <div class="table-wrap admin-store-products-table">
+        <table>
+          <thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th><th>Ativo</th><th></th></tr></thead>
+          <tbody>
+            ${renderProductTableRows(products, categories)}
+          </tbody>
+        </table>
+      </div>
+    </div>`
+}
+
 function bindPlanBrandingToggle(scope) {
   scope.querySelectorAll('[data-plan-branding-form]').forEach((form) => {
     const planSelect = form.querySelector('[name="plan_id"]')
@@ -184,7 +387,7 @@ function metricCards(metrics, pendingCount) {
   `
 }
 
-export async function renderAdminDashboard(main, tab = 'overview') {
+export async function renderAdminDashboard(main, tab = 'overview', selectedStoreId = null) {
   const user = guardAdmin(main)
   if (!user) return
 
@@ -369,6 +572,7 @@ export async function renderAdminDashboard(main, tab = 'overview') {
                   <td>${statusBadge(s.status)}</td>
                   <td>${escapeHtml(s.plan_id)}</td>
                   <td style="white-space:nowrap">
+                    <a href="#${adminProductsPath(s.id)}" class="btn btn-outline btn-sm">Produtos</a>
                     <button type="button" class="btn btn-outline btn-sm" data-edit-store="${s.id}">Editar</button>
                     ${s.status === 'approved' ? `<a href="#/loja/${escapeHtml(s.slug)}" class="btn btn-outline btn-sm">Ver</a>` : ''}
                   </td>
@@ -454,142 +658,39 @@ export async function renderAdminDashboard(main, tab = 'overview') {
   }
 
   if (tab === 'products') {
-    const [products, stores, categories] = await Promise.all([
+    const [allProducts, stores, categories] = await Promise.all([
       fetchAdminProducts(),
       fetchAllStoresAdmin(),
       fetchCategories(),
     ])
 
-    const approvedStores = stores.filter((s) => s.status === 'approved')
+    const counts = productCountMap(allProducts)
+    const selectedStore = selectedStoreId ? stores.find((s) => s.id === selectedStoreId) : null
+    const storeProducts = selectedStoreId
+      ? allProducts.filter((p) => p.store_id === selectedStoreId)
+      : []
 
     main.innerHTML = adminPage(
       menuItem.label,
-      `${products.length} produto(s) no marketplace`,
+      selectedStore
+        ? `Gerenciando produtos de ${selectedStore.name}`
+        : `${allProducts.length} produto(s) em ${stores.length} loja(s)`,
       `
         <div id="admin-product-msg"></div>
-        <details class="admin-form-panel" open>
-          <summary>+ Novo produto</summary>
-          <form id="admin-product-form" class="admin-form-grid">
-            <div class="form-group admin-form-grid__full">
-              <label class="form-label">Loja</label>
-              <select class="form-input" name="store_id" required>
-                <option value="">Selecione a loja...</option>
-                ${approvedStores.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Nome</label>
-              <input class="form-input" name="name" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Preço (R$)</label>
-              <input class="form-input" name="price" type="number" step="0.01" min="0" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Estoque</label>
-              <input class="form-input" name="stock" type="number" min="0" value="10" required />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Categoria</label>
-              <select class="form-input" name="category_id">
-                <option value="">Sem categoria</option>
-                ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group admin-form-grid__full">
-              <label class="form-label">Descrição</label>
-              <textarea class="form-input" name="description" rows="2"></textarea>
-            </div>
-            <div class="form-group admin-form-grid__full">
-              <label class="form-label">Imagem do produto</label>
-              <div class="admin-image-field">
-                <div data-preview-product-create>${imagePreviewBlock(null, 'Novo produto', 'square')}</div>
-                <input class="form-input" type="file" name="image" accept="image/*" />
-                <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
-              </div>
-            </div>
-            <div class="admin-form-grid__full">
-              <button type="submit" class="btn btn-primary">Criar produto</button>
-            </div>
-          </form>
-        </details>
-        <div class="table-wrap" style="margin-top:1.5rem">
-          <table>
-            <thead><tr><th>Produto</th><th>Loja</th><th>Preço</th><th>Estoque</th><th>Ativo</th><th></th></tr></thead>
-            <tbody>
-              ${products.length === 0 ? '<tr><td colspan="6">Nenhum produto</td></tr>' : products.map((p) => `
-                <tr>
-                  <td>
-                    <div class="admin-table-thumb">
-                      ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<span>📦</span>'}
-                    </div>
-                    ${escapeHtml(p.name)}
-                  </td>
-                  <td>${escapeHtml(p.store?.name ?? '—')}</td>
-                  <td>${formatCurrency(p.price)}</td>
-                  <td>${p.stock}</td>
-                  <td>${p.active ? '✓' : '✗'}</td>
-                  <td style="white-space:nowrap">
-                    <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">Editar</button>
-                    <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">Excluir</button>
-                  </td>
-                </tr>
-                <tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
-                  <td colspan="6">
-                    <form class="admin-edit-panel admin-form-grid" data-product-edit="${p.id}">
-                      <div class="form-group">
-                        <label class="form-label">Nome</label>
-                        <input class="form-input" name="name" value="${escapeHtml(p.name)}" required />
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">Preço (R$)</label>
-                        <input class="form-input" name="price" type="number" step="0.01" min="0" value="${p.price}" required />
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">Estoque</label>
-                        <input class="form-input" name="stock" type="number" min="0" value="${p.stock}" required />
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">Categoria</label>
-                        <select class="form-input" name="category_id">
-                          <option value="">Sem categoria</option>
-                          ${categories.map((c) => `<option value="${c.id}" ${p.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
-                        </select>
-                      </div>
-                      <div class="form-group">
-                        <label class="form-label">Ativo</label>
-                        <select class="form-input" name="active">
-                          <option value="true" ${p.active ? 'selected' : ''}>Sim</option>
-                          <option value="false" ${!p.active ? 'selected' : ''}>Não</option>
-                        </select>
-                      </div>
-                      <div class="form-group admin-form-grid__full">
-                        <label class="form-label">Descrição</label>
-                        <textarea class="form-input" name="description" rows="2">${escapeHtml(p.description ?? '')}</textarea>
-                      </div>
-                      <div class="form-group admin-form-grid__full">
-                        <label class="form-label">Imagem</label>
-                        <div class="admin-image-field">
-                          <div data-preview-product="${p.id}">${imagePreviewBlock(p.image, p.name, 'square')}</div>
-                          <input class="form-input" type="file" name="image" accept="image/*" />
-                          <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
-                        </div>
-                      </div>
-                      <div class="admin-form-grid__full admin-edit-panel__actions">
-                        <button type="submit" class="btn btn-primary btn-sm">Salvar produto</button>
-                        <button type="button" class="btn btn-outline btn-sm" data-cancel-product="${p.id}">Cancelar</button>
-                      </div>
-                    </form>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+        <div class="admin-store-products-layout">
+          ${renderStoreProductsSidebar(stores, counts, selectedStoreId)}
+          ${renderStoreProductsPanel({
+            store: selectedStore,
+            products: storeProducts,
+            categories,
+            canCreate: selectedStore?.status === 'approved',
+          })}
         </div>
       `
     )
 
-    bindProductForm(main)
+    bindStoreProductsNav(main)
+    bindProductForm(main, selectedStoreId)
     return
   }
 
@@ -721,7 +822,20 @@ function bindStoreEdits(main) {
   })
 }
 
-function bindProductForm(main) {
+function bindStoreProductsNav(main) {
+  const search = main.querySelector('#admin-store-products-search')
+  const items = main.querySelectorAll('[data-store-nav]')
+
+  search?.addEventListener('input', () => {
+    const term = search.value.trim().toLowerCase()
+    items.forEach((item) => {
+      const name = item.dataset.storeName ?? ''
+      item.hidden = term.length > 0 && !name.includes(term)
+    })
+  })
+}
+
+function bindProductForm(main, selectedStoreId = null) {
   const createForm = main.querySelector('#admin-product-form')
   const createImageInput = createForm?.querySelector('input[name="image"]')
   bindImagePreview(createImageInput, main.querySelector('[data-preview-product-create]'))
@@ -738,7 +852,8 @@ function bindProductForm(main) {
         const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
         if (err) throw new Error(err)
       }
-      await createProduct(f.store_id.value, {
+      const storeId = f.store_id.value
+      await createProduct(storeId, {
         name: f.name.value.trim(),
         description: f.description.value.trim(),
         price: parseFloat(f.price.value),
@@ -748,7 +863,7 @@ function bindProductForm(main) {
         image: imageFile,
       })
       showToast('Produto criado!')
-      navigate('/admin/produtos')
+      navigate(adminProductsPath(storeId || selectedStoreId))
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
     } finally {
@@ -756,10 +871,10 @@ function bindProductForm(main) {
     }
   })
 
-  bindProductEdits(main)
+  bindProductEdits(main, selectedStoreId)
 }
 
-function bindProductEdits(main) {
+function bindProductEdits(main, selectedStoreId = null) {
   main.querySelectorAll('[data-edit-product]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.editProduct
@@ -802,7 +917,7 @@ function bindProductEdits(main) {
           image: imageFile,
         })
         showToast('Produto atualizado!')
-        renderAdminDashboard(main, 'products')
+        renderAdminDashboard(main, 'products', selectedStoreId)
       } catch (err) {
         showToast(err.message)
       } finally {
@@ -816,7 +931,7 @@ function bindProductEdits(main) {
       if (!confirm('Excluir este produto?')) return
       await deleteProduct(btn.dataset.delProduct)
       showToast('Produto excluído')
-      renderAdminDashboard(main, 'products')
+      renderAdminDashboard(main, 'products', selectedStoreId)
     })
   })
 }
