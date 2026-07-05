@@ -1,7 +1,6 @@
 -- MaredeVendas Marketplace - Schema Inicial
 
--- Extensões
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- gen_random_uuid() é nativo no Postgres 13+ (Supabase)
 
 -- Enum types
 CREATE TYPE user_role AS ENUM ('customer', 'merchant', 'admin');
@@ -19,7 +18,7 @@ CREATE TABLE public.users (
 
 -- Categories
 CREATE TABLE public.categories (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   slug TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -27,7 +26,7 @@ CREATE TABLE public.categories (
 
 -- Stores
 CREATE TABLE public.stores (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -51,7 +50,7 @@ CREATE INDEX idx_stores_category ON public.stores(category_id);
 
 -- Products
 CREATE TABLE public.products (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
   category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
@@ -68,7 +67,7 @@ CREATE INDEX idx_products_active ON public.products(active);
 
 -- Orders
 CREATE TABLE public.orders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
   customer_name TEXT NOT NULL,
   customer_phone TEXT NOT NULL,
@@ -83,7 +82,7 @@ CREATE INDEX idx_orders_created ON public.orders(created_at DESC);
 
 -- Order Items
 CREATE TABLE public.order_items (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
   product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE RESTRICT,
   quantity INTEGER NOT NULL CHECK (quantity > 0),
@@ -94,7 +93,7 @@ CREATE INDEX idx_order_items_order ON public.order_items(order_id);
 
 -- Store Views (Analytics)
 CREATE TABLE public.store_views (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
   visitor_ip TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -104,7 +103,7 @@ CREATE INDEX idx_store_views_store ON public.store_views(store_id);
 
 -- Reviews
 CREATE TABLE public.reviews (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
@@ -115,7 +114,7 @@ CREATE TABLE public.reviews (
 
 -- Favorites
 CREATE TABLE public.favorites (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   store_id UUID NOT NULL REFERENCES public.stores(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

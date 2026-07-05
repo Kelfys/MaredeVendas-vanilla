@@ -12,8 +12,8 @@
  * - Carregar credenciais de variáveis de ambiente no build (CI)
  * - Suporte a múltiplos ambientes (dev/staging/prod)
  */
-export const SUPABASE_URL = 'https://ogyrbdmlynfwkgwumicn.supabase.co'
-export const SUPABASE_ANON_KEY = 'sb_publishable_19GJapxf-RSrbq3VFzi6gQ_tv6cWh5P'
+export const SUPABASE_URL = 'https://ulpjsxmilumqedkkfuqw.supabase.co'
+export const SUPABASE_ANON_KEY = 'sb_publishable_2hCOD3j1j7FRjLMsPF3sdw_4dG7A_HW'
 
 export const APP_NAME = 'MaredeVendas'
 export const CART_STORAGE_KEY = 'maredevendas-cart'

@@ -81,12 +81,25 @@ Acesse: http://localhost:8080
 
 ### 2. Configurar Supabase
 
-1. Crie um projeto em [supabase.com](https://supabase.com)
-2. No **SQL Editor**, execute cada arquivo em `supabase/migrations/` **na ordem numérica** (001 → 011)
-3. Em **Authentication → URL Configuration**, adicione:
+**Projeto atual:** `ulpjsxmilumqedkkfuqw` — https://ulpjsxmilumqedkkfuqw.supabase.co
+
+**Via CLI (recomendado):**
+
+```bash
+npx supabase login
+npx supabase init          # já feito neste repo
+npx supabase link --project-ref ulpjsxmilumqedkkfuqw
+npx supabase db push       # aplica migrations 001–011
+```
+
+**Ou manualmente:** execute cada arquivo em `supabase/migrations/` no **SQL Editor** (ordem 001 → 011).
+
+Depois:
+
+1. Em **Authentication → URL Configuration**, adicione:
    - `http://localhost:8080`
-   - URL de produção (ex.: `https://kelfys.github.io/MaredeVendas-vanilla/`)
-4. Edite `js/config.js` com sua URL e chave anon/publishable:
+   - `https://kelfys.github.io/MaredeVendas-vanilla/`
+2. Credenciais em `js/config.js`:
 
 ```js
 export const SUPABASE_URL = 'https://seu-projeto.supabase.co'

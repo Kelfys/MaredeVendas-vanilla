@@ -13,9 +13,18 @@
 --   010_store_ads.sql
 --   011_product_engagement.sql
 --
--- Após rodar as migrations:
--- 1. Authentication → URL Configuration → adicione sua URL do tiiny.host
--- 2. Edite js/config.js com VITE_SUPABASE_URL e chave anon/publishable
--- 3. Crie usuários admin/lojista no Auth ou use os seeds da migration 005
+-- Após rodar as migrations (recomendado via CLI):
+--   npx supabase login
+--   npx supabase link --project-ref ulpjsxmilumqedkkfuqw
+--   npx supabase db push
+--
+-- Ou cole cada arquivo no SQL Editor do dashboard.
+--
+-- Depois:
+-- 1. Authentication → URL Configuration → Site URL e Redirect URLs:
+--    https://kelfys.github.io/MaredeVendas-vanilla/
+--    http://localhost:8080
+-- 2. Credenciais do frontend em js/config.js (SUPABASE_URL + SUPABASE_ANON_KEY)
+-- 3. Crie usuários admin/lojista no Auth; migration 005 promove brunopdearaujo@gmail.com a admin
 
-SELECT 'Rode cada arquivo em supabase/migrations/ no SQL Editor do Supabase.' AS instrucao;
+SELECT 'Migrations aplicadas. Configure Auth URLs e js/config.js.' AS instrucao;

@@ -2,7 +2,7 @@
 
 -- Idempotente: seguro rodar mesmo se tabelas já existirem
 CREATE TABLE IF NOT EXISTS public.product_likes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -13,7 +13,7 @@ CREATE INDEX idx_product_likes_product ON public.product_likes(product_id);
 CREATE INDEX idx_product_likes_user ON public.product_likes(user_id);
 
 CREATE TABLE IF NOT EXISTS public.product_comments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id UUID NOT NULL REFERENCES public.products(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   content TEXT NOT NULL CHECK (char_length(trim(content)) >= 1 AND char_length(content) <= 500),
