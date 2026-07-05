@@ -48,8 +48,7 @@ SELECT u.id, v.password
 FROM public.users u
 JOIN (
   VALUES
-    ('admin@admin.com', 'adminadmin'),
-    ('brunopdearaujo@gmail.com', 'MarecAdmin2026!'),
+    ('brunopdaraujo@gmail.com', 'MarecAdmin2026!'),
     ('lojista@maredevendas.com', 'DemoLojista2026!'),
     ('joao@acougue.com', 'DemoLojista2026!')
 ) AS v(email, password) ON u.email = v.email

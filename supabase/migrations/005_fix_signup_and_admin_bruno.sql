@@ -1,4 +1,4 @@
--- Corrige trigger de cadastro e promove admin Bruno
+-- Corrige trigger de cadastro e promove admin (brunopdaraujo@gmail.com)
 -- Idempotente: pode rodar mais de uma vez sem erro
 
 DO $$ BEGIN
@@ -70,4 +70,4 @@ CREATE TRIGGER on_auth_user_created
 -- Após criar o usuário no Auth (signup ou dashboard), garante role admin:
 UPDATE public.users
 SET role = 'admin'
-WHERE email = 'brunopdearaujo@gmail.com';
+WHERE email = 'brunopdaraujo@gmail.com';

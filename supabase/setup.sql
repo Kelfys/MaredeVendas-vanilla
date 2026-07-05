@@ -13,6 +13,7 @@
 --   010_store_ads.sql
 --   011_product_engagement.sql
 --   012_demo_stores.sql
+--   013_admin_only_bruno.sql
 --
 -- Após rodar as migrations (recomendado via CLI):
 --   npx supabase login
@@ -26,6 +27,6 @@
 --    https://kelfys.github.io/MaredeVendas-vanilla/
 --    http://localhost:8080
 -- 2. Credenciais do frontend em js/config.js (SUPABASE_URL + SUPABASE_ANON_KEY)
--- 3. Crie usuários admin/lojista no Auth; migration 005 promove brunopdearaujo@gmail.com a admin
+-- 3. Crie usuários no Auth; único admin: brunopdaraujo@gmail.com (migration 005/013)
 
 SELECT 'Migrations aplicadas. Configure Auth URLs e js/config.js.' AS instrucao;
