@@ -10,8 +10,17 @@
  * - Rastreamento de conversão (pedido enviado vs. confirmado)
  */
 import { formatCurrency } from './utils.js'
+import { getPaymentMethodLabel } from './payment.js'
 
-export function buildOrderMessage({ items, total, customerName, customerPhone, customerAddress, deliveryPeriod }) {
+export function buildOrderMessage({
+  items,
+  total,
+  customerName,
+  customerPhone,
+  customerAddress,
+  deliveryPeriod,
+  paymentMethod,
+}) {
   const lines = items.map(
     (item) => `${item.product.name} (${item.quantity}x) - ${formatCurrency(item.product.price * item.quantity)}`
   )
@@ -24,6 +33,7 @@ export function buildOrderMessage({ items, total, customerName, customerPhone, c
     ...lines,
     '',
     `Total: ${formatCurrency(total)}`,
+    ...(paymentMethod ? ['', `Forma de pagamento: ${getPaymentMethodLabel(paymentMethod)}`] : []),
     '',
     `Nome: ${customerName}`,
     `Telefone: ${customerPhone}`,

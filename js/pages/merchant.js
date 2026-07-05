@@ -30,6 +30,7 @@ import { MERCHANT_PANEL, getMerchantMenuItem, merchantHref } from '../merchant-n
 import { renderOrdersChart, bindOrdersChart } from '../order-charts.js'
 import { bindPaginatedSortableList } from '../list-utils.js'
 import { routeHref } from '../router.js'
+import { getPaymentMethodLabel } from '../payment.js'
 
 const ORDER_STATUS_LABELS = {
   pending: 'Pendente',
@@ -260,12 +261,13 @@ function renderRecentOrders(orders) {
   return `
     <div class="table-wrap admin-orders-table">
       <table>
-        <thead><tr><th>Data</th><th>Cliente</th><th>Total</th><th>Status</th></tr></thead>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Pagamento</th><th>Total</th><th>Status</th></tr></thead>
         <tbody>
           ${orders.slice(0, 5).map((o) => `
             <tr>
               <td>${formatDate(o.created_at)}</td>
               <td>${escapeHtml(o.customer_name)}</td>
+              <td>${escapeHtml(o.payment_method ? getPaymentMethodLabel(o.payment_method) : '—')}</td>
               <td>${formatCurrency(o.total)}</td>
               <td>${orderStatusBadge(o.status)}</td>
             </tr>
@@ -496,6 +498,7 @@ function renderOrderRows(orders) {
       <td>${formatDate(o.created_at)}</td>
       <td><strong>${escapeHtml(o.customer_name)}</strong></td>
       <td>${escapeHtml(o.customer_phone)}</td>
+      <td>${escapeHtml(o.payment_method ? getPaymentMethodLabel(o.payment_method) : '—')}</td>
       <td>${formatCurrency(o.total)}</td>
       <td>${orderStatusBadge(o.status)}</td>
       <td style="white-space:nowrap">
@@ -643,12 +646,13 @@ function updateMerchantOrdersSortButton(main, _sortField, sortDirection) {
 }
 
 function ordersToCsv(orders) {
-  const headers = ['Data', 'Cliente', 'Telefone', 'Endereço', 'Total (R$)', 'Status', 'ID']
+  const headers = ['Data', 'Cliente', 'Telefone', 'Endereço', 'Pagamento', 'Total (R$)', 'Status', 'ID']
   const rows = orders.map((o) => [
     formatDateTimeCsv(o.created_at),
     o.customer_name,
     o.customer_phone,
     o.customer_address ?? '',
+    o.payment_method ? getPaymentMethodLabel(o.payment_method) : '',
     Number(o.total).toFixed(2),
     ORDER_STATUS_LABELS[o.status] ?? o.status,
     o.id,
@@ -1198,6 +1202,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
                   </th>
                   <th>Cliente</th>
                   <th>Telefone</th>
+                  <th>Pagamento</th>
                   <th>Total</th>
                   <th>Status</th>
                   <th></th>
@@ -1205,7 +1210,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
                 <tbody id="merchant-orders-tbody">
                   ${renderOrderRows(orders)}
                   <tr data-orders-empty hidden>
-                    <td colspan="6">${merchantEmptyState('🔍', 'Nenhum resultado', 'Nenhum pedido corresponde aos filtros selecionados.')}</td>
+                    <td colspan="7">${merchantEmptyState('🔍', 'Nenhum resultado', 'Nenhum pedido corresponde aos filtros selecionados.')}</td>
                   </tr>
                 </tbody>
               </table>

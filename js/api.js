@@ -619,14 +619,21 @@ export async function createOrder(storeId, checkout, items) {
   const client = await requireClient()
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
 
-  const { data: order, error: orderError } = await client.from('orders').insert({
+  const orderPayload = {
     store_id: storeId,
     customer_name: checkout.customerName,
     customer_phone: checkout.customerPhone,
     customer_address: checkout.customerAddress,
     total,
     status: 'sent',
-  }).select().single()
+  }
+  if (checkout.paymentMethod) orderPayload.payment_method = checkout.paymentMethod
+
+  let { data: order, error: orderError } = await client.from('orders').insert(orderPayload).select().single()
+  if (orderError?.code === 'PGRST204' && orderPayload.payment_method) {
+    delete orderPayload.payment_method
+    ;({ data: order, error: orderError } = await client.from('orders').insert(orderPayload).select().single())
+  }
   if (orderError) throw orderError
 
   const orderItems = items.map((item) => ({

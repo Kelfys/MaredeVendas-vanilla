@@ -23,6 +23,7 @@ import {
   getCartTotal, getCartItemCount, clearCart,
 } from './state.js'
 import { buildOrderMessage, buildWhatsAppUrl } from './whatsapp.js'
+import { PAYMENT_METHODS, DEFAULT_PAYMENT_METHOD, isValidPaymentMethod } from './payment.js'
 import { createOrder } from './api.js'
 import { navigate, render as rerenderRoute, getCurrentPath, routeHref } from './router.js'
 import { showToast } from './utils.js'
@@ -510,6 +511,29 @@ export function renderCartDrawer() {
   document.getElementById('checkout-start')?.addEventListener('click', showCheckoutForm)
 }
 
+function renderPaymentOptions(selected = DEFAULT_PAYMENT_METHOD) {
+  return `
+    <fieldset class="checkout-payment">
+      <legend class="checkout-payment__label">Forma de pagamento</legend>
+      <div class="checkout-payment__options">
+        ${PAYMENT_METHODS.map((method) => `
+          <label class="checkout-payment__option ${selected === method.id ? 'active' : ''}">
+            <input
+              type="radio"
+              name="payment"
+              value="${escapeHtml(method.id)}"
+              ${selected === method.id ? 'checked' : ''}
+              required
+            />
+            <span class="checkout-payment__title">${escapeHtml(method.label)}</span>
+            <span class="checkout-payment__hint">${escapeHtml(method.hint)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </fieldset>
+  `
+}
+
 function showCheckoutForm() {
   const area = document.getElementById('checkout-area')
   const user = getUser()
@@ -519,6 +543,7 @@ function showCheckoutForm() {
 
   area.innerHTML = `
     <form id="checkout-form">
+      ${renderPaymentOptions()}
       <div class="form-group">
         <input class="form-input" name="name" placeholder="Seu nome" required value="${escapeHtml(defaults.name)}" />
       </div>
@@ -534,6 +559,14 @@ function showCheckoutForm() {
       </div>
     </form>
   `
+
+  area.querySelectorAll('.checkout-payment__option input').forEach((input) => {
+    input.addEventListener('change', () => {
+      area.querySelectorAll('.checkout-payment__option').forEach((label) => {
+        label.classList.toggle('active', label.querySelector('input')?.checked)
+      })
+    })
+  })
 
   document.getElementById('checkout-back')?.addEventListener('click', () => {
     area.innerHTML = '<button type="button" class="btn btn-green btn-block" id="checkout-start">Finalizar Pedido</button>'
@@ -552,6 +585,8 @@ async function handleCheckout(e) {
   const name = form.name.value.trim()
   const phone = form.phone.value.trim()
   const address = form.address.value.trim()
+  const paymentMethod = form.payment?.value
+  if (!isValidPaymentMethod(paymentMethod)) return
   const total = getCartTotal()
   const user = getUser()
 
@@ -565,6 +600,7 @@ async function handleCheckout(e) {
     customerPhone: phone,
     customerAddress: address,
     deliveryPeriod,
+    paymentMethod,
   })
 
   const submitBtn = document.getElementById('checkout-submit')
@@ -575,6 +611,7 @@ async function handleCheckout(e) {
       customerName: name,
       customerPhone: phone,
       customerAddress: address,
+      paymentMethod,
     }, cart.items)
   } catch (err) {
     console.error('Erro ao salvar pedido:', err)
