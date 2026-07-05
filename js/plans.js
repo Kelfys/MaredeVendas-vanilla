@@ -16,6 +16,13 @@ function priceCooldownLabel(hours) {
   return `Alteração de preços a cada ${days} dia${days > 1 ? 's' : ''}`
 }
 
+export const FREE_PLAN_BRANDING_MESSAGE =
+  'O plano Gratuito não inclui logo nem banner. Assine um plano pago para personalizar a vitrine.'
+
+export function planAllowsStoreBranding(planId) {
+  return Boolean(planId && planId !== 'free')
+}
+
 export const SUBSCRIPTION_PLANS = [
   {
     id: 'free',
@@ -24,6 +31,8 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 0,
     features: [
       'Até 10 produtos',
+      'Imagens de produtos (até 500 KB cada)',
+      'Vitrine com tema padrão (sem logo nem banner)',
       priceCooldownLabel(24),
       'Ativar ou ocultar produtos à venda',
       'Pedidos via WhatsApp',
@@ -36,6 +45,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 5,
     features: [
       'Até 30 produtos',
+      'Logo e banner personalizados',
       priceCooldownLabel(12),
       'Destaque visual na página inicial',
       'Ativar ou ocultar produtos à venda',
@@ -48,6 +58,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 15,
     features: [
       'Até 80 produtos',
+      'Logo e banner personalizados',
       priceCooldownLabel(4),
       'Anúncio ampliado na vitrine principal',
       'Prioridade nas buscas',
@@ -60,6 +71,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 35,
     features: [
       'Produtos ilimitados',
+      'Logo e banner personalizados',
       priceCooldownLabel(null),
       'Máximo destaque na página inicial',
       'Rotação de prioridade a cada 15 min',

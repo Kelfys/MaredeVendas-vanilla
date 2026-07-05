@@ -11,12 +11,25 @@
  * Melhorias futuras:
  * - Paginação em fetchStores / fetchOrdersByStore
  * - Cache em memória para categorias (mudam pouco)
- * - Upload de imagens (banner/logo/produto) via Storage API
+ * - Upload de imagens: js/uploads.js (banner/logo/produto)
  * - Webhook de assinatura real (Stripe) em vez de status manual
  */
 import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
 import { generateSlug, sanitizeSearch } from './utils.js'
 import { DEFAULT_THEME_COLOR } from './config.js'
+import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
+import { planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE } from './plans.js'
+
+async function assertStoreBrandingAllowed(client, storeId, planIdOverride) {
+  let planId = planIdOverride
+  if (!planId) {
+    const { data } = await client.from('stores').select('plan_id').eq('id', storeId).single()
+    planId = data?.plan_id
+  }
+  if (!planAllowsStoreBranding(planId)) {
+    throw new Error(FREE_PLAN_BRANDING_MESSAGE)
+  }
+}
 
 // --- Auth ---
 export async function signUp(email, password, name, role = 'customer') {
@@ -174,7 +187,57 @@ export async function updateStore(storeId, form) {
   for (const key of ['name', 'description', 'whatsapp', 'address', 'city', 'state', 'opening_hours', 'category_id', 'theme_color']) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
+
+  if (form.remove_logo) updates.logo = null
+  else if (form.logo instanceof File) {
+    await assertStoreBrandingAllowed(client, storeId)
+    updates.logo = await uploadImage(STORAGE_BUCKETS.logos, `${storeId}/logo`, form.logo)
+  }
+
+  if (form.remove_banner) updates.banner = null
+  else if (form.banner instanceof File) {
+    await assertStoreBrandingAllowed(client, storeId)
+    updates.banner = await uploadImage(STORAGE_BUCKETS.banners, `${storeId}/banner`, form.banner)
+  }
+
   const { data, error } = await client.from('stores').update(updates).eq('id', storeId).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateStoreAsAdmin(storeId, form) {
+  const client = await requireClient()
+  const updates = {}
+  for (const key of ['name', 'description', 'whatsapp', 'address', 'city', 'state', 'opening_hours', 'category_id', 'theme_color', 'plan_id', 'status']) {
+    if (form[key] !== undefined) updates[key] = form[key]
+  }
+
+  const brandingUpload = form.logo instanceof File || form.banner instanceof File
+  if (brandingUpload) {
+    await assertStoreBrandingAllowed(client, storeId, form.plan_id)
+  }
+
+  if (form.remove_logo) updates.logo = null
+  else if (form.logo instanceof File) {
+    updates.logo = await uploadImage(STORAGE_BUCKETS.logos, `${storeId}/logo`, form.logo)
+  }
+
+  if (form.remove_banner) updates.banner = null
+  else if (form.banner instanceof File) {
+    updates.banner = await uploadImage(STORAGE_BUCKETS.banners, `${storeId}/banner`, form.banner)
+  }
+
+  if (form.status !== undefined) {
+    if (form.status === 'approved') {
+      updates.subscription_status = 'active'
+      const { data: current } = await client.from('stores').select('status').eq('id', storeId).single()
+      if (current?.status !== 'approved') updates.approved_at = new Date().toISOString()
+    } else if (form.status === 'blocked' || form.status === 'pending') {
+      updates.subscription_status = 'inactive'
+    }
+  }
+
+  const { data, error } = await client.from('stores').update(updates).eq('id', storeId).select('*, category:categories(*), owner:users(id, name, email)').single()
   if (error) throw error
   return data
 }
@@ -390,6 +453,11 @@ export async function fetchMerchantProducts(storeId) {
 
 export async function createProduct(storeId, form) {
   const client = await requireClient()
+  let imageUrl = null
+  if (form.image instanceof File) {
+    imageUrl = await uploadImage(STORAGE_BUCKETS.products, `${storeId}/${Date.now()}`, form.image)
+  }
+
   const { data, error } = await client.from('products').insert({
     store_id: storeId,
     name: form.name,
@@ -398,6 +466,7 @@ export async function createProduct(storeId, form) {
     category_id: form.category_id || null,
     stock: form.stock,
     active: form.active ?? true,
+    image: imageUrl,
   }).select().single()
   if (error) throw error
   return data
@@ -405,7 +474,17 @@ export async function createProduct(storeId, form) {
 
 export async function updateProduct(productId, form) {
   const client = await requireClient()
-  const { data, error } = await client.from('products').update(form).eq('id', productId).select().single()
+  const updates = {}
+  for (const key of ['name', 'description', 'price', 'category_id', 'stock', 'active']) {
+    if (form[key] !== undefined) updates[key] = form[key]
+  }
+  if (form.category_id === '') updates.category_id = null
+
+  if (form.image instanceof File) {
+    updates.image = await uploadImage(STORAGE_BUCKETS.products, `${productId}/${Date.now()}`, form.image)
+  }
+
+  const { data, error } = await client.from('products').update(updates).eq('id', productId).select().single()
   if (error) throw error
   return data
 }

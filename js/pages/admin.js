@@ -5,14 +5,19 @@ import {
   fetchAdminMetrics, fetchPendingStoreApprovals,
   approveStoreRegistration, rejectStoreRegistration,
   updatePassword, fetchMerchants, fetchAllStoresAdmin,
-  fetchAdminProducts, createStoreAsAdmin, createProduct, deleteProduct,
-  fetchCategories,
+  fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
+  updateStoreAsAdmin, deleteProduct, fetchCategories,
 } from '../api.js'
 import { getUser } from '../state.js'
 import { navigate } from '../router.js'
 import { escapeHtml, formatDate, formatCurrency, showToast } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
 import { getAdminMenuItem } from '../admin-nav.js'
+import { planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE } from '../plans.js'
+import {
+  PRODUCT_IMAGE_UPLOAD_HINT, STORE_BRANDING_UPLOAD_HINT,
+  validateImageFile, STORAGE_BUCKETS,
+} from '../uploads.js'
 
 function guardAdmin(main) {
   const user = getUser()
@@ -44,6 +49,86 @@ function statusBadge(status) {
     blocked: '<span class="badge badge-blocked">Bloqueada</span>',
   }
   return map[status] ?? escapeHtml(status)
+}
+
+function imagePreviewBlock(url, alt, variant = 'square') {
+  if (!url) {
+    return `<div class="admin-image-preview admin-image-preview--empty admin-image-preview--${variant}">Sem imagem</div>`
+  }
+  return `<img class="admin-image-preview admin-image-preview--${variant}" src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" />`
+}
+
+function bindImagePreview(input, previewEl) {
+  if (!input || !previewEl) return
+  input.addEventListener('change', () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      previewEl.innerHTML = `<img class="admin-image-preview" src="${reader.result}" alt="Prévia" />`
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+function storeBrandingFieldsHtml(planId, store = null) {
+  const id = store?.id ?? ''
+  const allowed = planAllowsStoreBranding(planId)
+
+  if (!allowed) {
+    return `
+      <div class="form-group admin-form-grid__full" data-branding-locked>
+        <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_BRANDING_MESSAGE)}</p>
+      </div>`
+  }
+
+  return `
+    <div class="form-group" data-branding-field>
+      <label class="form-label">Logo</label>
+      ${store
+        ? `<div class="admin-image-field">
+            <div data-preview-logo="${id}">${imagePreviewBlock(store.logo, store.name, 'square')}</div>
+            <input class="form-input" type="file" name="logo" accept="image/*" />
+          </div>
+          ${store.logo ? `<label class="admin-check"><input type="checkbox" name="remove_logo" /> Remover logo atual</label>` : ''}`
+        : `<input class="form-input" type="file" name="logo" accept="image/*" />
+           <small class="form-hint">${STORE_BRANDING_UPLOAD_HINT}</small>`}
+    </div>
+    <div class="form-group admin-form-grid__full" data-branding-field>
+      <label class="form-label">Banner</label>
+      ${store
+        ? `<div class="admin-image-field">
+            <div data-preview-banner="${id}">${imagePreviewBlock(store.banner, store.name, 'banner')}</div>
+            <input class="form-input" type="file" name="banner" accept="image/*" />
+          </div>
+          ${store.banner ? `<label class="admin-check"><input type="checkbox" name="remove_banner" /> Remover banner atual</label>` : ''}`
+        : `<input class="form-input" type="file" name="banner" accept="image/*" />
+           <small class="form-hint">${STORE_BRANDING_UPLOAD_HINT}</small>`}
+    </div>`
+}
+
+function bindPlanBrandingToggle(scope) {
+  scope.querySelectorAll('[data-plan-branding-form]').forEach((form) => {
+    const planSelect = form.querySelector('[name="plan_id"]')
+    const brandingWrap = form.querySelector('[data-branding-wrap]')
+    if (!planSelect || !brandingWrap) return
+
+    const sync = () => {
+      const allowed = planAllowsStoreBranding(planSelect.value)
+      brandingWrap.querySelectorAll('[data-branding-field]').forEach((el) => {
+        el.hidden = !allowed
+        el.querySelectorAll('input[type="file"]').forEach((inp) => {
+          inp.disabled = !allowed
+          if (!allowed) inp.value = ''
+        })
+      })
+      const locked = brandingWrap.querySelector('[data-branding-locked]')
+      if (locked) locked.hidden = allowed
+    }
+
+    planSelect.addEventListener('change', sync)
+    sync()
+  })
 }
 
 function quickActions() {
@@ -196,7 +281,7 @@ export async function renderAdminDashboard(main, tab = 'overview') {
           : ''}
         <details class="admin-form-panel" open ${merchants.length === 0 ? 'style="opacity:0.6;pointer-events:none"' : ''}>
           <summary>+ Nova loja</summary>
-          <form id="admin-store-form" class="admin-form-grid">
+          <form id="admin-store-form" class="admin-form-grid" data-plan-branding-form>
             <div class="form-group">
               <label class="form-label">Lojista responsável</label>
               <select class="form-input" name="owner_id" required>
@@ -253,6 +338,9 @@ export async function renderAdminDashboard(main, tab = 'overview') {
                 <option value="premium">Premium</option>
               </select>
             </div>
+            <div data-branding-wrap class="admin-form-grid__full admin-form-grid">
+              ${storeBrandingFieldsHtml('free')}
+            </div>
             <div class="form-group admin-form-grid__full">
               <label class="admin-check">
                 <input type="checkbox" name="approved" checked />
@@ -270,12 +358,87 @@ export async function renderAdminDashboard(main, tab = 'overview') {
             <tbody>
               ${stores.length === 0 ? '<tr><td colspan="6">Nenhuma loja</td></tr>' : stores.map((s) => `
                 <tr>
-                  <td><strong>${escapeHtml(s.name)}</strong><br><small>/${escapeHtml(s.slug)}</small></td>
+                  <td>
+                    <div class="admin-table-thumb">
+                      ${s.logo ? `<img src="${escapeHtml(s.logo)}" alt="" />` : '<span>🏪</span>'}
+                    </div>
+                    <strong>${escapeHtml(s.name)}</strong><br><small>/${escapeHtml(s.slug)}</small>
+                  </td>
                   <td>${escapeHtml(s.owner?.name ?? '—')}<br><small>${escapeHtml(s.owner?.email ?? '')}</small></td>
                   <td>${escapeHtml(s.city)}, ${escapeHtml(s.state)}</td>
                   <td>${statusBadge(s.status)}</td>
                   <td>${escapeHtml(s.plan_id)}</td>
-                  <td>${s.status === 'approved' ? `<a href="#/loja/${escapeHtml(s.slug)}" class="btn btn-outline btn-sm">Ver</a>` : ''}</td>
+                  <td style="white-space:nowrap">
+                    <button type="button" class="btn btn-outline btn-sm" data-edit-store="${s.id}">Editar</button>
+                    ${s.status === 'approved' ? `<a href="#/loja/${escapeHtml(s.slug)}" class="btn btn-outline btn-sm">Ver</a>` : ''}
+                  </td>
+                </tr>
+                <tr class="admin-edit-row" id="edit-store-row-${s.id}" hidden>
+                  <td colspan="6">
+                    <form class="admin-edit-panel admin-form-grid" data-store-edit="${s.id}" data-plan-branding-form>
+                      <div class="form-group">
+                        <label class="form-label">Nome</label>
+                        <input class="form-input" name="name" value="${escapeHtml(s.name)}" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">WhatsApp</label>
+                        <input class="form-input" name="whatsapp" value="${escapeHtml(s.whatsapp)}" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Cidade</label>
+                        <input class="form-input" name="city" value="${escapeHtml(s.city)}" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">UF</label>
+                        <input class="form-input" name="state" value="${escapeHtml(s.state)}" maxlength="2" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Categoria</label>
+                        <select class="form-input" name="category_id">
+                          ${categories.map((c) => `<option value="${c.id}" ${s.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Cor do tema</label>
+                        <select class="form-input" name="theme_color">
+                          ${STORE_THEME_COLORS.map((c) => `<option value="${c.id}" ${s.theme_color === c.id ? 'selected' : ''}>${c.id}</option>`).join('')}
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select class="form-input" name="status">
+                          <option value="pending" ${s.status === 'pending' ? 'selected' : ''}>Pendente</option>
+                          <option value="approved" ${s.status === 'approved' ? 'selected' : ''}>Aprovada</option>
+                          <option value="blocked" ${s.status === 'blocked' ? 'selected' : ''}>Bloqueada</option>
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Plano</label>
+                        <select class="form-input" name="plan_id">
+                          ${['free', 'starter', 'growth', 'premium'].map((p) => `<option value="${p}" ${s.plan_id === p ? 'selected' : ''}>${p}</option>`).join('')}
+                        </select>
+                      </div>
+                      <div class="form-group admin-form-grid__full">
+                        <label class="form-label">Descrição</label>
+                        <textarea class="form-input" name="description" rows="2">${escapeHtml(s.description ?? '')}</textarea>
+                      </div>
+                      <div class="form-group admin-form-grid__full">
+                        <label class="form-label">Endereço</label>
+                        <input class="form-input" name="address" value="${escapeHtml(s.address ?? '')}" />
+                      </div>
+                      <div class="form-group admin-form-grid__full">
+                        <label class="form-label">Horário</label>
+                        <input class="form-input" name="opening_hours" value="${escapeHtml(s.opening_hours ?? '')}" />
+                      </div>
+                      <div data-branding-wrap class="admin-form-grid__full admin-form-grid">
+                        ${storeBrandingFieldsHtml(s.plan_id, s)}
+                      </div>
+                      <div class="admin-form-grid__full admin-edit-panel__actions">
+                        <button type="submit" class="btn btn-primary btn-sm">Salvar loja</button>
+                        <button type="button" class="btn btn-outline btn-sm" data-cancel-store="${s.id}">Cancelar</button>
+                      </div>
+                    </form>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -285,6 +448,8 @@ export async function renderAdminDashboard(main, tab = 'overview') {
     )
 
     bindStoreForm(main)
+    bindStoreEdits(main)
+    bindPlanBrandingToggle(main)
     return
   }
 
@@ -335,6 +500,14 @@ export async function renderAdminDashboard(main, tab = 'overview') {
               <label class="form-label">Descrição</label>
               <textarea class="form-input" name="description" rows="2"></textarea>
             </div>
+            <div class="form-group admin-form-grid__full">
+              <label class="form-label">Imagem do produto</label>
+              <div class="admin-image-field">
+                <div data-preview-product-create>${imagePreviewBlock(null, 'Novo produto', 'square')}</div>
+                <input class="form-input" type="file" name="image" accept="image/*" />
+                <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+              </div>
+            </div>
             <div class="admin-form-grid__full">
               <button type="submit" class="btn btn-primary">Criar produto</button>
             </div>
@@ -346,12 +519,68 @@ export async function renderAdminDashboard(main, tab = 'overview') {
             <tbody>
               ${products.length === 0 ? '<tr><td colspan="6">Nenhum produto</td></tr>' : products.map((p) => `
                 <tr>
-                  <td>${escapeHtml(p.name)}</td>
+                  <td>
+                    <div class="admin-table-thumb">
+                      ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<span>📦</span>'}
+                    </div>
+                    ${escapeHtml(p.name)}
+                  </td>
                   <td>${escapeHtml(p.store?.name ?? '—')}</td>
                   <td>${formatCurrency(p.price)}</td>
                   <td>${p.stock}</td>
                   <td>${p.active ? '✓' : '✗'}</td>
-                  <td><button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">Excluir</button></td>
+                  <td style="white-space:nowrap">
+                    <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">Editar</button>
+                    <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">Excluir</button>
+                  </td>
+                </tr>
+                <tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
+                  <td colspan="6">
+                    <form class="admin-edit-panel admin-form-grid" data-product-edit="${p.id}">
+                      <div class="form-group">
+                        <label class="form-label">Nome</label>
+                        <input class="form-input" name="name" value="${escapeHtml(p.name)}" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Preço (R$)</label>
+                        <input class="form-input" name="price" type="number" step="0.01" min="0" value="${p.price}" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Estoque</label>
+                        <input class="form-input" name="stock" type="number" min="0" value="${p.stock}" required />
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Categoria</label>
+                        <select class="form-input" name="category_id">
+                          <option value="">Sem categoria</option>
+                          ${categories.map((c) => `<option value="${c.id}" ${p.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
+                        </select>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Ativo</label>
+                        <select class="form-input" name="active">
+                          <option value="true" ${p.active ? 'selected' : ''}>Sim</option>
+                          <option value="false" ${!p.active ? 'selected' : ''}>Não</option>
+                        </select>
+                      </div>
+                      <div class="form-group admin-form-grid__full">
+                        <label class="form-label">Descrição</label>
+                        <textarea class="form-input" name="description" rows="2">${escapeHtml(p.description ?? '')}</textarea>
+                      </div>
+                      <div class="form-group admin-form-grid__full">
+                        <label class="form-label">Imagem</label>
+                        <div class="admin-image-field">
+                          <div data-preview-product="${p.id}">${imagePreviewBlock(p.image, p.name, 'square')}</div>
+                          <input class="form-input" type="file" name="image" accept="image/*" />
+                          <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+                        </div>
+                      </div>
+                      <div class="admin-form-grid__full admin-edit-panel__actions">
+                        <button type="submit" class="btn btn-primary btn-sm">Salvar produto</button>
+                        <button type="button" class="btn btn-outline btn-sm" data-cancel-product="${p.id}">Cancelar</button>
+                      </div>
+                    </form>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -393,6 +622,8 @@ function bindStoreForm(main) {
     e.preventDefault()
     const f = e.target
     const msgEl = main.querySelector('#admin-store-msg')
+    const submitBtn = f.querySelector('button[type="submit"]')
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Criando...' }
     try {
       const store = await createStoreAsAdmin({
         owner_id: f.owner_id.value,
@@ -408,20 +639,105 @@ function bindStoreForm(main) {
         plan_id: f.plan_id.value,
         approved: f.approved.checked,
       })
+
+      const logoFile = f.logo?.files?.[0]
+      const bannerFile = f.banner?.files?.[0]
+      if (logoFile || bannerFile) {
+        if (!planAllowsStoreBranding(f.plan_id.value)) {
+          throw new Error(FREE_PLAN_BRANDING_MESSAGE)
+        }
+        await updateStoreAsAdmin(store.id, {
+          plan_id: f.plan_id.value,
+          logo: logoFile ?? undefined,
+          banner: bannerFile ?? undefined,
+        })
+      }
+
       showToast(`Loja "${store.name}" criada!`)
       navigate('/admin/lojas')
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Criar loja' }
     }
   })
 }
 
+function bindStoreEdits(main) {
+  main.querySelectorAll('[data-edit-store]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.editStore
+      main.querySelectorAll('.admin-edit-row[id^="edit-store-row-"]').forEach((row) => {
+        row.hidden = row.id !== `edit-store-row-${id}`
+      })
+      const row = main.querySelector(`#edit-store-row-${id}`)
+      row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  })
+
+  main.querySelectorAll('[data-cancel-store]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      main.querySelector(`#edit-store-row-${btn.dataset.cancelStore}`).hidden = true
+    })
+  })
+
+  main.querySelectorAll('[data-store-edit]').forEach((form) => {
+    const id = form.dataset.storeEdit
+    const logoInput = form.querySelector('input[name="logo"]')
+    const bannerInput = form.querySelector('input[name="banner"]')
+    bindImagePreview(logoInput, form.querySelector(`[data-preview-logo="${id}"]`))
+    bindImagePreview(bannerInput, form.querySelector(`[data-preview-banner="${id}"]`))
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const submitBtn = form.querySelector('button[type="submit"]')
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Salvando...' }
+      try {
+        await updateStoreAsAdmin(id, {
+          name: form.name.value.trim(),
+          whatsapp: form.whatsapp.value.trim(),
+          city: form.city.value.trim(),
+          state: form.state.value.trim().toUpperCase(),
+          category_id: form.category_id.value,
+          theme_color: form.theme_color.value,
+          status: form.status.value,
+          plan_id: form.plan_id.value,
+          description: form.description.value.trim(),
+          address: form.address.value.trim(),
+          opening_hours: form.opening_hours.value.trim(),
+          logo: logoInput?.files?.[0],
+          banner: bannerInput?.files?.[0],
+          remove_logo: !logoInput?.files?.[0] && form.remove_logo?.checked,
+          remove_banner: !bannerInput?.files?.[0] && form.remove_banner?.checked,
+        })
+        showToast('Loja atualizada!')
+        renderAdminDashboard(main, 'stores')
+      } catch (err) {
+        showToast(err.message)
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Salvar loja' }
+      }
+    })
+  })
+}
+
 function bindProductForm(main) {
-  main.querySelector('#admin-product-form')?.addEventListener('submit', async (e) => {
+  const createForm = main.querySelector('#admin-product-form')
+  const createImageInput = createForm?.querySelector('input[name="image"]')
+  bindImagePreview(createImageInput, main.querySelector('[data-preview-product-create]'))
+
+  createForm?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const f = e.target
     const msgEl = main.querySelector('#admin-product-msg')
+    const submitBtn = f.querySelector('button[type="submit"]')
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Criando...' }
     try {
+      const imageFile = f.image?.files?.[0]
+      if (imageFile) {
+        const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
+        if (err) throw new Error(err)
+      }
       await createProduct(f.store_id.value, {
         name: f.name.value.trim(),
         description: f.description.value.trim(),
@@ -429,12 +745,70 @@ function bindProductForm(main) {
         stock: parseInt(f.stock.value, 10),
         category_id: f.category_id.value,
         active: true,
+        image: imageFile,
       })
       showToast('Produto criado!')
       navigate('/admin/produtos')
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Criar produto' }
     }
+  })
+
+  bindProductEdits(main)
+}
+
+function bindProductEdits(main) {
+  main.querySelectorAll('[data-edit-product]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.editProduct
+      main.querySelectorAll('.admin-edit-row[id^="edit-product-row-"]').forEach((row) => {
+        row.hidden = row.id !== `edit-product-row-${id}`
+      })
+      const row = main.querySelector(`#edit-product-row-${id}`)
+      row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  })
+
+  main.querySelectorAll('[data-cancel-product]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      main.querySelector(`#edit-product-row-${btn.dataset.cancelProduct}`).hidden = true
+    })
+  })
+
+  main.querySelectorAll('[data-product-edit]').forEach((form) => {
+    const id = form.dataset.productEdit
+    const imageInput = form.querySelector('input[name="image"]')
+    bindImagePreview(imageInput, form.querySelector(`[data-preview-product="${id}"]`))
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const submitBtn = form.querySelector('button[type="submit"]')
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Salvando...' }
+      try {
+        const imageFile = imageInput?.files?.[0]
+        if (imageFile) {
+          const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
+          if (err) throw new Error(err)
+        }
+        await updateProduct(id, {
+          name: form.name.value.trim(),
+          description: form.description.value.trim(),
+          price: parseFloat(form.price.value),
+          stock: parseInt(form.stock.value, 10),
+          category_id: form.category_id.value,
+          active: form.active.value === 'true',
+          image: imageFile,
+        })
+        showToast('Produto atualizado!')
+        renderAdminDashboard(main, 'products')
+      } catch (err) {
+        showToast(err.message)
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Salvar produto' }
+      }
+    })
   })
 
   main.querySelectorAll('[data-del-product]').forEach((btn) => {
