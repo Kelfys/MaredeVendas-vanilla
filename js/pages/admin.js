@@ -1404,26 +1404,28 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
         <section class="admin-section">
           <div class="admin-section__head">
             <h2>Moderadores ativos</h2>
-            <span class="admin-stat-chip admin-stat-chip--sent">${moderators.length} cadastrado${moderators.length === 1 ? '' : 's'}</span>
+            <span class="admin-stat-chip admin-stat-chip--sent" id="admin-moderators-count">${moderators.length} cadastrado${moderators.length === 1 ? '' : 's'}</span>
           </div>
           ${moderators.length === 0
             ? adminEmptyState('🛡️', 'Nenhum moderador', 'Promova o primeiro usuário usando o formulário acima.')
-            : `<div class="table-wrap admin-moderators-table">
+            : `
+              <div class="admin-filter-bar admin-filter-bar--compact">
+                <input
+                  type="search"
+                  class="form-input admin-filter-bar__search"
+                  id="admin-moderators-search"
+                  placeholder="Buscar por nome ou email..."
+                  autocomplete="off"
+                />
+              </div>
+              <div class="table-wrap admin-moderators-table">
                 <table>
                   <thead><tr><th>Nome</th><th>Email</th><th>Desde</th><th></th></tr></thead>
                   <tbody>
-                    ${moderators.map((m) => `
-                      <tr>
-                        <td><strong>${escapeHtml(m.name)}</strong></td>
-                        <td>${escapeHtml(m.email)}</td>
-                        <td>${formatDate(m.created_at)}</td>
-                        <td>
-                          <button type="button" class="btn btn-outline btn-sm" data-demote-moderator="${m.id}" data-moderator-name="${escapeHtml(m.name)}">
-                            Remover acesso
-                          </button>
-                        </td>
-                      </tr>
-                    `).join('')}
+                    ${renderModeratorTableRows(moderators)}
+                    <tr data-moderators-empty hidden>
+                      <td colspan="4">${adminEmptyState('🔍', 'Nenhum resultado', 'Nenhum moderador corresponde à busca.')}</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>`}
@@ -1708,7 +1710,57 @@ function bindProductEdits(main, selectedStoreId = null) {
   })
 }
 
+function renderModeratorTableRows(moderators) {
+  if (moderators.length === 0) return ''
+
+  return moderators.map((m) => `
+    <tr
+      data-moderator-row
+      data-moderator-search="${escapeHtml(`${m.name} ${m.email}`.toLowerCase())}"
+    >
+      <td><strong>${escapeHtml(m.name)}</strong></td>
+      <td>${escapeHtml(m.email)}</td>
+      <td>${formatDate(m.created_at)}</td>
+      <td>
+        <button type="button" class="btn btn-outline btn-sm" data-demote-moderator="${m.id}" data-moderator-name="${escapeHtml(m.name)}">
+          Remover acesso
+        </button>
+      </td>
+    </tr>
+  `).join('')
+}
+
+function bindModeratorsSearch(main) {
+  const search = main.querySelector('#admin-moderators-search')
+  const rows = main.querySelectorAll('[data-moderator-row]')
+  const emptyRow = main.querySelector('[data-moderators-empty]')
+  const countEl = main.querySelector('#admin-moderators-count')
+  if (!search || rows.length === 0) return
+
+  const apply = () => {
+    const term = search.value.trim().toLowerCase()
+    let visibleCount = 0
+
+    rows.forEach((row) => {
+      const matches = !term || (row.dataset.moderatorSearch ?? '').includes(term)
+      row.hidden = !matches
+      if (matches) visibleCount++
+    })
+
+    if (emptyRow) emptyRow.hidden = visibleCount > 0
+    if (countEl) {
+      countEl.textContent = term && visibleCount !== rows.length
+        ? `${visibleCount} de ${rows.length} moderador${rows.length === 1 ? '' : 'es'}`
+        : `${rows.length} cadastrado${rows.length === 1 ? '' : 's'}`
+    }
+  }
+
+  search.addEventListener('input', apply)
+}
+
 function bindModeratorManagement(main) {
+  bindModeratorsSearch(main)
+
   main.querySelector('#promote-moderator-form')?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const form = e.target
