@@ -1,5 +1,4 @@
-# Deploy automático para GitHub Pages.
-# Copia arquivos estáticos para dist/ e publica via actions/deploy-pages.
+# Deploy automático para GitHub Pages (branch gh-pages via peaceiris).
 # Dispara em push na main ou manualmente: gh workflow run deploy.yml
 name: Deploy GitHub Pages
 
@@ -9,16 +8,14 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,20 +23,13 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p dist
-          cp index.html favicon.svg dist/
+          cp index.html favicon.svg 404.html dist/
           cp -r css js dist/
           touch dist/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          force_orphan: true
