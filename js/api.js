@@ -695,6 +695,79 @@ export async function fetchMerchants() {
   return data ?? []
 }
 
+export async function fetchModerators() {
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('users')
+    .select('id, name, email, role, created_at')
+    .eq('role', 'moderator')
+    .order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchUserByEmail(email) {
+  const client = await requireClient()
+  const trimmed = email.trim()
+  if (!trimmed) return null
+
+  const { data, error } = await client
+    .from('users')
+    .select('id, name, email, role, created_at')
+    .ilike('email', trimmed)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function promoteUserToModerator(email) {
+  const trimmed = email.trim()
+  if (!trimmed) throw new Error('Informe o email do usuário.')
+
+  const user = await fetchUserByEmail(trimmed)
+  if (!user) throw new Error('Usuário não encontrado. A pessoa precisa ter uma conta no site.')
+  if (user.role === 'admin') throw new Error('Não é possível alterar o papel de um administrador.')
+  if (user.role === 'moderator') throw new Error('Este usuário já é moderador.')
+
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('users')
+    .update({ role: 'moderator' })
+    .eq('id', user.id)
+    .select('id, name, email, role, created_at')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function demoteModerator(userId) {
+  const client = await requireClient()
+  const { data: user, error: fetchError } = await client
+    .from('users')
+    .select('id, name, email, role')
+    .eq('id', userId)
+    .single()
+  if (fetchError) throw fetchError
+  if (user.role !== 'moderator') throw new Error('Usuário não é moderador.')
+
+  const { data: store } = await client
+    .from('stores')
+    .select('id')
+    .eq('owner_id', userId)
+    .limit(1)
+    .maybeSingle()
+  const newRole = store ? 'merchant' : 'customer'
+
+  const { data, error } = await client
+    .from('users')
+    .update({ role: newRole })
+    .eq('id', userId)
+    .select('id, name, email, role, created_at')
+    .single()
+  if (error) throw error
+  return data
+}
+
 export async function fetchAllStoresAdmin() {
   const client = await requireClient()
   const { data, error } = await client

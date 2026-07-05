@@ -6,7 +6,8 @@ import {
   buildOrderPeriodSeries, getOrderPeriodCutoff,
   fetchPendingStoreApprovals,
   approveStoreRegistration, rejectStoreRegistration,
-  updatePassword, fetchMerchants, fetchAllStoresAdmin,
+  updatePassword, fetchMerchants, fetchModerators, promoteUserToModerator, demoteModerator,
+  fetchAllStoresAdmin,
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteProduct, fetchCategories,
 } from '../api.js'
@@ -1371,6 +1372,71 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
     return
   }
 
+  if (tab === 'moderators') {
+    if (panel !== 'admin') {
+      navigate('/moderador')
+      return
+    }
+
+    const moderators = await fetchModerators()
+
+    main.innerHTML = adminPage(
+      menuItem.label,
+      'Promova usuários existentes ao papel de moderador',
+      `
+        <section class="admin-section admin-moderators-promote">
+          <div class="admin-section__head">
+            <h2>Promover usuário</h2>
+          </div>
+          <p class="admin-moderators-promote__hint">
+            O usuário precisa já ter conta como cliente ou lojista. Após a promoção, ele acessa em
+            <a href="#/moderador/entrar">#/moderador/entrar</a>.
+          </p>
+          <form id="promote-moderator-form" class="admin-moderators-promote__form">
+            <div class="form-group">
+              <label class="form-label" for="promote-moderator-email">Email do usuário</label>
+              <input class="form-input" type="email" id="promote-moderator-email" name="email" placeholder="usuario@email.com" required autocomplete="off" />
+            </div>
+            <div id="promote-moderator-msg"></div>
+            <button type="submit" class="btn btn-primary btn-sm">Promover a moderador</button>
+          </form>
+        </section>
+        <section class="admin-section">
+          <div class="admin-section__head">
+            <h2>Moderadores ativos</h2>
+            <span class="admin-stat-chip admin-stat-chip--sent">${moderators.length} cadastrado${moderators.length === 1 ? '' : 's'}</span>
+          </div>
+          ${moderators.length === 0
+            ? adminEmptyState('🛡️', 'Nenhum moderador', 'Promova o primeiro usuário usando o formulário acima.')
+            : `<div class="table-wrap admin-moderators-table">
+                <table>
+                  <thead><tr><th>Nome</th><th>Email</th><th>Desde</th><th></th></tr></thead>
+                  <tbody>
+                    ${moderators.map((m) => `
+                      <tr>
+                        <td><strong>${escapeHtml(m.name)}</strong></td>
+                        <td>${escapeHtml(m.email)}</td>
+                        <td>${formatDate(m.created_at)}</td>
+                        <td>
+                          <button type="button" class="btn btn-outline btn-sm" data-demote-moderator="${m.id}" data-moderator-name="${escapeHtml(m.name)}">
+                            Remover acesso
+                          </button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>`}
+        </section>
+      `,
+      '',
+      panel
+    )
+
+    bindModeratorManagement(main)
+    return
+  }
+
   if (tab === 'account') {
     main.innerHTML = adminPage(
       menuItem.label,
@@ -1638,6 +1704,39 @@ function bindProductEdits(main, selectedStoreId = null) {
       await deleteProduct(btn.dataset.delProduct)
       showToast('Produto excluído')
       rerenderStaff(main, 'products', selectedStoreId)
+    })
+  })
+}
+
+function bindModeratorManagement(main) {
+  main.querySelector('#promote-moderator-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const msgEl = main.querySelector('#promote-moderator-msg')
+    const submitBtn = form.querySelector('button[type="submit"]')
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Promovendo...' }
+    try {
+      const promoted = await promoteUserToModerator(form.email.value)
+      showToast(`${promoted.name} agora é moderador`)
+      rerenderStaff(main, 'moderators')
+    } catch (err) {
+      msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Promover a moderador' }
+    }
+  })
+
+  main.querySelectorAll('[data-demote-moderator]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.moderatorName
+      if (!confirm(`Remover acesso de moderador de ${name}?`)) return
+      try {
+        await demoteModerator(btn.dataset.demoteModerator)
+        showToast('Acesso de moderador removido')
+        rerenderStaff(main, 'moderators')
+      } catch (err) {
+        showToast(err.message)
+      }
     })
   })
 }

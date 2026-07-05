@@ -69,6 +69,7 @@ function boot() {
   registerRoute('/admin/produtos', (main) => renderAdminDashboard(main, 'products'))
   registerRoute('/admin/pedidos', (main) => renderAdminDashboard(main, 'pedidos'))
   registerRoute('/admin/aprovacoes', (main) => renderAdminDashboard(main, 'approvals'))
+  registerRoute('/admin/moderadores', (main) => renderAdminDashboard(main, 'moderators'))
   registerRoute('/admin/conta', (main) => renderAdminDashboard(main, 'account'))
   registerRoute('/moderador/entrar', renderModeratorLogin)
   registerRoute('/moderador', (main) => renderModeratorDashboard(main, 'overview'))
