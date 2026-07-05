@@ -13,7 +13,12 @@ import { navigate } from '../router.js'
 import { escapeHtml, formatDate, formatCurrency, showToast } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
 import { getAdminMenuItem } from '../admin-nav.js'
-import { planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE } from '../plans.js'
+import {
+  planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
+  FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
+  countProductsWithImages, freePlanProductImagesRemaining, canAddProductImage,
+  planAllowsUnlimitedProductImages,
+} from '../plans.js'
 import {
   PRODUCT_IMAGE_UPLOAD_HINT, STORE_BRANDING_UPLOAD_HINT,
   validateImageFile, STORAGE_BUCKETS,
@@ -119,12 +124,31 @@ function productCountMap(products) {
   return counts
 }
 
-function renderProductTableRows(products, categories) {
+function productImageLimitHintHtml(store, products, product = null) {
+  if (!store || planAllowsUnlimitedProductImages(store.plan_id)) return ''
+
+  const withImages = countProductsWithImages(products)
+  const remaining = freePlanProductImagesRemaining(store.plan_id, withImages)
+  const allowed = canAddProductImage(store.plan_id, withImages, Boolean(product?.image))
+
+  if (!allowed) {
+    return `<p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)}</p>`
+  }
+
+  return `<p class="form-hint">Plano Gratuito: ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}</p>`
+}
+
+function renderProductTableRows(products, categories, store = null) {
   if (products.length === 0) {
     return '<tr><td colspan="5">Nenhum produto nesta loja</td></tr>'
   }
 
-  return products.map((p) => `
+  const withImages = countProductsWithImages(products)
+
+  return products.map((p) => {
+    const canAddImage = canAddProductImage(store?.plan_id, withImages, Boolean(p.image))
+
+    return `
     <tr>
       <td>
         <div class="admin-table-thumb">
@@ -177,8 +201,9 @@ function renderProductTableRows(products, categories) {
             <label class="form-label">Imagem</label>
             <div class="admin-image-field">
               <div data-preview-product="${p.id}">${imagePreviewBlock(p.image, p.name, 'square')}</div>
-              <input class="form-input" type="file" name="image" accept="image/*" />
-              <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+              ${productImageLimitHintHtml(store, products, p)}
+              <input class="form-input" type="file" name="image" accept="image/*" ${canAddImage ? '' : 'disabled'} />
+              ${canAddImage ? `<small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>` : ''}
             </div>
           </div>
           <div class="admin-form-grid__full admin-edit-panel__actions">
@@ -188,7 +213,7 @@ function renderProductTableRows(products, categories) {
         </form>
       </td>
     </tr>
-  `).join('')
+  `}).join('')
 }
 
 function renderStoreProductsSidebar(stores, counts, selectedStoreId) {
@@ -228,6 +253,11 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId) {
 }
 
 function renderStoreProductsPanel({ store, products, categories, canCreate }) {
+  const withImages = store ? countProductsWithImages(products) : 0
+  const canAddImageOnCreate = store
+    ? canAddProductImage(store.plan_id, withImages)
+    : true
+
   if (!store) {
     return `
       <div class="admin-store-products-main admin-store-products-main--empty">
@@ -247,6 +277,7 @@ function renderStoreProductsPanel({ store, products, categories, canCreate }) {
             ${escapeHtml(store.city)}, ${escapeHtml(store.state)}
             · ${statusBadge(store.status)}
             · ${products.length} produto${products.length === 1 ? '' : 's'}
+            ${store.plan_id === 'free' ? ` · ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} com imagem` : ''}
           </p>
         </div>
         <div class="admin-store-products-main__actions">
@@ -286,8 +317,9 @@ function renderStoreProductsPanel({ store, products, categories, canCreate }) {
               <label class="form-label">Imagem do produto</label>
               <div class="admin-image-field">
                 <div data-preview-product-create>${imagePreviewBlock(null, 'Novo produto', 'square')}</div>
-                <input class="form-input" type="file" name="image" accept="image/*" />
-                <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+                ${productImageLimitHintHtml(store, products)}
+                <input class="form-input" type="file" name="image" accept="image/*" ${canAddImageOnCreate ? '' : 'disabled'} />
+                ${canAddImageOnCreate ? `<small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>` : ''}
               </div>
             </div>
             <div class="admin-form-grid__full">
@@ -303,7 +335,7 @@ function renderStoreProductsPanel({ store, products, categories, canCreate }) {
         <table>
           <thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th><th>Ativo</th><th></th></tr></thead>
           <tbody>
-            ${renderProductTableRows(products, categories)}
+            ${renderProductTableRows(products, categories, store)}
           </tbody>
         </table>
       </div>

@@ -23,6 +23,30 @@ export function planAllowsStoreBranding(planId) {
   return Boolean(planId && planId !== 'free')
 }
 
+export const FREE_PLAN_PRODUCT_IMAGE_LIMIT = 4
+
+export const FREE_PLAN_PRODUCT_IMAGE_MESSAGE =
+  `O plano Gratuito permite imagens em até ${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos. Assine um plano pago para liberar mais.`
+
+export function planAllowsUnlimitedProductImages(planId) {
+  return Boolean(planId && planId !== 'free')
+}
+
+export function countProductsWithImages(products) {
+  return (products ?? []).filter((p) => Boolean(p.image?.trim?.() ?? p.image)).length
+}
+
+export function freePlanProductImagesRemaining(planId, productsWithImages) {
+  if (planAllowsUnlimitedProductImages(planId)) return null
+  return Math.max(0, FREE_PLAN_PRODUCT_IMAGE_LIMIT - productsWithImages)
+}
+
+export function canAddProductImage(planId, productsWithImages, productAlreadyHasImage = false) {
+  if (productAlreadyHasImage) return true
+  if (planAllowsUnlimitedProductImages(planId)) return true
+  return productsWithImages < FREE_PLAN_PRODUCT_IMAGE_LIMIT
+}
+
 export const SUBSCRIPTION_PLANS = [
   {
     id: 'free',
@@ -31,7 +55,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 0,
     features: [
       'Até 10 produtos',
-      'Imagens de produtos (até 500 KB cada)',
+      'Imagens em até 4 produtos (500 KB cada)',
       'Vitrine com tema padrão (sem logo nem banner)',
       priceCooldownLabel(24),
       'Ativar ou ocultar produtos à venda',
@@ -45,6 +69,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 5,
     features: [
       'Até 30 produtos',
+      'Imagens em todos os produtos',
       'Logo e banner personalizados',
       priceCooldownLabel(12),
       'Destaque visual na página inicial',
@@ -58,6 +83,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 15,
     features: [
       'Até 80 produtos',
+      'Imagens em todos os produtos',
       'Logo e banner personalizados',
       priceCooldownLabel(4),
       'Anúncio ampliado na vitrine principal',
@@ -71,6 +97,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 35,
     features: [
       'Produtos ilimitados',
+      'Imagens em todos os produtos',
       'Logo e banner personalizados',
       priceCooldownLabel(null),
       'Máximo destaque na página inicial',

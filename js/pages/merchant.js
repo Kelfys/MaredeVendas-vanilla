@@ -18,8 +18,16 @@ import { getUser } from '../state.js'
 import { navigate } from '../router.js'
 import { escapeHtml, formatCurrency, formatDate } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
-import { planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE } from '../plans.js'
-import { STORE_BRANDING_UPLOAD_HINT } from '../uploads.js'
+import {
+  planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
+  FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
+  countProductsWithImages, freePlanProductImagesRemaining, canAddProductImage,
+  planAllowsUnlimitedProductImages,
+} from '../plans.js'
+import {
+  STORE_BRANDING_UPLOAD_HINT, PRODUCT_IMAGE_UPLOAD_HINT,
+  validateImageFile, STORAGE_BUCKETS,
+} from '../uploads.js'
 
 function imagePreviewBlock(url, alt, variant = 'square') {
   if (!url) {
@@ -151,6 +159,14 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
   if (tab === 'products') {
     const products = await fetchMerchantProducts(store.id)
     const categories = await fetchCategories()
+    const withImages = countProductsWithImages(products)
+    const canAddImage = canAddProductImage(store.plan_id, withImages)
+    const remaining = freePlanProductImagesRemaining(store.plan_id, withImages)
+    const imageLimitHint = !planAllowsUnlimitedProductImages(store.plan_id)
+      ? (canAddImage
+        ? `<p class="form-hint">Plano Gratuito: ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}</p>`
+        : `<p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)} <a href="#/regras">Ver planos</a></p>`)
+      : ''
 
     main.innerHTML = dashboardShell('Produtos', 'products', `
       <div id="product-msg"></div>
@@ -167,6 +183,15 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
             <select class="form-input" name="category_id"><option value="">Sem categoria</option>
               ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
             </select>
+          </div>
+          <div class="form-group" style="margin-top:0.5rem">
+            <label class="form-label">Imagem do produto</label>
+            <div class="admin-image-field">
+              <div data-preview-product-create>${imagePreviewBlock(null, 'Novo produto', 'square')}</div>
+              ${imageLimitHint}
+              <input class="form-input" type="file" name="image" accept="image/*" ${canAddImage ? '' : 'disabled'} />
+              ${canAddImage ? `<small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>` : ''}
+            </div>
           </div>
           <button type="submit" class="btn btn-primary btn-sm">Salvar produto</button>
         </form>
@@ -189,10 +214,21 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
       </div>
     `)
 
-    main.querySelector('#product-form')?.addEventListener('submit', async (e) => {
+    const productForm = main.querySelector('#product-form')
+    bindImagePreview(
+      productForm?.querySelector('input[name="image"]'),
+      main.querySelector('[data-preview-product-create]'),
+    )
+
+    productForm?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const f = e.target
       try {
+        const imageFile = f.image?.files?.[0]
+        if (imageFile) {
+          const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
+          if (err) throw new Error(err)
+        }
         await createProduct(store.id, {
           name: f.name.value,
           description: f.description.value,
@@ -200,6 +236,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
           stock: parseInt(f.stock.value, 10),
           category_id: f.category_id.value,
           active: true,
+          image: imageFile,
         })
         renderMerchantDashboard(main, 'products')
       } catch (err) {

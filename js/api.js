@@ -18,7 +18,36 @@ import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
 import { generateSlug, sanitizeSearch } from './utils.js'
 import { DEFAULT_THEME_COLOR } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
-import { planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE } from './plans.js'
+import {
+  planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
+  FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
+} from './plans.js'
+
+async function countStoreProductsWithImages(client, storeId) {
+  const { data, error } = await client
+    .from('products')
+    .select('id, image')
+    .eq('store_id', storeId)
+  if (error) throw error
+  return (data ?? []).filter((p) => Boolean(p.image?.trim?.() ?? p.image)).length
+}
+
+async function assertProductImageAllowed(client, storeId, { productHadImage = false } = {}) {
+  if (productHadImage) return
+
+  const { data: store, error: storeError } = await client
+    .from('stores')
+    .select('plan_id')
+    .eq('id', storeId)
+    .single()
+  if (storeError) throw storeError
+  if (store?.plan_id !== 'free') return
+
+  const count = await countStoreProductsWithImages(client, storeId)
+  if (count >= FREE_PLAN_PRODUCT_IMAGE_LIMIT) {
+    throw new Error(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)
+  }
+}
 
 async function assertStoreBrandingAllowed(client, storeId, planIdOverride) {
   let planId = planIdOverride
@@ -455,6 +484,7 @@ export async function createProduct(storeId, form) {
   const client = await requireClient()
   let imageUrl = null
   if (form.image instanceof File) {
+    await assertProductImageAllowed(client, storeId)
     imageUrl = await uploadImage(STORAGE_BUCKETS.products, `${storeId}/${Date.now()}`, form.image)
   }
 
@@ -481,6 +511,16 @@ export async function updateProduct(productId, form) {
   if (form.category_id === '') updates.category_id = null
 
   if (form.image instanceof File) {
+    const { data: existing, error: fetchError } = await client
+      .from('products')
+      .select('store_id, image')
+      .eq('id', productId)
+      .single()
+    if (fetchError) throw fetchError
+
+    await assertProductImageAllowed(client, existing.store_id, {
+      productHadImage: Boolean(existing.image?.trim?.() ?? existing.image),
+    })
     updates.image = await uploadImage(STORAGE_BUCKETS.products, `${productId}/${Date.now()}`, form.image)
   }
 
