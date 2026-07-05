@@ -565,6 +565,66 @@ export async function isFavorite(userId, storeId) {
 }
 
 // --- Admin ---
+export async function fetchMerchants() {
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('users')
+    .select('id, name, email')
+    .eq('role', 'merchant')
+    .order('name')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchAllStoresAdmin() {
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('stores')
+    .select('*, category:categories(*), owner:users(id, name, email)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function fetchAdminProducts(storeId = null) {
+  const client = await requireClient()
+  let query = client
+    .from('products')
+    .select('*, category:categories(*), store:stores(id, name, slug)')
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (storeId) query = query.eq('store_id', storeId)
+  const { data, error } = await query
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createStoreAsAdmin(form) {
+  const client = await requireClient()
+  const slug = form.slug?.trim() || generateSlug(form.name)
+  const approved = form.approved !== false
+
+  const { data, error } = await client.from('stores').insert({
+    owner_id: form.owner_id,
+    name: form.name,
+    slug,
+    description: form.description ?? '',
+    whatsapp: form.whatsapp,
+    address: form.address ?? '',
+    city: form.city,
+    state: form.state,
+    category_id: form.category_id || null,
+    opening_hours: form.opening_hours ?? '',
+    theme_color: form.theme_color ?? DEFAULT_THEME_COLOR,
+    status: approved ? 'approved' : 'pending',
+    plan_id: form.plan_id ?? 'free',
+    subscription_status: approved ? 'active' : 'inactive',
+    approved_at: approved ? new Date().toISOString() : null,
+  }).select('*, category:categories(*)').single()
+  if (error) throw error
+  return data
+}
+
 export async function fetchAdminMetrics() {
   const client = await requireClient()
   const [stores, products, views, orders, pending] = await Promise.all([
