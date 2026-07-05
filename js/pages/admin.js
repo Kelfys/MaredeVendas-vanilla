@@ -8,7 +8,7 @@ import {
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteProduct, fetchCategories,
 } from '../api.js'
-import { getUser } from '../state.js'
+import { getUser, setAdminPendingCount } from '../state.js'
 import { navigate } from '../router.js'
 import { escapeHtml, formatDate, formatCurrency, showToast } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
@@ -33,18 +33,87 @@ function guardAdmin(main) {
   return user
 }
 
-function adminPage(title, subtitle, content) {
+function adminPage(title, subtitle, content, actions = '') {
   return `
     <div class="admin-page">
       <div class="admin-page__head">
-        <div>
+        <div class="admin-page__head-main">
+          <p class="admin-page__eyebrow">Painel Admin</p>
           <h1 class="admin-page__title">${escapeHtml(title)}</h1>
           ${subtitle ? `<p class="admin-page__subtitle">${escapeHtml(subtitle)}</p>` : ''}
         </div>
+        ${actions ? `<div class="admin-page__actions">${actions}</div>` : ''}
       </div>
       <div class="admin-page__body admin-fade-in">${content}</div>
     </div>
   `
+}
+
+function adminEmptyState(icon, title, text, actionHtml = '') {
+  return `
+    <div class="admin-empty">
+      <span class="admin-empty__icon">${icon}</span>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${text}</p>
+      ${actionHtml}
+    </div>`
+}
+
+function storeStatusSummary(stores) {
+  const counts = { approved: 0, pending: 0, blocked: 0 }
+  for (const store of stores) counts[store.status] = (counts[store.status] ?? 0) + 1
+
+  return `
+    <div class="admin-stat-chips">
+      <span class="admin-stat-chip admin-stat-chip--approved">${counts.approved} aprovadas</span>
+      <span class="admin-stat-chip admin-stat-chip--pending">${counts.pending} pendentes</span>
+      <span class="admin-stat-chip admin-stat-chip--blocked">${counts.blocked} bloqueadas</span>
+    </div>`
+}
+
+function adminFilterBar({ searchId, searchPlaceholder, chips }) {
+  return `
+    <div class="admin-filter-bar">
+      <input type="search" class="form-input admin-filter-bar__search" id="${searchId}" placeholder="${escapeHtml(searchPlaceholder)}" autocomplete="off" />
+      <div class="admin-filter-chips" role="group">
+        ${chips.map((c) => `
+          <button type="button" class="admin-filter-chip ${c.active ? 'active' : ''}" data-filter="${c.id}">${escapeHtml(c.label)}</button>
+        `).join('')}
+      </div>
+    </div>`
+}
+
+function bindListFilters(main, {
+  searchId, rowSelector, getSearchText, getFilterValue,
+  chipSelector = '[data-filter]', linkedEditPrefix = null,
+}) {
+  const search = main.querySelector(`#${searchId}`)
+  const chips = main.querySelectorAll(chipSelector)
+  const rows = main.querySelectorAll(rowSelector)
+  let activeFilter = 'all'
+
+  const apply = () => {
+    const term = search?.value.trim().toLowerCase() ?? ''
+    rows.forEach((row) => {
+      const matchesSearch = !term || getSearchText(row).includes(term)
+      const matchesFilter = activeFilter === 'all' || getFilterValue(row) === activeFilter
+      const visible = matchesSearch && matchesFilter
+      row.hidden = !visible
+      if (linkedEditPrefix && row.dataset.storeId) {
+        const editRow = main.querySelector(`#${linkedEditPrefix}${row.dataset.storeId}`)
+        if (editRow && !visible) editRow.hidden = true
+      }
+    })
+  }
+
+  search?.addEventListener('input', apply)
+  chips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      activeFilter = chip.dataset.filter
+      chips.forEach((c) => c.classList.toggle('active', c === chip))
+      apply()
+    })
+  })
 }
 
 function statusBadge(status) {
@@ -149,7 +218,7 @@ function renderProductTableRows(products, categories, store = null) {
     const canAddImage = canAddProductImage(store?.plan_id, withImages, Boolean(p.image))
 
     return `
-    <tr>
+    <tr data-product-row data-product-name="${escapeHtml(p.name.toLowerCase())}">
       <td>
         <div class="admin-table-thumb">
           ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<span>📦</span>'}
@@ -331,10 +400,14 @@ function renderStoreProductsPanel({ store, products, categories, canCreate }) {
           Esta loja ainda não está aprovada. Aprove-a em Aprovações para cadastrar novos produtos.
         </div>`}
 
+      ${products.length > 0 ? `
+        <div class="admin-filter-bar admin-filter-bar--compact">
+          <input type="search" class="form-input admin-filter-bar__search" id="admin-products-search" placeholder="Buscar produto..." autocomplete="off" />
+        </div>` : ''}
       <div class="table-wrap admin-store-products-table">
         <table>
           <thead><tr><th>Produto</th><th>Preço</th><th>Estoque</th><th>Ativo</th><th></th></tr></thead>
-          <tbody>
+          <tbody id="admin-products-tbody">
             ${renderProductTableRows(products, categories, store)}
           </tbody>
         </table>
@@ -426,10 +499,14 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
   const menuItem = getAdminMenuItem(tab)
 
   if (tab === 'overview') {
-    const [metrics, pending] = await Promise.all([
+    const [metrics, pending, stores] = await Promise.all([
       fetchAdminMetrics(),
       fetchPendingStoreApprovals(),
+      fetchAllStoresAdmin(),
     ])
+
+    setAdminPendingCount(pending.length)
+    import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 
     const pendingPreview = pending.slice(0, 3)
 
@@ -441,17 +518,25 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
         ${metricCards(metrics, pending.length)}
         <section class="admin-section">
           <div class="admin-section__head">
+            <h2>Status das lojas</h2>
+            <a href="#/admin/lojas" class="btn btn-outline btn-sm">Gerenciar lojas</a>
+          </div>
+          ${storeStatusSummary(stores)}
+        </section>
+        <section class="admin-section">
+          <div class="admin-section__head">
             <h2>Aprovações recentes</h2>
             ${pending.length > 0 ? `<a href="#/admin/aprovacoes" class="btn btn-outline btn-sm">Ver todas (${pending.length})</a>` : ''}
           </div>
           ${pendingPreview.length === 0
-            ? '<div class="empty-state"><p>Nenhuma loja aguardando aprovação.</p></div>'
+            ? adminEmptyState('✅', 'Tudo em dia', 'Nenhuma loja aguardando aprovação no momento.')
             : `<div class="admin-cards-list">
                 ${pendingPreview.map((s) => `
-                  <article class="admin-list-card">
-                    <div>
+                  <article class="admin-list-card admin-list-card--highlight">
+                    <div class="admin-list-card__main">
                       <strong>${escapeHtml(s.name)}</strong>
                       <p>${escapeHtml(s.city)}, ${escapeHtml(s.state)} · ${formatDate(s.created_at)}</p>
+                      <p class="admin-list-card__meta">${escapeHtml(s.owner?.name ?? 'Lojista')} · ${escapeHtml(s.owner?.email ?? '')}</p>
                     </div>
                     <div class="admin-list-card__actions">
                       <button type="button" class="btn btn-primary btn-sm" data-approve="${s.id}">Aprovar</button>
@@ -461,7 +546,8 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
                 `).join('')}
               </div>`}
         </section>
-      `
+      `,
+      `<span class="admin-user-badge">${escapeHtml(user.email)}</span>`
     )
 
     bindApprovalActions(main, 'overview')
@@ -470,29 +556,37 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
 
   if (tab === 'approvals') {
     const pending = await fetchPendingStoreApprovals()
+    setAdminPendingCount(pending.length)
+    import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 
     main.innerHTML = adminPage(
       menuItem.label,
       `${pending.length} loja(s) aguardando sua revisão`,
       pending.length === 0
-        ? '<div class="empty-state"><p>Nenhuma loja aguardando aprovação.</p></div>'
-        : `<div class="table-wrap"><table>
-            <thead><tr><th>Loja</th><th>Lojista</th><th>Cidade</th><th>Data</th><th>Ações</th></tr></thead>
-            <tbody>
-              ${pending.map((s) => `
-                <tr>
-                  <td><strong>${escapeHtml(s.name)}</strong><br><small>${escapeHtml(s.whatsapp)}</small></td>
-                  <td>${escapeHtml(s.owner?.name ?? '—')}<br><small>${escapeHtml(s.owner?.email ?? '')}</small></td>
-                  <td>${escapeHtml(s.city)}, ${escapeHtml(s.state)}</td>
-                  <td>${formatDate(s.created_at)}</td>
-                  <td style="white-space:nowrap">
-                    <button type="button" class="btn btn-primary btn-sm" data-approve="${s.id}">Aprovar</button>
-                    <button type="button" class="btn btn-outline btn-sm" data-reject="${s.id}">Rejeitar</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table></div>`
+        ? adminEmptyState('✅', 'Fila vazia', 'Nenhuma loja aguardando aprovação.')
+        : `<div class="admin-cards-list">
+            ${pending.map((s) => `
+              <article class="admin-approval-card">
+                <div class="admin-approval-card__head">
+                  <div>
+                    <h3>${escapeHtml(s.name)}</h3>
+                    <p>${escapeHtml(s.city)}, ${escapeHtml(s.state)} · ${formatDate(s.created_at)}</p>
+                  </div>
+                  ${statusBadge(s.status)}
+                </div>
+                <dl class="admin-approval-card__details">
+                  <div><dt>Lojista</dt><dd>${escapeHtml(s.owner?.name ?? '—')}</dd></div>
+                  <div><dt>Email</dt><dd>${escapeHtml(s.owner?.email ?? '—')}</dd></div>
+                  <div><dt>WhatsApp</dt><dd>${escapeHtml(s.whatsapp)}</dd></div>
+                  <div><dt>Categoria</dt><dd>${escapeHtml(s.category?.name ?? '—')}</dd></div>
+                </dl>
+                <div class="admin-approval-card__actions">
+                  <button type="button" class="btn btn-primary btn-sm" data-approve="${s.id}">Aprovar loja</button>
+                  <button type="button" class="btn btn-outline btn-sm" data-reject="${s.id}">Rejeitar</button>
+                </div>
+              </article>
+            `).join('')}
+          </div>`
     )
 
     bindApprovalActions(main, 'approvals')
@@ -500,11 +594,15 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
   }
 
   if (tab === 'stores') {
-    const [stores, merchants, categories] = await Promise.all([
+    const [stores, merchants, categories, pending] = await Promise.all([
       fetchAllStoresAdmin(),
       fetchMerchants(),
       fetchCategories(),
+      fetchPendingStoreApprovals(),
     ])
+
+    setAdminPendingCount(pending.length)
+    import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 
     main.innerHTML = adminPage(
       menuItem.label,
@@ -587,12 +685,23 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
             </div>
           </form>
         </details>
-        <div class="table-wrap" style="margin-top:1.5rem">
+        ${stores.length > 0 ? adminFilterBar({
+          searchId: 'admin-stores-search',
+          searchPlaceholder: 'Buscar loja, cidade ou lojista...',
+          chips: [
+            { id: 'all', label: 'Todas', active: true },
+            { id: 'approved', label: 'Aprovadas', active: false },
+            { id: 'pending', label: 'Pendentes', active: false },
+            { id: 'blocked', label: 'Bloqueadas', active: false },
+          ],
+        }) : ''}
+        ${storeStatusSummary(stores)}
+        <div class="table-wrap admin-stores-table" style="margin-top:1rem">
           <table>
             <thead><tr><th>Loja</th><th>Lojista</th><th>Cidade</th><th>Status</th><th>Plano</th><th></th></tr></thead>
             <tbody>
-              ${stores.length === 0 ? '<tr><td colspan="6">Nenhuma loja</td></tr>' : stores.map((s) => `
-                <tr>
+              ${stores.length === 0 ? `<tr><td colspan="6">${adminEmptyState('🏪', 'Nenhuma loja', 'Cadastre a primeira loja usando o formulário acima.')}</td></tr>` : stores.map((s) => `
+                <tr data-store-row data-store-id="${s.id}" data-store-status="${s.status}" data-store-search="${escapeHtml(`${s.name} ${s.city} ${s.state} ${s.owner?.name ?? ''} ${s.owner?.email ?? ''}`.toLowerCase())}">
                   <td>
                     <div class="admin-table-thumb">
                       ${s.logo ? `<img src="${escapeHtml(s.logo)}" alt="" />` : '<span>🏪</span>'}
@@ -686,15 +795,32 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
     bindStoreForm(main)
     bindStoreEdits(main)
     bindPlanBrandingToggle(main)
+    bindListFilters(main, {
+      searchId: 'admin-stores-search',
+      rowSelector: '[data-store-row]',
+      getSearchText: (row) => row.dataset.storeSearch ?? '',
+      getFilterValue: (row) => row.dataset.storeStatus ?? '',
+      linkedEditPrefix: 'edit-store-row-',
+    })
     return
   }
 
   if (tab === 'products') {
-    const [allProducts, stores, categories] = await Promise.all([
+    const [allProducts, stores, categories, pending] = await Promise.all([
       fetchAdminProducts(),
       fetchAllStoresAdmin(),
       fetchCategories(),
+      fetchPendingStoreApprovals(),
     ])
+
+    setAdminPendingCount(pending.length)
+    import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
+
+    if (!selectedStoreId && stores.length > 0) {
+      const first = [...stores].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))[0]
+      navigate(adminProductsPath(first.id))
+      return
+    }
 
     const counts = productCountMap(allProducts)
     const selectedStore = selectedStoreId ? stores.find((s) => s.id === selectedStoreId) : null
@@ -722,6 +848,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
     )
 
     bindStoreProductsNav(main)
+    bindProductSearch(main)
     bindProductForm(main, selectedStoreId)
     return
   }
@@ -729,8 +856,10 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
   if (tab === 'account') {
     main.innerHTML = adminPage(
       menuItem.label,
-      `Conta: ${user.email}`,
+      'Altere sua senha de acesso ao painel',
       `
+        <div class="admin-account-card">
+          <p class="admin-account-card__email"><span>Conta</span> ${escapeHtml(user.email)}</p>
         <form id="admin-password-form" class="admin-password-form">
           <div class="form-group">
             <label class="form-label">Nova senha</label>
@@ -743,11 +872,28 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
           <div id="admin-password-msg"></div>
           <button type="submit" class="btn btn-primary btn-sm">Alterar senha</button>
         </form>
+        </div>
       `
     )
 
     bindPasswordForm(main)
   }
+}
+
+function bindProductSearch(main) {
+  const search = main.querySelector('#admin-products-search')
+  if (!search) return
+
+  search.addEventListener('input', () => {
+    const term = search.value.trim().toLowerCase()
+    main.querySelectorAll('[data-product-row]').forEach((row) => {
+      const name = row.dataset.productName ?? ''
+      const show = !term || name.includes(term)
+      row.hidden = !show
+      const editRow = main.querySelector(`#edit-product-row-${row.querySelector('[data-edit-product]')?.dataset.editProduct}`)
+      if (editRow?.hidden === false && !show) editRow.hidden = true
+    })
+  })
 }
 
 function bindStoreForm(main) {

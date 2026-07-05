@@ -16,7 +16,7 @@ import { APP_NAME } from './config.js'
 import { getStoreThemeColor } from './config.js'
 import { escapeHtml, formatCurrency, formatPhone } from './utils.js'
 import {
-  getUser, logout, onAuthChange, toggleTheme, getTheme,
+  getUser, logout, onAuthChange, toggleTheme, getTheme, getAdminPendingCount,
   getCart, onCartChange, openCart, closeCart, removeItem, updateQuantity,
   getCartTotal, getCartItemCount, clearCart,
 } from './state.js'
@@ -100,11 +100,14 @@ export function renderHeader() {
       <div class="admin-toolbar">
         <div class="admin-toolbar__inner">
           <div class="admin-toolbar__tabs">
-            ${ADMIN_MENU.map((item) => `
+            ${ADMIN_MENU.map((item) => {
+              const pending = item.id === 'approvals' ? getAdminPendingCount() : 0
+              return `
               <a href="${item.href}" class="admin-toolbar__tab ${adminTab === item.id ? 'active' : ''}">
                 <span>${item.icon}</span> ${item.label}
-              </a>
-            `).join('')}
+                ${pending > 0 ? `<span class="admin-toolbar__badge">${pending}</span>` : ''}
+              </a>`
+            }).join('')}
           </div>
           <button type="button" class="btn btn-outline btn-sm" id="admin-refresh" title="Atualizar dados">↻ Atualizar</button>
         </div>

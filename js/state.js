@@ -32,6 +32,17 @@ export function toggleTheme() {
   return next
 }
 
+// --- Admin UI (badge na toolbar) ---
+let adminPendingCount = 0
+
+export function setAdminPendingCount(count) {
+  adminPendingCount = Math.max(0, Number(count) || 0)
+}
+
+export function getAdminPendingCount() {
+  return adminPendingCount
+}
+
 // --- Auth ---
 let currentUser = null
 const authListeners = new Set()
