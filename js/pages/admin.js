@@ -88,7 +88,16 @@ function adminFilterBar({ searchId, searchPlaceholder, chips }) {
     </div>`
 }
 
-function adminOrdersFilterBar() {
+function storesFromOrders(orders) {
+  const map = new Map()
+  for (const order of orders) {
+    const store = order.store
+    if (store?.id) map.set(store.id, store)
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+}
+
+function adminOrdersFilterBar(stores) {
   return `
     <div class="admin-orders-filters">
       <input
@@ -99,13 +108,20 @@ function adminOrdersFilterBar() {
         autocomplete="off"
       />
       <div class="admin-orders-filters__groups">
+        <div class="admin-filter-group admin-filter-group--store">
+          <label class="admin-filter-group__label" for="admin-orders-store">Loja</label>
+          <select class="form-input admin-orders-store-select" id="admin-orders-store">
+            <option value="all">Todas as lojas</option>
+            ${stores.map((s) => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('')}
+          </select>
+        </div>
         <div class="admin-filter-group">
           <span class="admin-filter-group__label">Status</span>
           <div class="admin-filter-chips" role="group">
-            <button type="button" class="admin-filter-chip active" data-filter="all">Todos</button>
-            <button type="button" class="admin-filter-chip" data-filter="sent">Enviados</button>
-            <button type="button" class="admin-filter-chip" data-filter="viewed">Visualizados</button>
-            <button type="button" class="admin-filter-chip" data-filter="pending">Pendentes</button>
+            <button type="button" class="admin-filter-chip active" data-order-status="all">Todos</button>
+            <button type="button" class="admin-filter-chip" data-order-status="sent">Enviados</button>
+            <button type="button" class="admin-filter-chip" data-order-status="viewed">Visualizados</button>
+            <button type="button" class="admin-filter-chip" data-order-status="pending">Pendentes</button>
           </div>
         </div>
         <div class="admin-filter-group">
@@ -123,7 +139,8 @@ function adminOrdersFilterBar() {
 
 function bindOrdersListFilters(main) {
   const search = main.querySelector('#admin-orders-search')
-  const statusChips = main.querySelectorAll('[data-filter]')
+  const storeSelect = main.querySelector('#admin-orders-store')
+  const statusChips = main.querySelectorAll('[data-order-status]')
   const periodChips = main.querySelectorAll('[data-order-period]')
   const rows = main.querySelectorAll('[data-order-row]')
   const emptyRow = main.querySelector('[data-orders-empty]')
@@ -132,15 +149,17 @@ function bindOrdersListFilters(main) {
 
   const apply = () => {
     const term = search?.value.trim().toLowerCase() ?? ''
+    const activeStore = storeSelect?.value ?? 'all'
     const cutoff = getOrderPeriodCutoff(activePeriod)
     let visibleCount = 0
 
     rows.forEach((row) => {
       const matchesSearch = !term || (row.dataset.orderSearch ?? '').includes(term)
+      const matchesStore = activeStore === 'all' || row.dataset.orderStoreId === activeStore
       const matchesStatus = activeStatus === 'all' || row.dataset.orderStatus === activeStatus
       const orderDate = new Date(row.dataset.orderCreated)
       const matchesPeriod = !cutoff || orderDate >= cutoff
-      const visible = matchesSearch && matchesStatus && matchesPeriod
+      const visible = matchesSearch && matchesStore && matchesStatus && matchesPeriod
       row.hidden = !visible
       if (visible) visibleCount++
     })
@@ -149,9 +168,10 @@ function bindOrdersListFilters(main) {
   }
 
   search?.addEventListener('input', apply)
+  storeSelect?.addEventListener('change', apply)
   statusChips.forEach((chip) => {
     chip.addEventListener('click', () => {
-      activeStatus = chip.dataset.filter
+      activeStatus = chip.dataset.orderStatus
       statusChips.forEach((c) => c.classList.toggle('active', c === chip))
       apply()
     })
@@ -396,6 +416,7 @@ function renderAdminOrderRows(orders, { compact = false } = {}) {
     <tr
       data-order-row
       data-order-id="${escapeHtml(o.id)}"
+      data-order-store-id="${escapeHtml(o.store_id ?? o.store?.id ?? '')}"
       data-order-status="${escapeHtml(o.status)}"
       data-order-created="${escapeHtml(o.created_at)}"
       data-order-search="${escapeHtml(`${o.customer_name} ${o.customer_phone} ${o.store?.name ?? ''} ${o.store?.city ?? ''}`.toLowerCase())}"
@@ -1187,7 +1208,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
         ${renderOrdersChart(buildOrderPeriodSeries(orderAnalytics.timeline, '30d'), { period: '30d', metric: 'orders' })}
         ${orders.length > 0 ? `
           <div class="admin-orders-toolbar">
-            ${adminOrdersFilterBar()}
+            ${adminOrdersFilterBar(storesFromOrders(orders))}
             <button type="button" class="btn btn-outline btn-sm" id="admin-orders-export">⬇ Exportar CSV</button>
           </div>` : ''}
         <div class="table-wrap admin-orders-table" style="margin-top:1rem">
@@ -1205,7 +1226,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
         </div>
       `,
       orders.length > 0
-        ? '<span class="admin-export-hint">Exporta os pedidos visíveis (respeita busca, status e período)</span>'
+        ? '<span class="admin-export-hint">Exporta os pedidos visíveis (respeita busca, loja, status e período)</span>'
         : ''
     )
 

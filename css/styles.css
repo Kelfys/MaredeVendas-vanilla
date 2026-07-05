@@ -1583,6 +1583,16 @@ tr:last-child td { border-bottom: none; }
   color: var(--text-muted);
 }
 
+.admin-filter-group--store {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  max-width: 18rem;
+}
+
+.admin-orders-store-select {
+  font-size: 0.875rem;
+}
+
 .admin-export-hint {
   font-size: 0.75rem;
   color: var(--text-muted);
