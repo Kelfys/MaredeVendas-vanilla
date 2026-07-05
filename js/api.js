@@ -762,6 +762,69 @@ export async function fetchAdminMetrics() {
   }
 }
 
+function localDateKey(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function startOfLocalDay(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+export function buildOrderPeriodSeries(orders, period = '30d') {
+  const today = startOfLocalDay()
+  const buckets = []
+
+  if (period === '7d' || period === '30d') {
+    const days = period === '7d' ? 7 : 30
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      buckets.push({
+        key: localDateKey(date),
+        label: date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }),
+        orders: 0,
+        revenue: 0,
+      })
+    }
+
+    const bucketMap = Object.fromEntries(buckets.map((b) => [b.key, b]))
+    for (const order of orders) {
+      const key = localDateKey(new Date(order.created_at))
+      const bucket = bucketMap[key]
+      if (!bucket) continue
+      bucket.orders++
+      bucket.revenue += Number(order.total) || 0
+    }
+    return buckets
+  }
+
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    buckets.push({
+      key,
+      label: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+      orders: 0,
+      revenue: 0,
+    })
+  }
+
+  const bucketMap = Object.fromEntries(buckets.map((b) => [b.key, b]))
+  for (const order of orders) {
+    const date = new Date(order.created_at)
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const bucket = bucketMap[key]
+    if (!bucket) continue
+    bucket.orders++
+    bucket.revenue += Number(order.total) || 0
+  }
+
+  return buckets
+}
+
 function summarizeAdminOrders(orders) {
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -790,13 +853,22 @@ function summarizeAdminOrders(orders) {
   }
 }
 
-export async function fetchAdminOrderMetrics() {
+export async function fetchAdminOrdersAnalytics() {
   const client = await requireClient()
   const { data, error } = await client
     .from('orders')
     .select('id, total, status, created_at')
   if (error) throw error
-  return summarizeAdminOrders(data ?? [])
+  const timeline = data ?? []
+  return {
+    metrics: summarizeAdminOrders(timeline),
+    timeline,
+  }
+}
+
+export async function fetchAdminOrderMetrics() {
+  const { metrics } = await fetchAdminOrdersAnalytics()
+  return metrics
 }
 
 export async function fetchAdminOrders(limit = 200) {

@@ -2,7 +2,8 @@
  * Painel administrativo — conteúdo dinâmico; navegação no ícone ⚙️ do header.
  */
 import {
-  fetchAdminMetrics, fetchAdminOrderMetrics, fetchAdminOrders,
+  fetchAdminMetrics, fetchAdminOrdersAnalytics, fetchAdminOrders,
+  buildOrderPeriodSeries,
   fetchPendingStoreApprovals,
   approveStoreRegistration, rejectStoreRegistration,
   updatePassword, fetchMerchants, fetchAllStoresAdmin,
@@ -160,6 +161,104 @@ function orderMetricsChips(metrics) {
       <span class="admin-stat-chip admin-stat-chip--viewed">${metrics.byStatus.viewed} visualizados</span>
       <span class="admin-stat-chip admin-stat-chip--order-pending">${metrics.byStatus.pending} pendentes</span>
     </div>`
+}
+
+function formatChartValue(value, metric) {
+  return metric === 'revenue' ? formatCurrency(value) : String(value)
+}
+
+function renderOrdersChartPlot(series, metric = 'orders') {
+  const max = Math.max(...series.map((b) => (metric === 'orders' ? b.orders : b.revenue)), 1)
+
+  return `
+    <div class="admin-chart__plot">
+      ${series.map((bucket) => {
+        const value = metric === 'orders' ? bucket.orders : bucket.revenue
+        const height = Math.round((value / max) * 100)
+        const tooltip = metric === 'orders'
+          ? `${bucket.label}: ${value} pedido${value === 1 ? '' : 's'}`
+          : `${bucket.label}: ${formatCurrency(value)}`
+        return `
+          <div class="admin-chart__column">
+            <span class="admin-chart__value">${value > 0 ? formatChartValue(value, metric) : ''}</span>
+            <div class="admin-chart__bar-track" title="${escapeHtml(tooltip)}">
+              <div class="admin-chart__bar ${metric === 'revenue' ? 'admin-chart__bar--revenue' : ''}" style="height: ${height}%"></div>
+            </div>
+            <span class="admin-chart__label">${escapeHtml(bucket.label)}</span>
+          </div>`
+      }).join('')}
+    </div>`
+}
+
+function renderOrdersChart(series, { period = '30d', metric = 'orders', compact = false } = {}) {
+  const totalOrders = series.reduce((sum, b) => sum + b.orders, 0)
+  const totalRevenue = series.reduce((sum, b) => sum + b.revenue, 0)
+
+  return `
+    <section class="admin-chart-panel ${compact ? 'admin-chart-panel--compact' : ''}">
+      <div class="admin-chart-panel__head">
+        <div>
+          <h3>Pedidos por período</h3>
+          <p class="admin-chart-panel__summary">
+            ${totalOrders} pedido${totalOrders === 1 ? '' : 's'} · ${formatCurrency(totalRevenue)} no período
+          </p>
+        </div>
+        ${compact ? '' : `
+          <div class="admin-chart-panel__controls">
+            <div class="admin-filter-chips" role="group" data-chart-period-group>
+              <button type="button" class="admin-filter-chip ${period === '7d' ? 'active' : ''}" data-chart-period="7d">7 dias</button>
+              <button type="button" class="admin-filter-chip ${period === '30d' ? 'active' : ''}" data-chart-period="30d">30 dias</button>
+              <button type="button" class="admin-filter-chip ${period === '12m' ? 'active' : ''}" data-chart-period="12m">12 meses</button>
+            </div>
+            <div class="admin-filter-chips" role="group" data-chart-metric-group>
+              <button type="button" class="admin-filter-chip ${metric === 'orders' ? 'active' : ''}" data-chart-metric="orders">Pedidos</button>
+              <button type="button" class="admin-filter-chip ${metric === 'revenue' ? 'active' : ''}" data-chart-metric="revenue">Receita</button>
+            </div>
+          </div>`}
+      </div>
+      <div class="admin-chart" id="admin-orders-chart-body" role="img" aria-label="Gráfico de pedidos por período">
+        ${renderOrdersChartPlot(series, metric)}
+      </div>
+    </section>`
+}
+
+function updateOrdersChart(main, timeline, period, metric) {
+  const series = buildOrderPeriodSeries(timeline, period)
+  const body = main.querySelector('#admin-orders-chart-body')
+  const summary = main.querySelector('.admin-chart-panel__summary')
+  if (!body) return
+
+  const totalOrders = series.reduce((sum, b) => sum + b.orders, 0)
+  const totalRevenue = series.reduce((sum, b) => sum + b.revenue, 0)
+
+  if (summary) {
+    summary.textContent = `${totalOrders} pedido${totalOrders === 1 ? '' : 's'} · ${formatCurrency(totalRevenue)} no período`
+  }
+
+  body.innerHTML = renderOrdersChartPlot(series, metric)
+}
+
+function bindOrdersChart(main, timeline) {
+  if (!main.querySelector('[data-chart-period]')) return
+
+  let period = main.querySelector('[data-chart-period].active')?.dataset.chartPeriod ?? '30d'
+  let metric = main.querySelector('[data-chart-metric].active')?.dataset.chartMetric ?? 'orders'
+
+  main.querySelectorAll('[data-chart-period]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      period = btn.dataset.chartPeriod
+      main.querySelectorAll('[data-chart-period]').forEach((b) => b.classList.toggle('active', b === btn))
+      updateOrdersChart(main, timeline, period, metric)
+    })
+  })
+
+  main.querySelectorAll('[data-chart-metric]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      metric = btn.dataset.chartMetric
+      main.querySelectorAll('[data-chart-metric]').forEach((b) => b.classList.toggle('active', b === btn))
+      updateOrdersChart(main, timeline, period, metric)
+    })
+  })
 }
 
 function renderAdminOrderRows(orders, { compact = false } = {}) {
@@ -567,13 +666,14 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
   const menuItem = getAdminMenuItem(tab)
 
   if (tab === 'overview') {
-    const [metrics, pending, stores, orderMetrics, recentOrders] = await Promise.all([
+    const [metrics, pending, stores, orderAnalytics, recentOrders] = await Promise.all([
       fetchAdminMetrics(),
       fetchPendingStoreApprovals(),
       fetchAllStoresAdmin(),
-      fetchAdminOrderMetrics(),
+      fetchAdminOrdersAnalytics(),
       fetchAdminOrders(5),
     ])
+    const orderMetrics = orderAnalytics.metrics
 
     setAdminPendingCount(pending.length)
     import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
@@ -592,6 +692,9 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
             <a href="#/admin/pedidos" class="btn btn-outline btn-sm">Ver todos</a>
           </div>
           ${orderMetricsChips(orderMetrics)}
+          ${orderAnalytics.timeline.length > 0
+            ? renderOrdersChart(buildOrderPeriodSeries(orderAnalytics.timeline, '7d'), { period: '7d', metric: 'orders', compact: true })
+            : ''}
           ${recentOrders.length === 0
             ? adminEmptyState('🛒', 'Sem pedidos', 'Nenhum pedido foi registrado na plataforma ainda.')
             : `<div class="table-wrap admin-orders-table" style="margin-top:1rem">
@@ -939,11 +1042,12 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
   }
 
   if (tab === 'pedidos') {
-    const [orders, orderMetrics, pending] = await Promise.all([
+    const [orders, orderAnalytics, pending] = await Promise.all([
       fetchAdminOrders(),
-      fetchAdminOrderMetrics(),
+      fetchAdminOrdersAnalytics(),
       fetchPendingStoreApprovals(),
     ])
+    const orderMetrics = orderAnalytics.metrics
 
     setAdminPendingCount(pending.length)
     import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
@@ -953,6 +1057,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
       `${orderMetrics.totalOrders} pedido(s) · ${formatCurrency(orderMetrics.totalRevenue)} em vendas`,
       `
         ${orderMetricsChips(orderMetrics)}
+        ${renderOrdersChart(buildOrderPeriodSeries(orderAnalytics.timeline, '30d'), { period: '30d', metric: 'orders' })}
         ${orders.length > 0 ? adminFilterBar({
           searchId: 'admin-orders-search',
           searchPlaceholder: 'Buscar cliente, telefone ou loja...',
@@ -976,6 +1081,7 @@ export async function renderAdminDashboard(main, tab = 'overview', selectedStore
       `
     )
 
+    bindOrdersChart(main, orderAnalytics.timeline)
     bindListFilters(main, {
       searchId: 'admin-orders-search',
       rowSelector: '[data-order-row]',
