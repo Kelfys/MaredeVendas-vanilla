@@ -83,30 +83,34 @@ Acesse: http://localhost:8080
 
 **Projeto atual:** `ulpjsxmilumqedkkfuqw` — https://ulpjsxmilumqedkkfuqw.supabase.co
 
+> **Nota:** No dashboard Supabase, as abas *Next.js*, *Prisma* e *Server* não se aplicam a este projeto. Aqui usamos **JavaScript vanilla** com `@supabase/supabase-js` via CDN em `js/db.js` e credenciais em `js/config.js` (equivalente ao `NEXT_PUBLIC_SUPABASE_*` do Next.js).
+
 **Via CLI (recomendado):**
 
 ```bash
 npx supabase login
 npx supabase init          # já feito neste repo
 npx supabase link --project-ref ulpjsxmilumqedkkfuqw
-npx supabase db push       # aplica migrations 001–011
+npx supabase db push       # aplica migrations 001–015
 ```
 
-**Ou manualmente:** execute cada arquivo em `supabase/migrations/` no **SQL Editor** (ordem 001 → 011).
+**Ou manualmente:** execute cada arquivo em `supabase/migrations/` no **SQL Editor** (ordem 001 → 015).
 
 Depois:
 
 1. Em **Authentication → URL Configuration**, adicione:
    - `http://localhost:8080`
    - `https://kelfys.github.io/MaredeVendas-vanilla/`
-2. Credenciais em `js/config.js`:
+2. Credenciais em `js/config.js` (chave **publishable** / anon — pública por design):
 
 ```js
-export const SUPABASE_URL = 'https://seu-projeto.supabase.co'
-export const SUPABASE_ANON_KEY = 'sua-chave-anon'
+export const SUPABASE_URL = 'https://ulpjsxmilumqedkkfuqw.supabase.co'
+export const SUPABASE_ANON_KEY = 'sb_publishable_...'
 ```
 
-> A chave anon é pública por design — o RLS no banco protege os dados. **Nunca** exponha a `service_role` key no frontend.
+Veja `.env.example` só como referência de nomes de variáveis. **Nunca** commite `SUPABASE_SECRET_KEY` nem `service_role`.
+
+> O RLS no banco protege os dados. Skills/MCP do Supabase (`npx skills add supabase/agent-skills`) são opcionais para o editor, não fazem parte do deploy do site.
 
 ---
 

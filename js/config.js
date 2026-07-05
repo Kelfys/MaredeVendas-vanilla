@@ -1,8 +1,9 @@
 /**
  * Configuração central da aplicação.
  *
- * ATENÇÃO: SUPABASE_ANON_KEY é pública por design (RLS protege os dados).
- * Nunca commitar service_role key neste arquivo.
+ * ATENÇÃO: SUPABASE_ANON_KEY é a chave publishable (anon) — pública por design.
+ * No dashboard Supabase aparece como NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.
+ * Nunca commitar secret/service_role key neste arquivo.
  *
  * Manutenção:
  * - Novas cores de tema: adicionar em STORE_THEME_COLORS
