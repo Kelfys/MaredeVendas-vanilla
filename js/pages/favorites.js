@@ -1,7 +1,279 @@
-/** Página de lojas favoritas do cliente logado. */
-import { fetchFavorites } from '../api.js'
-import { getUser } from '../state.js'
-import { renderStoreCard } from '../ui.js'
+/**
+ * Dashboard do cliente — favoritos, curtidos, pedidos e perfil.
+ */
+import {
+  fetchFavorites,
+  fetchLikedProductsByUser,
+  fetchOrdersByCustomer,
+  updateCustomerProfile,
+  updatePassword,
+} from '../api.js'
+import { getUser, setUser, getCart, getCartItemCount, setStore, addItem, openCart } from '../state.js'
+import { renderStoreCard, renderFeedProductCard } from '../ui.js'
+import { escapeHtml, formatCurrency, formatDate, showToast } from '../utils.js'
+import { routeHref } from '../router.js'
+import { normalizeStorePaymentMethods, getPaymentMethodLabel } from '../payment.js'
+
+const DELIVERY_LABELS = {
+  manha: 'Manhã',
+  tarde: 'Tarde',
+  noite: 'Noite',
+  madrugada: 'Madrugada',
+}
+
+const ORDER_STATUS_LABELS = {
+  pending: 'Pendente',
+  sent: 'Enviado',
+  viewed: 'Visualizado',
+}
+
+const TABS = [
+  { id: 'overview', label: 'Início', icon: '🏠' },
+  { id: 'favorites', label: 'Favoritos', icon: '❤️' },
+  { id: 'liked', label: 'Curtidos', icon: '👍' },
+  { id: 'orders', label: 'Pedidos', icon: '📦' },
+  { id: 'profile', label: 'Perfil', icon: '👤' },
+]
+
+function customerPage(title, subtitle, content) {
+  return `
+    <div class="admin-page customer-page">
+      <div class="admin-page__head">
+        <div class="admin-page__head-main">
+          <p class="admin-page__eyebrow">Minha conta</p>
+          <h1 class="admin-page__title">${escapeHtml(title)}</h1>
+          ${subtitle ? `<p class="admin-page__subtitle">${escapeHtml(subtitle)}</p>` : ''}
+        </div>
+      </div>
+      <div class="admin-page__body admin-fade-in">${content}</div>
+    </div>
+  `
+}
+
+function customerEmpty(icon, title, text, actionHtml = '') {
+  return `
+    <div class="admin-empty">
+      <span class="admin-empty__icon">${icon}</span>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${text}</p>
+      ${actionHtml}
+    </div>`
+}
+
+function orderStatusBadge(status) {
+  const map = {
+    pending: 'badge-order-pending',
+    sent: 'badge-order-sent',
+    viewed: 'badge-order-viewed',
+  }
+  const label = ORDER_STATUS_LABELS[status] ?? status
+  return `<span class="badge ${map[status] ?? ''}">${escapeHtml(label)}</span>`
+}
+
+function renderOrderCard(order) {
+  const items = (order.items ?? [])
+    .map((item) => `${item.quantity}x ${item.product?.name ?? 'Item'}`)
+    .join(', ')
+  const payment = order.payment_method ? getPaymentMethodLabel(order.payment_method) : null
+
+  return `
+    <article class="customer-order-card">
+      <div class="customer-order-card__head">
+        <div>
+          <h3 class="customer-order-card__store">
+            <a href="#/loja/${escapeHtml(order.store?.slug ?? '')}">${escapeHtml(order.store?.name ?? 'Loja')}</a>
+          </h3>
+          <p class="customer-order-card__meta">${formatDate(order.created_at)}${order.store?.city ? ` · ${escapeHtml(order.store.city)}` : ''}</p>
+        </div>
+        <div class="customer-order-card__aside">
+          ${orderStatusBadge(order.status)}
+          <strong class="customer-order-card__total">${formatCurrency(order.total)}</strong>
+        </div>
+      </div>
+      ${items ? `<p class="customer-order-card__items">${escapeHtml(items)}</p>` : ''}
+      ${payment ? `<p class="customer-order-card__payment">Pagamento: ${escapeHtml(payment)}</p>` : ''}
+    </article>
+  `
+}
+
+function renderMetrics({ favorites, liked, orders, cartCount }) {
+  return `
+    <div class="metrics admin-metrics customer-metrics">
+      <button type="button" class="metric-card metric-card--link" data-customer-tab="favorites">
+        <div class="metric-card__value">${favorites}</div>
+        <div class="metric-card__label">Lojas favoritas</div>
+      </button>
+      <button type="button" class="metric-card metric-card--link" data-customer-tab="liked">
+        <div class="metric-card__value">${liked}</div>
+        <div class="metric-card__label">Produtos curtidos</div>
+      </button>
+      <button type="button" class="metric-card metric-card--link" data-customer-tab="orders">
+        <div class="metric-card__value">${orders}</div>
+        <div class="metric-card__label">Pedidos</div>
+      </button>
+      ${cartCount > 0 ? `
+        <div class="metric-card metric-card--alert">
+          <div class="metric-card__value">${cartCount}</div>
+          <div class="metric-card__label">Itens no carrinho</div>
+        </div>
+      ` : ''}
+    </div>
+  `
+}
+
+function renderOverview({ user, favorites, likedProducts, orders, cart }) {
+  const cartCount = getCartItemCount()
+  const previewStores = favorites.slice(0, 2)
+  const previewLiked = likedProducts.slice(0, 2)
+
+  return `
+    ${renderMetrics({
+      favorites: favorites.length,
+      liked: likedProducts.length,
+      orders: orders.length,
+      cartCount,
+    })}
+    <div class="admin-quick-actions">
+      <a href="${routeHref('/')}" class="admin-quick-card">
+        <span class="admin-quick-card__icon">🔍</span>
+        <strong>Explorar lojas</strong>
+        <span>Descubra novidades no feed</span>
+      </a>
+      <button type="button" class="admin-quick-card" data-customer-tab="favorites">
+        <span class="admin-quick-card__icon">❤️</span>
+        <strong>Ver favoritos</strong>
+        <span>${favorites.length ? `${favorites.length} loja(s) salva(s)` : 'Salve lojas que gostar'}</span>
+      </button>
+      ${cartCount > 0 ? `
+        <button type="button" class="admin-quick-card" data-open-cart>
+          <span class="admin-quick-card__icon">🛒</span>
+          <strong>Abrir carrinho</strong>
+          <span>${cartCount} item(ns) · ${escapeHtml(cart.storeName ?? 'Loja')}</span>
+        </button>
+      ` : ''}
+    </div>
+    ${previewStores.length ? `
+      <section class="admin-section">
+        <div class="admin-section__head">
+          <h2>Lojas favoritas recentes</h2>
+          ${favorites.length > 2 ? '<button type="button" class="btn btn-ghost btn-sm" data-customer-tab="favorites">Ver todas</button>' : ''}
+        </div>
+        <div class="feed customer-feed-preview">${previewStores.map((store) => renderStoreCard(store)).join('')}</div>
+      </section>
+    ` : ''}
+    ${previewLiked.length ? `
+      <section class="admin-section">
+        <div class="admin-section__head">
+          <h2>Produtos curtidos</h2>
+          ${likedProducts.length > 2 ? '<button type="button" class="btn btn-ghost btn-sm" data-customer-tab="liked">Ver todos</button>' : ''}
+        </div>
+        <div class="feed customer-feed-preview">${previewLiked.map((product) => renderFeedProductCard(product, { badge: 'liked' })).join('')}</div>
+      </section>
+    ` : ''}
+    ${!previewStores.length && !previewLiked.length ? customerEmpty(
+      '✨',
+      `Olá, ${user.name?.split(' ')[0] ?? 'cliente'}!`,
+      'Explore lojas no início, favorite as que mais gostar e curta produtos para montar sua lista.',
+      `<a href="${routeHref('/')}" class="btn btn-primary">Ir para o início</a>`,
+    ) : ''}
+  `
+}
+
+function renderFavoritesTab(stores) {
+  if (!stores.length) {
+    return customerEmpty(
+      '❤️',
+      'Nenhuma loja favorita',
+      'Abra uma loja e toque no coração para salvar aqui.',
+      `<a href="${routeHref('/')}" class="btn btn-primary">Explorar lojas</a>`,
+    )
+  }
+  return `<div class="feed">${stores.map((store) => renderStoreCard(store)).join('')}</div>`
+}
+
+function renderLikedTab(products) {
+  if (!products.length) {
+    return customerEmpty(
+      '👍',
+      'Nenhum produto curtido',
+      'Curta produtos nas vitrines para encontrá-los rapidamente aqui.',
+      `<a href="${routeHref('/')}" class="btn btn-primary">Ver produtos</a>`,
+    )
+  }
+  return `<div class="feed">${products.map((product) => renderFeedProductCard(product, { badge: 'liked' })).join('')}</div>`
+}
+
+function renderOrdersTab(orders) {
+  if (!orders.length) {
+    return customerEmpty(
+      '📦',
+      'Nenhum pedido ainda',
+      'Seus pedidos feitos pela plataforma aparecerão aqui após o checkout.',
+      `<a href="${routeHref('/')}" class="btn btn-primary">Fazer um pedido</a>`,
+    )
+  }
+  return `<div class="customer-orders-list">${orders.map(renderOrderCard).join('')}</div>`
+}
+
+function renderProfileTab(user) {
+  const birthLabel = user.birth_date ? formatDate(user.birth_date) : '—'
+
+  return `
+    <div class="customer-profile">
+      <form class="admin-form customer-profile__form" id="customer-profile-form">
+        <div class="admin-form-grid">
+          <label class="form-group">
+            <span class="form-label">Nome</span>
+            <input class="form-input" name="name" required value="${escapeHtml(user.name ?? '')}" />
+          </label>
+          <label class="form-group">
+            <span class="form-label">Telefone</span>
+            <input class="form-input" name="phone" required value="${escapeHtml(user.phone ?? '')}" />
+          </label>
+          <label class="form-group admin-form-grid__full">
+            <span class="form-label">Endereço</span>
+            <input class="form-input" name="address" required value="${escapeHtml(user.address ?? '')}" />
+          </label>
+          <label class="form-group">
+            <span class="form-label">Horário preferido de entrega</span>
+            <select class="form-input" name="delivery_period" required>
+              ${Object.entries(DELIVERY_LABELS).map(([value, label]) => `
+                <option value="${value}" ${user.delivery_period === value ? 'selected' : ''}>${label}</option>
+              `).join('')}
+            </select>
+          </label>
+          <div class="form-group">
+            <span class="form-label">E-mail</span>
+            <input class="form-input" value="${escapeHtml(user.email ?? '')}" disabled />
+          </div>
+          <div class="form-group">
+            <span class="form-label">Data de nascimento</span>
+            <input class="form-input" value="${escapeHtml(birthLabel)}" disabled />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="customer-profile-save">Salvar perfil</button>
+      </form>
+
+      <section class="customer-profile__password">
+        <h2>Alterar senha</h2>
+        <p class="form-hint">Use uma senha forte com pelo menos 8 caracteres.</p>
+        <form id="customer-password-form" class="admin-form">
+          <div class="admin-form-grid">
+            <label class="form-group admin-form-grid__full">
+              <span class="form-label">Nova senha</span>
+              <input class="form-input" type="password" name="password" minlength="8" required autocomplete="new-password" />
+            </label>
+            <label class="form-group admin-form-grid__full">
+              <span class="form-label">Confirmar nova senha</span>
+              <input class="form-input" type="password" name="password_confirm" minlength="8" required autocomplete="new-password" />
+            </label>
+          </div>
+          <button type="submit" class="btn btn-secondary" id="customer-password-save">Atualizar senha</button>
+        </form>
+      </section>
+    </div>
+  `
+}
 
 export async function renderFavorites(main) {
   const user = getUser()
@@ -9,21 +281,198 @@ export async function renderFavorites(main) {
     main.innerHTML = `
       <div class="empty-state">
         <h2>Faça login</h2>
-        <p>Entre na sua conta para ver lojas favoritas.</p>
-        <a href="#/conta/entrar?redirect=/favoritos" class="btn btn-primary">Entrar</a>
+        <p>Entre na sua conta para acessar favoritos, pedidos e perfil.</p>
+        <a href="${routeHref('/conta/entrar?redirect=/favoritos')}" class="btn btn-primary">Entrar</a>
       </div>
     `
     return
   }
 
-  const stores = await fetchFavorites(user.id)
+  let activeTab = 'overview'
+  let favorites = []
+  let likedProducts = []
+  let orders = []
+  let productMap = new Map()
+  let loading = true
+  let profileSaving = false
+  let passwordSaving = false
 
-  main.innerHTML = `
-    <div class="container" style="padding:1.5rem 1rem 3rem">
-      <h1 style="font-size:1.5rem;margin-bottom:1.5rem">Favoritos</h1>
-      ${stores.length === 0
-        ? '<div class="empty-state"><h2>Nenhum favorito</h2><p>Explore lojas e favorite as que mais gostar.</p><a href="#/" class="btn btn-primary">Ver lojas</a></div>'
-        : `<div class="feed">${stores.map(renderStoreCard).join('')}</div>`}
-    </div>
-  `
+  async function load() {
+    loading = true
+    paint()
+
+    try {
+      ;[favorites, likedProducts, orders] = await Promise.all([
+        fetchFavorites(user.id),
+        fetchLikedProductsByUser(user.id),
+        fetchOrdersByCustomer(user.id),
+      ])
+      productMap = new Map(likedProducts.map((product) => [product.id, product]))
+    } catch (err) {
+      showToast(err.message ?? 'Erro ao carregar dados')
+    } finally {
+      loading = false
+      paint()
+    }
+  }
+
+  function bindProductCartEvents() {
+    main.querySelectorAll('[data-feed-add-product]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const product = productMap.get(btn.dataset.feedAddProduct)
+        if (!product?.store) return
+
+        setStore(
+          product.store.id,
+          product.store.name,
+          product.store.whatsapp,
+          normalizeStorePaymentMethods(product.store.payment_methods),
+        )
+        addItem(product)
+        openCart()
+      })
+    })
+  }
+
+  function switchTab(tab) {
+    if (tab === activeTab) return
+    activeTab = tab
+    paint()
+  }
+
+  function renderTabContent() {
+    if (loading) {
+      return '<div class="loading"><div class="spinner"></div></div>'
+    }
+
+    switch (activeTab) {
+      case 'favorites':
+        return renderFavoritesTab(favorites)
+      case 'liked':
+        return renderLikedTab(likedProducts)
+      case 'orders':
+        return renderOrdersTab(orders)
+      case 'profile':
+        return renderProfileTab(user)
+      default:
+        return renderOverview({
+          user,
+          favorites,
+          likedProducts,
+          orders,
+          cart: getCart(),
+        })
+    }
+  }
+
+  function paint() {
+    const tabLabels = {
+      overview: 'Visão geral',
+      favorites: 'Lojas favoritas',
+      liked: 'Produtos curtidos',
+      orders: 'Meus pedidos',
+      profile: 'Meu perfil',
+    }
+
+    main.innerHTML = customerPage(
+      tabLabels[activeTab] ?? 'Minha conta',
+      activeTab === 'overview' ? `Olá, ${user.name?.split(' ')[0] ?? 'cliente'}!` : '',
+      `
+        <nav class="customer-tabs tabs" aria-label="Seções da conta">
+          ${TABS.map((tab) => `
+            <button
+              type="button"
+              class="tab ${activeTab === tab.id ? 'active' : ''}"
+              data-customer-tab="${tab.id}"
+            >
+              <span class="customer-tab__icon" aria-hidden="true">${tab.icon}</span>
+              ${tab.label}
+              ${tab.id === 'favorites' && favorites.length ? ` (${favorites.length})` : ''}
+              ${tab.id === 'liked' && likedProducts.length ? ` (${likedProducts.length})` : ''}
+              ${tab.id === 'orders' && orders.length ? ` (${orders.length})` : ''}
+            </button>
+          `).join('')}
+        </nav>
+        <div class="customer-tab-panel">${renderTabContent()}</div>
+      `,
+    )
+
+    main.querySelectorAll('[data-customer-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.customerTab))
+    })
+
+    main.querySelector('[data-open-cart]')?.addEventListener('click', openCart)
+    bindProductCartEvents()
+
+    const profileForm = main.querySelector('#customer-profile-form')
+    profileForm?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      if (profileSaving) return
+      profileSaving = true
+      const submitBtn = main.querySelector('#customer-profile-save')
+      if (submitBtn) {
+        submitBtn.disabled = true
+        submitBtn.textContent = 'Salvando...'
+      }
+
+      try {
+        const form = e.target
+        const updated = await updateCustomerProfile(user.id, {
+          name: form.name.value,
+          phone: form.phone.value,
+          address: form.address.value,
+          delivery_period: form.delivery_period.value,
+        })
+        Object.assign(user, updated)
+        setUser({ ...user, ...updated })
+        showToast('Perfil atualizado')
+      } catch (err) {
+        showToast(err.message ?? 'Erro ao salvar perfil')
+      } finally {
+        profileSaving = false
+        if (submitBtn) {
+          submitBtn.disabled = false
+          submitBtn.textContent = 'Salvar perfil'
+        }
+      }
+    })
+
+    const passwordForm = main.querySelector('#customer-password-form')
+    passwordForm?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      if (passwordSaving) return
+
+      const form = e.target
+      const password = form.password.value
+      const confirm = form.password_confirm.value
+      if (password !== confirm) {
+        showToast('As senhas não coincidem')
+        return
+      }
+
+      passwordSaving = true
+      const submitBtn = main.querySelector('#customer-password-save')
+      if (submitBtn) {
+        submitBtn.disabled = true
+        submitBtn.textContent = 'Atualizando...'
+      }
+
+      try {
+        await updatePassword(password)
+        form.reset()
+        showToast('Senha atualizada')
+      } catch (err) {
+        showToast(err.message ?? 'Erro ao atualizar senha')
+      } finally {
+        passwordSaving = false
+        if (submitBtn) {
+          submitBtn.disabled = false
+          submitBtn.textContent = 'Atualizar senha'
+        }
+      }
+    })
+  }
+
+  paint()
+  await load()
 }

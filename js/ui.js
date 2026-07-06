@@ -90,7 +90,7 @@ export function renderHeader() {
       <div class="header__actions">
         <button type="button" class="icon-btn" id="theme-toggle" title="Alternar tema">${getTheme() === 'dark' ? '☀️' : '🌙'}</button>
 
-        ${user?.role === 'customer' ? `<a href="#/favoritos" class="icon-btn" title="Favoritos">❤️</a>` : ''}
+        ${user?.role === 'customer' ? `<a href="#/favoritos" class="icon-btn" title="Minha conta">👤</a>` : ''}
         ${user?.role === 'merchant' ? `
           <div class="header-dropdown ${staffMenuOpen ? 'open' : ''}" id="staff-dropdown-merchant">
             <button type="button" class="icon-btn ${onMerchant ? 'icon-btn--active' : ''}" id="staff-menu-toggle-merchant" title="${MERCHANT_PANEL.label}" aria-expanded="${staffMenuOpen}" aria-haspopup="true">${MERCHANT_PANEL.icon}</button>
@@ -125,7 +125,7 @@ export function renderHeader() {
           <span>Entrar</span>
         </a>` : ''}
       </div>
-      ${user?.role === 'customer' ? '<a href="#/favoritos">❤️ Favoritos</a>' : ''}
+      ${user?.role === 'customer' ? '<a href="#/favoritos">👤 Minha conta</a>' : ''}
       ${user?.role === 'merchant' ? `
         <p class="nav-mobile__section">Painel do Lojista</p>
         ${MERCHANT_MENU.map((item) => {

@@ -807,6 +807,8 @@ export async function createOrder(storeId, checkout, items) {
   const client = await requireClient()
   const total = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
 
+  const { data: { user: authUser } } = await client.auth.getUser()
+
   const orderPayload = {
     store_id: storeId,
     customer_name: checkout.customerName,
@@ -816,10 +818,15 @@ export async function createOrder(storeId, checkout, items) {
     status: 'sent',
   }
   if (checkout.paymentMethod) orderPayload.payment_method = checkout.paymentMethod
+  if (authUser?.id) orderPayload.user_id = authUser.id
 
   let { data: order, error: orderError } = await client.from('orders').insert(orderPayload).select().single()
   if (orderError?.code === 'PGRST204' && orderPayload.payment_method) {
     delete orderPayload.payment_method
+    ;({ data: order, error: orderError } = await client.from('orders').insert(orderPayload).select().single())
+  }
+  if (orderError?.code === 'PGRST204' && orderPayload.user_id) {
+    delete orderPayload.user_id
     ;({ data: order, error: orderError } = await client.from('orders').insert(orderPayload).select().single())
   }
   if (orderError) throw orderError
@@ -844,6 +851,21 @@ export async function fetchOrdersByStore(storeId) {
     .eq('store_id', storeId)
     .order('created_at', { ascending: false })
   if (error) throw error
+  return data ?? []
+}
+
+export async function fetchOrdersByCustomer(userId, limit = 20) {
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('orders')
+    .select('*, store:stores(name, slug, city), items:order_items(quantity, price, product:products(name))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) {
+    if (error.code === '42703' || error.code === 'PGRST204') return []
+    throw error
+  }
   return data ?? []
 }
 
@@ -896,6 +918,71 @@ export async function isFavorite(userId, storeId) {
     .eq('store_id', storeId)
     .maybeSingle()
   return Boolean(data)
+}
+
+export async function fetchLikedProductsByUser(userId, limit = 24) {
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('product_likes')
+    .select(`
+      created_at,
+      product:products(
+        *,
+        store:stores(id, name, slug, theme_color, whatsapp, plan_id, city, state, status, payment_methods)
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) {
+    if (isMissingEngagementTableError(error)) return []
+    throw error
+  }
+  return (data ?? [])
+    .map((row) => row.product)
+    .filter((product) => product?.active && product.store?.status === 'approved')
+    .map((product) => ({ ...product, liked_by_user: true }))
+}
+
+const DELIVERY_PERIODS = new Set(['manha', 'tarde', 'noite', 'madrugada'])
+
+export async function updateCustomerProfile(userId, { name, phone, address, delivery_period }) {
+  const trimmedName = String(name ?? '').trim()
+  const trimmedPhone = String(phone ?? '').trim()
+  const trimmedAddress = String(address ?? '').trim()
+  if (!trimmedName) throw new Error('Informe seu nome.')
+  if (!trimmedPhone) throw new Error('Informe seu telefone.')
+  if (!trimmedAddress) throw new Error('Informe seu endereço.')
+  if (!DELIVERY_PERIODS.has(delivery_period)) throw new Error('Selecione um horário de entrega.')
+
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('users')
+    .update({
+      name: trimmedName,
+      phone: trimmedPhone,
+      address: trimmedAddress,
+      delivery_period,
+    })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+
+  try {
+    await client.auth.updateUser({
+      data: {
+        name: trimmedName,
+        phone: trimmedPhone,
+        address: trimmedAddress,
+        delivery_period,
+      },
+    })
+  } catch {
+    // Perfil salvo no banco; metadata do Auth é opcional
+  }
+
+  return data
 }
 
 // --- Admin ---

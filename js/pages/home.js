@@ -1,8 +1,8 @@
 /**
- * Página inicial — feed misto de lojas, produtos e anúncios.
+ * Página inicial — abas "Para você" (lojas e produtos) e "Anúncios".
  *
  * Ranking em js/feed.js (plano, engajamento, diversidade entre lojas).
- * Busca e filtros por categoria substituem o feed padrão.
+ * Busca e filtros por categoria aplicam-se ao feed principal.
  */
 import { fetchCategories, fetchStores, fetchNewProducts, fetchTopLikedProducts, fetchActiveFeedAds } from '../api.js'
 import { renderStoreCard, renderFeedProductCard, renderFeedAdCard, openCart } from '../ui.js'
@@ -12,10 +12,12 @@ import { setStore, addItem, getUser } from '../state.js'
 import { normalizeStorePaymentMethods } from '../payment.js'
 
 const FEED_PRODUCT_LIMIT = 12
+const FEED_ADS_LIMIT = 12
 
 export async function renderHome(main) {
   let search = ''
   let categoryId = null
+  let activeTab = 'feed'
   let categories = []
   let stores = []
   let newProducts = []
@@ -46,10 +48,10 @@ export async function renderHome(main) {
         }),
         fetchNewProducts(productFilters),
         fetchTopLikedProducts(productFilters),
-        fetchActiveFeedAds(6),
+        fetchActiveFeedAds(FEED_ADS_LIMIT),
       ])
 
-      feedItems = buildHomeFeed(stores, newProducts, likedProducts, feedAds, {
+      feedItems = buildHomeFeed(stores, newProducts, likedProducts, [], {
         search,
         categoryId,
       })
@@ -90,38 +92,72 @@ export async function renderHome(main) {
 
   function renderFeedItem(item) {
     if (item.kind === 'store') return renderStoreCard(item.store, { showPlanBadge: true })
-    if (item.kind === 'ad') return renderFeedAdCard(item.ad)
     return renderFeedProductCard(item.product, { badge: item.badge })
+  }
+
+  function filterAds(ads) {
+    const term = search.trim().toLowerCase()
+    if (!term) return ads
+    return ads.filter((ad) => {
+      const haystack = `${ad.title} ${ad.message} ${ad.store?.name ?? ''}`.toLowerCase()
+      return haystack.includes(term)
+    })
+  }
+
+  function renderFeedContent() {
+    if (activeTab === 'ads') {
+      const ads = filterAds(feedAds)
+      if (ads.length === 0) {
+        return search
+          ? '<div class="empty-state"><h2>Nenhum anúncio encontrado</h2><p>Tente outro termo de busca.</p></div>'
+          : '<div class="empty-state"><h2>Sem anúncios no momento</h2><p>Volte em breve para ver ofertas patrocinadas.</p></div>'
+      }
+      return ads.map((ad) => renderFeedAdCard(ad)).join('')
+    }
+
+    const hasFilters = Boolean(search || categoryId)
+    if (feedItems.length === 0) {
+      return hasFilters
+        ? '<div class="empty-state"><h2>Nada encontrado</h2><p>Tente outra categoria ou limpe a busca.</p></div>'
+        : '<div class="empty-state"><h2>Feed vazio</h2><p>Em breve novas lojas e produtos aparecerão aqui.</p></div>'
+    }
+    return feedItems.map(renderFeedItem).join('')
   }
 
   function paint() {
     const hasFilters = Boolean(search || categoryId)
-    const label = search
-      ? `Resultados para "${search}"`
-      : categoryId
-        ? `${categories.find((c) => c.id === categoryId)?.name ?? 'Categoria'}`
+    const label = activeTab === 'feed' && (search || categoryId)
+      ? search
+        ? `Resultados para "${search}"`
+        : `${categories.find((c) => c.id === categoryId)?.name ?? 'Categoria'}`
+      : activeTab === 'ads' && search
+        ? `Anúncios para "${search}"`
         : ''
-
-    const emptyMessage = hasFilters
-      ? '<div class="empty-state"><h2>Nada encontrado</h2><p>Tente outra categoria ou limpe a busca.</p></div>'
-      : '<div class="empty-state"><h2>Feed vazio</h2><p>Em breve novas lojas e produtos aparecerão aqui.</p></div>'
 
     main.innerHTML = `
       <div class="toolbar">
         <div class="container" style="display:flex;flex-direction:column;gap:0.5rem;padding:0.5rem 0">
-          <input type="search" class="search-input" id="search" placeholder="Buscar loja ou produto..." value="${escapeHtml(search)}" />
-          <div class="category-scroll" id="categories">
-            <button type="button" class="chip ${!categoryId ? 'active' : ''}" data-cat="">Todas</button>
-            ${categories.map((c) => `
-              <button type="button" class="chip ${categoryId === c.id ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>
-            `).join('')}
-          </div>
+          <input type="search" class="search-input" id="search" placeholder="${activeTab === 'ads' ? 'Buscar anúncio...' : 'Buscar loja ou produto...'}" value="${escapeHtml(search)}" />
+          ${activeTab === 'feed' ? `
+            <div class="category-scroll" id="categories">
+              <button type="button" class="chip ${!categoryId ? 'active' : ''}" data-cat="">Todas</button>
+              ${categories.map((c) => `
+                <button type="button" class="chip ${categoryId === c.id ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>
+              `).join('')}
+            </div>
+          ` : ''}
         </div>
       </div>
       <div class="container">
+        <div class="home-tabs tabs">
+          <button type="button" class="tab ${activeTab === 'feed' ? 'active' : ''}" data-home-tab="feed">Para você</button>
+          <button type="button" class="tab ${activeTab === 'ads' ? 'active' : ''}" data-home-tab="ads">
+            Anúncios${feedAds.length ? ` (${feedAds.length})` : ''}
+          </button>
+        </div>
         ${label ? `<p class="feed-label">${escapeHtml(label)}</p>` : ''}
         <div class="feed" id="feed">
-          ${feedItems.length === 0 ? emptyMessage : feedItems.map(renderFeedItem).join('')}
+          ${renderFeedContent()}
         </div>
       </div>
     `
@@ -129,13 +165,27 @@ export async function renderHome(main) {
     let debounce
     main.querySelector('#search')?.addEventListener('input', (e) => {
       clearTimeout(debounce)
-      debounce = setTimeout(() => { search = e.target.value; load() }, 300)
+      debounce = setTimeout(() => {
+        search = e.target.value
+        if (activeTab === 'feed') load()
+        else paint()
+      }, 300)
     })
 
     main.querySelectorAll('[data-cat]').forEach((btn) => {
       btn.addEventListener('click', () => {
         categoryId = btn.dataset.cat || null
         load()
+      })
+    })
+
+    main.querySelectorAll('[data-home-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.homeTab
+        if (tab === activeTab) return
+        activeTab = tab
+        paint()
+        if (tab === 'feed') load()
       })
     })
 

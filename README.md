@@ -10,8 +10,8 @@ Marketplace local de lojas — **HTML, CSS e JavaScript vanilla** com backend [S
 
 | Papel | O que pode fazer |
 |-------|------------------|
-| **Visitante** | Ver feed de lojas e produtos, buscar, adicionar ao carrinho e pedir pelo WhatsApp |
-| **Cliente** | Favoritar lojas, curtir/comentar produtos, dados pré-preenchidos no checkout |
+| **Visitante** | Ver feed de lojas e produtos (abas **Para você** e **Anúncios**), buscar, adicionar ao carrinho e pedir pelo WhatsApp |
+| **Cliente** | Dashboard em **Minha conta** (`/favoritos`): favoritos, produtos curtidos, histórico de pedidos e perfil editável; curtir/comentar produtos; checkout com dados pré-preenchidos |
 | **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin) |
 | **Moderador** | Aprovações, lojas, produtos e pedidos (somente leitura em lojas/produtos) |
 | **Admin** | Métricas, moderação, gestão de lojistas/moderadores e configuração da plataforma |
@@ -50,7 +50,7 @@ maredevendas-vanilla/
 │   ├── merchant-nav.js     # Menu do painel do lojista
 │   ├── staff-nav.js        # Menu dos painéis admin e moderador
 │   └── pages/              # Uma página por rota
-├── supabase/migrations/    # Migrations SQL (001 → 029)
+├── supabase/migrations/    # Migrations SQL (001 → 032)
 ├── tests/                  # Testes unitários (Vitest)
 └── .github/workflows/
     └── deploy.yml          # Pipeline de deploy para GitHub Pages
@@ -163,7 +163,7 @@ Botões na UI em `/conta/entrar`, `/conta/criar` e `/lojista/cadastro`. **Requer
 
 - **Desktop:** `Início · Entrar` (pills no menu; Entrar só para visitantes)
 - **Mobile:** `Início` e `Entrar` no topo do menu hambúrguer (☰)
-- Logado: ícones de favoritos, painel ou sair conforme o papel
+- Logado: **👤 Minha conta** (cliente), painel do lojista/admin/moderador ou sair conforme o papel
 - Painéis admin/moderador/lojista: link **← Voltar ao site** (feed)
 
 ---
@@ -192,7 +192,7 @@ gh workflow run deploy.yml
 
 | Rota | Página |
 |------|--------|
-| `/` | Feed de lojas e produtos |
+| `/` | Feed de lojas e produtos (abas **Para você** / **Anúncios**) |
 | `/loja/:slug` | Página pública da loja |
 | `/conta/entrar` | Login unificado |
 | `/conta/criar` | Cadastro do cliente (com data de nascimento) |
@@ -200,7 +200,7 @@ gh workflow run deploy.yml
 | `/dashboard` | Painel do lojista |
 | `/admin` | Painel admin |
 | `/moderador` | Painel moderador |
-| `/favoritos` | Lojas favoritas |
+| `/favoritos` | Dashboard do cliente (favoritos, curtidos, pedidos, perfil) |
 | `/regras` | Regras e planos |
 | `/auth/callback` | Retorno OAuth Google / recovery de senha |
 
@@ -213,8 +213,9 @@ gh workflow run deploy.yml
 1. Cliente navega até uma loja aprovada
 2. Adiciona produtos ao carrinho (uma loja por vez)
 3. Escolhe forma de pagamento e preenche nome, telefone e endereço
-4. O pedido é salvo no Supabase (`orders` + `order_items`)
+4. O pedido é salvo no Supabase (`orders` + `order_items`); se o cliente estiver logado, `orders.user_id` vincula o pedido à conta (migration `032`)
 5. WhatsApp abre com a mensagem formatada para o lojista
+6. Cliente logado vê o histórico em **Minha conta → Pedidos** (pedidos anteriores à migration `032` não têm `user_id`)
 
 ---
 
@@ -228,9 +229,11 @@ gh workflow run deploy.yml
 
 ### Nova migration
 
-1. Crie `supabase/migrations/025_descricao.sql`
+1. Crie `supabase/migrations/033_descricao.sql` (próximo número sequencial)
 2. `npx supabase db push` ou SQL Editor
 3. Atualize `api.js` e a UI conforme necessário
+
+**Última migration:** `032_customer_orders.sql` — coluna `user_id` em `orders` e RLS para o cliente ler seus pedidos.
 
 ---
 
