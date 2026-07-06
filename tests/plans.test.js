@@ -73,6 +73,13 @@ describe('renderSubscriptionPlanCards', () => {
     expect(html).not.toContain('Seu plano atual')
   })
 
+  it('hides payment buttons in info-only login mode', () => {
+    const html = renderSubscriptionPlanCards({ infoOnly: true })
+    expect(html).not.toContain('Enviar comprovante')
+    expect(html).toContain('Incluso na aprovação do cadastro')
+    expect(html).toContain('Starter')
+  })
+
   it('highlights current plan in dashboard mode', () => {
     const html = renderSubscriptionPlanCards({ currentPlanId: 'starter' })
     expect(html).toContain('plan-card--current')

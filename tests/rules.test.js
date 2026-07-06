@@ -8,7 +8,7 @@ describe('renderRulesAndPlansContent', () => {
     expect(html).toContain('id="regras"')
     expect(html).toContain('id="planos"')
     expect(html).toContain('Conduta')
-    expect(html).toContain('Enviar comprovante — Starter')
+    expect(html).not.toContain('Enviar comprovante')
     expect(html).toContain('Como assinar um plano pago')
   })
 })

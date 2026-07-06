@@ -30,7 +30,7 @@ describe('login page rules and plans', () => {
       renderRulesAndPlansContent: () => `
         <div class="auth-info-panel">
           <h2 id="regras">Regras</h2>
-          <section id="planos">Enviar comprovante — Starter</section>
+          <section id="planos">Planos para lojistas</section>
           <p>Conduta</p>
         </div>`,
     }))
@@ -47,10 +47,10 @@ describe('login page rules and plans', () => {
     expect(main.innerHTML).toContain('auth-page__info')
     expect(main.innerHTML).toContain('id="regras"')
     expect(main.innerHTML).toContain('id="planos"')
-    expect(main.innerHTML).toContain('Enviar comprovante — Starter')
+    expect(main.innerHTML).not.toContain('Enviar comprovante')
+    expect(main.innerHTML).not.toContain('sec=regras')
+    expect(main.innerHTML).not.toContain('sec=planos')
     expect(main.innerHTML).toContain('Conduta')
-    expect(main.innerHTML).toContain('sec=regras')
-    expect(main.innerHTML).toContain('sec=planos')
   })
 
   it('renderRules redirects to login rules section', async () => {

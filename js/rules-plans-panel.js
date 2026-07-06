@@ -2,7 +2,7 @@ import { renderSubscriptionPlanCards } from './plans.js'
 
 /** Painel de regras e planos exibido na página Entrar. */
 export function renderRulesAndPlansContent() {
-  const planCards = renderSubscriptionPlanCards()
+  const planCards = renderSubscriptionPlanCards({ infoOnly: true })
 
   return `
     <div class="auth-info-panel">
@@ -34,14 +34,14 @@ export function renderRulesAndPlansContent() {
 
       <section class="rules-section" id="planos">
         <h3>4. Planos para lojistas</h3>
-        <p>Escolha o plano que melhor se encaixa no tamanho da sua loja. O plano <strong>Gratuito</strong> é ativado após aprovação do cadastro. Para planos pagos, realize o pagamento e envie o comprovante pelo WhatsApp.</p>
+        <p>Escolha o plano que melhor se encaixa no tamanho da sua loja. O plano <strong>Gratuito</strong> é ativado após aprovação do cadastro. Para planos pagos, solicite a mudança no painel da loja após o login.</p>
         <div class="plan-grid">${planCards}</div>
         <div class="plan-payment-info">
           <p><strong>Como assinar um plano pago:</strong></p>
           <ol>
+            <li>Entre no painel da loja em <strong>Planos</strong>.</li>
             <li>Realize o pagamento do valor mensal do plano escolhido.</li>
-            <li>Clique no botão do plano escolhido acima para enviar o comprovante pelo WhatsApp.</li>
-            <li>Informe o nome da loja e o email cadastrado na mensagem.</li>
+            <li>Solicite o plano e envie o comprovante pelo WhatsApp.</li>
             <li>Após confirmação, seu plano será ativado pelo administrador.</li>
           </ol>
         </div>

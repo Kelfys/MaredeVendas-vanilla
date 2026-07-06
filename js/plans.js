@@ -170,9 +170,16 @@ function planRank(planId) {
   return PLAN_RANK[planId] ?? 0
 }
 
-function renderPlanCardAction(plan, currentPlanId, { requestMode = false } = {}) {
+function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOnly = false } = {}) {
   const isDashboard = Boolean(currentPlanId)
   const isCurrent = currentPlanId === plan.id
+
+  if (infoOnly && !isDashboard) {
+    if (plan.priceMonthly === 0) {
+      return `<p class="plan-card__note">Incluso na aprovação do cadastro</p>`
+    }
+    return ''
+  }
   const whatsappBtn = (label) => `
     <a href="${buildPlanPaymentUrl(plan)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-block btn-sm">
       ${label}
@@ -224,8 +231,8 @@ function renderPlanCardAction(plan, currentPlanId, { requestMode = false } = {})
   return ''
 }
 
-/** Cards de planos para /regras e painel do lojista. */
-export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode = false } = {}) {
+/** Cards de planos para login informativo e painel do lojista. */
+export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode = false, infoOnly = false } = {}) {
   return SUBSCRIPTION_PLANS.map((plan) => {
     const isCurrent = currentPlanId === plan.id
     const highlight = plan.id === 'premium' || isCurrent
@@ -240,7 +247,7 @@ export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode 
       <ul class="plan-card__features">
         ${plan.features.map((f) => `<li>${escapeHtml(f)}</li>`).join('')}
       </ul>
-      ${renderPlanCardAction(plan, currentPlanId, { requestMode })}
+      ${renderPlanCardAction(plan, currentPlanId, { requestMode, infoOnly })}
     </article>`
   }).join('')
 }

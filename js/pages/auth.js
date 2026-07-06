@@ -85,8 +85,6 @@ export async function renderLogin(main) {
       <div class="auth-links">
         <a href="#/conta/criar">Criar conta de cliente</a>
         <a href="#/lojista/cadastro">Cadastrar minha loja</a>
-        <a href="#/conta/entrar?sec=regras">Regras</a>
-        <a href="#/conta/entrar?sec=planos">Planos</a>
       </div>
     `,
     { infoPanelHtml: renderRulesAndPlansContent() },
