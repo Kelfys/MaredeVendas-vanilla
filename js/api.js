@@ -1712,9 +1712,23 @@ export async function countUnreadMerchantOrders(storeId) {
   return count ?? 0
 }
 
+const activeStoreOrderChannels = new Map()
+
+function removeStoreOrderChannel(client, storeId) {
+  const topic = `realtime:orders-store-${storeId}`
+  if (typeof client.getChannels === 'function') {
+    for (const ch of client.getChannels()) {
+      if (ch.topic === topic) client.removeChannel(ch)
+    }
+  }
+  activeStoreOrderChannels.delete(storeId)
+}
+
 export function subscribeToStoreOrders(storeId, onInsert) {
   const client = getSupabase()
   if (!client) return () => {}
+
+  removeStoreOrderChannel(client, storeId)
 
   const channel = client
     .channel(`orders-store-${storeId}`)
@@ -1726,7 +1740,7 @@ export function subscribeToStoreOrders(storeId, onInsert) {
     }, (payload) => onInsert?.(payload.new))
     .subscribe()
 
-  return () => {
-    client.removeChannel(channel)
-  }
+  activeStoreOrderChannels.set(storeId, { client, channel })
+
+  return () => removeStoreOrderChannel(client, storeId)
 }

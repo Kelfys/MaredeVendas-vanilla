@@ -32,7 +32,7 @@ import {
 import { MERCHANT_PANEL, getMerchantMenuItem, merchantHref } from '../merchant-nav.js'
 import { renderOrdersChart, bindOrdersChart } from '../order-charts.js'
 import { bindPaginatedSortableList } from '../list-utils.js'
-import { routeHref } from '../router.js'
+import { routeHref, render } from '../router.js'
 import {
   isService, getCatalogItemIcon, getCatalogItemLabel,
   catalogItemTypeFieldHtml, catalogStockFieldHtml, bindCatalogItemTypeForm, readCatalogItemForm,
@@ -1063,13 +1063,13 @@ function refreshHeader() {
   import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 }
 
-function buildOrdersSubscription(store, tab, main) {
+function buildOrdersSubscription(store) {
   return subscribeToStoreOrders(store.id, async () => {
     const count = await countUnreadMerchantOrders(store.id)
     setMerchantNewOrdersCount(count)
     refreshHeader()
     showToast(t('merchant.newOrderReceived'))
-    renderMerchantDashboard(main, tab)
+    await render()
   })
 }
 
@@ -1128,7 +1128,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
       `,
     )
 
-    return buildOrdersSubscription(store, 'overview', main)
+    return buildOrdersSubscription(store)
   }
 
   if (tab === 'products') {
@@ -1366,7 +1366,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
       bindMarkViewedActions(main, store)
     }
 
-    return buildOrdersSubscription(store, 'orders', main)
+    return buildOrdersSubscription(store)
   }
 
   if (tab === 'ads') {
