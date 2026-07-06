@@ -1,7 +1,7 @@
 /**
  * Componentes de UI reutilizáveis (renderização imperativa).
  *
- * Header: logo, nav-desktop (Lojas/Entrar), ações (tema, painel, sair)
+ * Header: logo, nav-desktop (Início/Entrar), ações (tema, painel, sair)
  * e nav-mobile (hambúrguer). Entrar fica no menu — não nas ações do header.
  *
  * Também: store-card, feed-product-card, cart-drawer e checkout com pagamentos por loja.
@@ -75,7 +75,7 @@ export function renderHeader() {
       </a>
 
       <nav class="nav-desktop">
-        <a href="${routeHref('/')}">Lojas</a>
+        <a href="${routeHref('/')}">Início</a>
         ${!user ? '<a href="#/conta/entrar">Entrar</a>' : ''}
       </nav>
 
@@ -107,7 +107,7 @@ export function renderHeader() {
     </div>
 
     <nav class="nav-mobile ${menuOpen ? 'open' : ''}" id="nav-mobile">
-      <a href="${routeHref('/')}">Lojas</a>
+      <a href="${routeHref('/')}">Início</a>
       ${user?.role === 'customer' ? '<a href="#/favoritos">❤️ Favoritos</a>' : ''}
       ${user?.role === 'merchant' ? `
         <p class="nav-mobile__section">Painel do Lojista</p>
