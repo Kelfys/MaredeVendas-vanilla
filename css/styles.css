@@ -1464,43 +1464,6 @@ img { max-width: 100%; display: block; }
   padding: 0 1rem 2rem;
 }
 
-.auth-page--with-plans {
-  max-width: 72rem;
-  display: grid;
-  gap: 1.5rem;
-}
-
-.auth-page__login {
-  min-width: 0;
-}
-
-.auth-page__plans {
-  min-width: 0;
-  padding: 1.5rem;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  scroll-margin-top: 5rem;
-}
-
-.auth-plans-panel__title {
-  font-size: 1.375rem;
-  margin-bottom: 0.5rem;
-}
-
-.auth-plans-panel__intro {
-  color: var(--text-secondary);
-  font-size: 0.9375rem;
-  margin-bottom: 1rem;
-}
-
-@media (min-width: 900px) {
-  .auth-page--with-plans {
-    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
-    align-items: start;
-  }
-}
-
 .auth-card {
   padding: 2rem;
   border-radius: var(--radius-xl);

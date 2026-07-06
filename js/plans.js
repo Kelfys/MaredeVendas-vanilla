@@ -1,6 +1,6 @@
 /**
  * Planos de assinatura para lojistas.
- * Fonte de verdade para limites, exibição pública e fluxos de billing.
+ * Fonte de verdade para limites, exibição na página de regras e fluxos de billing.
  */
 import { formatCurrency, escapeHtml } from './utils.js'
 import { buildWhatsAppUrl } from './whatsapp.js'
@@ -224,30 +224,7 @@ function renderPlanCardAction(plan, currentPlanId, { requestMode = false } = {})
   return ''
 }
 
-/** Painel público de planos (login do lojista). */
-export function renderPublicPlansPanel() {
-  return `
-    <div class="auth-plans-panel">
-      <h2 class="auth-plans-panel__title">Planos para lojistas</h2>
-      <p class="auth-plans-panel__intro">
-        Escolha o plano que melhor se encaixa no tamanho da sua loja.
-        O plano <strong>Gratuito</strong> é ativado após aprovação do cadastro.
-        Para planos pagos, realize o pagamento e envie o comprovante pelo WhatsApp.
-      </p>
-      <div class="plan-grid">${renderSubscriptionPlanCards()}</div>
-      <div class="plan-payment-info">
-        <p><strong>Como assinar um plano pago:</strong></p>
-        <ol>
-          <li>Realize o pagamento do valor mensal do plano escolhido.</li>
-          <li>Clique no botão do plano escolhido acima para enviar o comprovante pelo WhatsApp.</li>
-          <li>Informe o nome da loja e o email cadastrado na mensagem.</li>
-          <li>Após confirmação, seu plano será ativado pelo administrador.</li>
-        </ol>
-      </div>
-    </div>`
-}
-
-/** Cards de planos para login público e painel do lojista. */
+/** Cards de planos para /regras e painel do lojista. */
 export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode = false } = {}) {
   return SUBSCRIPTION_PLANS.map((plan) => {
     const isCurrent = currentPlanId === plan.id

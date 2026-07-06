@@ -9,7 +9,6 @@ import {
   canCreateProduct,
   canAddProductImage,
   renderSubscriptionPlanCards,
-  renderPublicPlansPanel,
 } from '../js/plans.js'
 
 describe('plan price cooldown', () => {
@@ -64,15 +63,6 @@ describe('plan catalog limits', () => {
     expect(canAddProductImage('starter', 9)).toBe(true)
     expect(canAddProductImage('starter', 10)).toBe(false)
     expect(canAddProductImage('starter', 10, true)).toBe(true)
-  })
-})
-
-describe('renderPublicPlansPanel', () => {
-  it('renders public plans panel for merchant login', () => {
-    const html = renderPublicPlansPanel()
-    expect(html).toContain('Planos para lojistas')
-    expect(html).toContain('Enviar comprovante — Starter')
-    expect(html).toContain('Como assinar um plano pago')
   })
 })
 
