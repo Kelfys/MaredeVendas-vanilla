@@ -104,6 +104,8 @@ export async function renderLogin(main) {
     'Entrar',
     'Use o mesmo login para conta de cliente ou lojista.',
     `
+      ${renderGoogleAuthButton('Entrar com Google')}
+      ${renderAuthDivider('ou use email e senha')}
       <form id="login-form">
         <div class="form-group">
           <label class="form-label">Email</label>
@@ -123,6 +125,9 @@ export async function renderLogin(main) {
     `,
     { infoPanelHtml: renderRulesAndPlansContent() },
   )
+
+  const oauthNext = redirect?.startsWith('/') ? redirect : '/favoritos'
+  bindGoogleAuth(main, { nextPath: oauthNext, redirect })
 
   main.querySelector('#login-form').addEventListener('submit', async (e) => {
     e.preventDefault()

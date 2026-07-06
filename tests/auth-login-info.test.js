@@ -37,13 +37,23 @@ describe('login page rules and plans', () => {
     }))
 
     const formStub = { addEventListener: vi.fn() }
+    const googleBtn = { addEventListener: vi.fn(), disabled: false }
     const main = {
       innerHTML: '',
-      querySelector: (sel) => (sel === '#login-form' ? formStub : null),
+      querySelector: (sel) => {
+        if (sel === '#login-form') return formStub
+        if (sel === '#google-auth-btn') return googleBtn
+        if (sel === '#auth-error') return { innerHTML: '' }
+        return null
+      },
     }
     const { renderLogin } = await import('../js/pages/auth.js')
     await renderLogin(main)
 
+    expect(main.innerHTML).toContain('Entrar com Google')
+    expect(main.innerHTML).toContain('btn-google')
+    expect(main.innerHTML).toContain('ou use email e senha')
+    expect(googleBtn.addEventListener).toHaveBeenCalled()
     expect(main.innerHTML).toContain('auth-page--with-info')
     expect(main.innerHTML).toContain('auth-page__info')
     expect(main.innerHTML).toContain('id="regras"')
