@@ -20,8 +20,12 @@ describe('router path helpers', () => {
       APP_BASE_PATH: '',
       USE_HISTORY_ROUTER: false,
     }))
-    const { getCurrentPath, routeHref } = await import('../js/router.js')
+    const { getCurrentPath, routeHref, getHashSection } = await import('../js/router.js')
     expect(getCurrentPath()).toBe('/dashboard/pedidos')
     expect(routeHref('/dashboard')).toBe('#/dashboard')
+
+    window.location.hash = '#/conta/entrar?sec=planos'
+    expect(getCurrentPath()).toBe('/conta/entrar')
+    expect(getHashSection()).toBe('planos')
   })
 })

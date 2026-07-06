@@ -407,7 +407,7 @@ function productImageLimitHintHtml(store, products, product = null) {
   const allowed = canAddProductImage(store.plan_id, withImages, Boolean(product?.image))
 
   if (!allowed) {
-    return `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))} <a href="${routeHref('/regras')}">Ver planos</a></p>`
+    return `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))} <a href="${routeHref('/conta/entrar?sec=planos')}">Ver planos</a></p>`
   }
 
   return `<p class="form-hint">${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}</p>`
@@ -548,7 +548,7 @@ function merchantBrandingSection(store) {
         <h2 class="merchant-branding__title">Logo e banner</h2>
         <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_BRANDING_MESSAGE)}</p>
         <p style="margin-top:0.75rem;font-size:0.875rem">
-          <a href="${routeHref('/regras')}">Ver planos e fazer upgrade</a>
+          <a href="${merchantHref('planos')}">Ver planos e fazer upgrade</a>
         </p>
         ${store.logo || store.banner ? `
           <div class="merchant-branding__readonly" style="margin-top:1rem">
@@ -613,7 +613,7 @@ async function renderMerchantPlansPanel(store) {
         <li>Use o botão do WhatsApp para enviar o comprovante com o nome da loja e o email cadastrado.</li>
         <li>Após aprovação, o plano é ativado automaticamente na sua conta.</li>
       </ol>
-      <p class="form-hint">Dúvidas sobre limites e benefícios? <a href="${routeHref('/regras')}">Leia as regras e planos</a>.</p>
+      <p class="form-hint">Dúvidas sobre limites? <a href="${routeHref('/conta/entrar?sec=regras')}">Leia as regras</a> ou <a href="${merchantHref('planos')}">gerencie seu plano</a>.</p>
     </div>`
 }
 
@@ -1115,10 +1115,10 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
     const canCreate = canCreateProduct(store.plan_id, products.length)
     const imageLimitHint = canAddImage
       ? `<p class="form-hint">${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}</p>`
-      : `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))} <a href="${routeHref('/regras')}">Ver planos</a></p>`
+      : `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))} <a href="${merchantHref('planos')}">Ver planos</a></p>`
     const productLimitHint = canCreate
       ? `<p class="form-hint">${escapeHtml(formatProductLimitHint(store.plan_id, products.length))}</p>`
-      : `<p class="form-hint form-hint--info">${escapeHtml(planProductLimitMessage(store.plan_id))} <a href="${routeHref('/regras')}">Ver planos</a></p>`
+      : `<p class="form-hint form-hint--info">${escapeHtml(planProductLimitMessage(store.plan_id))} <a href="${merchantHref('planos')}">Ver planos</a></p>`
 
     main.innerHTML = merchantPage(
       menuItem.label,

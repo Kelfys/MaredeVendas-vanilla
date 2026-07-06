@@ -11,26 +11,40 @@
  */
 import { signIn, signUpCustomer } from '../api.js'
 import { setUser } from '../state.js'
-import { navigate } from '../router.js'
+import { navigate, getHashSection } from '../router.js'
 import { escapeHtml, getMaxBirthDateForRegistration, validateRegistrationBirthDate } from '../utils.js'
+import { renderRulesAndPlansContent } from './rules.js'
 
 function parseQuery() {
   const hash = window.location.hash
-  const q = hash.includes('?') ? hash.split('?')[1] : ''
+  const q = hash.includes('?') ? hash.split('?')[1].split('#')[0] : ''
   return new URLSearchParams(q)
 }
 
-function authLayout(title, description, body) {
+function authLayout(title, description, body, { showRulesAndPlans = false } = {}) {
+  const pageClass = showRulesAndPlans ? 'auth-page auth-page--with-info' : 'auth-page'
+
   return `
-    <div class="auth-page">
-      <div class="auth-card">
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(description)}</p>
-        <div id="auth-error"></div>
-        ${body}
+    <div class="${pageClass}">
+      <div class="auth-page__login">
+        <div class="auth-card">
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(description)}</p>
+          <div id="auth-error"></div>
+          ${body}
+        </div>
       </div>
+      ${showRulesAndPlans ? `<aside class="auth-page__info">${renderRulesAndPlansContent()}</aside>` : ''}
     </div>
   `
+}
+
+function scrollToAuthSection(main, sectionId) {
+  if (!sectionId) return
+  requestAnimationFrame(() => {
+    const target = main.querySelector(`#${sectionId}`) ?? main.querySelector(`[id="${sectionId}"]`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 const ROLE_HOME = {
@@ -71,8 +85,11 @@ export async function renderLogin(main) {
       <div class="auth-links">
         <a href="#/conta/criar">Criar conta de cliente</a>
         <a href="#/lojista/cadastro">Cadastrar minha loja</a>
+        <a href="#/conta/entrar?sec=regras">Regras</a>
+        <a href="#/conta/entrar?sec=planos">Planos</a>
       </div>
-    `
+    `,
+    { showRulesAndPlans: true },
   )
 
   main.querySelector('#login-form').addEventListener('submit', async (e) => {
@@ -92,6 +109,8 @@ export async function renderLogin(main) {
       errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
     }
   })
+
+  scrollToAuthSection(main, getHashSection())
 }
 
 export const renderCustomerLogin = renderLogin

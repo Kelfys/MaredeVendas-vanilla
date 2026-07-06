@@ -25,7 +25,25 @@ export function getCurrentPath() {
     }
     return path.startsWith('/') ? path : `/${path}`
   }
-  return window.location.hash.replace(/^#/, '') || '/'
+  const raw = window.location.hash.replace(/^#/, '') || '/'
+  let path = raw.split('?')[0]
+  const anchorIdx = path.indexOf('#', 1)
+  if (anchorIdx !== -1) path = path.slice(0, anchorIdx)
+  return path.startsWith('/') ? path : `/${path}`
+}
+
+export function getHashSection() {
+  if (USE_HISTORY_ROUTER) {
+    return new URLSearchParams(window.location.search).get('sec')
+  }
+
+  const raw = window.location.hash.replace(/^#/, '') || '/'
+  const query = raw.split('?')[1] ?? ''
+  const fromQuery = new URLSearchParams(query.split('#')[0]).get('sec')
+  if (fromQuery) return fromQuery
+  const pathPart = raw.split('?')[0]
+  const anchorIdx = pathPart.indexOf('#', 1)
+  return anchorIdx !== -1 ? pathPart.slice(anchorIdx + 1) : null
 }
 
 function matchRoute(path) {
