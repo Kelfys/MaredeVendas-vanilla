@@ -7,7 +7,8 @@
  *   • 0 imagens de produto (productImages: 0 → canAddProductImage sempre false)
  *   • logo da loja sim; banner personalizado não (planAllowsStoreBanner)
  *   • alteração de preço a cada 24 h (PLAN_COOLDOWN_HOURS.free)
- * Validação na API: js/api.js (assertProductCountAllowed, assertProductImageAllowed).
+ * Anúncios no feed (store_ads): exclusivo Premium — até 4 por mês (PLAN_MONTHLY_AD_LIMIT).
+ * Validação na API: js/api.js (assertProductCountAllowed, assertProductImageAllowed, assertStoreAdAllowed).
  */
 import { formatCurrency, escapeHtml } from './utils.js'
 import { buildWhatsAppUrl } from './whatsapp.js'
@@ -43,6 +44,49 @@ export function planAllowsStoreLogo() {
 /** Banner da vitrine — somente planos pagos (starter, plus, premium). */
 export function planAllowsStoreBanner(planId) {
   return Boolean(planId && planId !== 'free')
+}
+
+/** Anúncios patrocinados no feed — somente plano Premium. */
+export const PLAN_MONTHLY_AD_LIMIT = {
+  free: 0,
+  starter: 0,
+  plus: 0,
+  premium: 4,
+}
+
+export function planAllowsStoreAds(planId) {
+  return planId === 'premium'
+}
+
+export function getPlanMonthlyAdLimit(planId) {
+  return PLAN_MONTHLY_AD_LIMIT[planId] ?? 0
+}
+
+/** Conta anúncios criados no mês calendário atual (qualquer status). */
+export function countStoreAdsThisMonth(ads, now = new Date()) {
+  const month = now.getMonth()
+  const year = now.getFullYear()
+  return (ads ?? []).filter((ad) => {
+    const created = new Date(ad.created_at)
+    return created.getMonth() === month && created.getFullYear() === year
+  }).length
+}
+
+export function canCreateStoreAd(planId, adsThisMonth) {
+  if (!planAllowsStoreAds(planId)) return false
+  return adsThisMonth < getPlanMonthlyAdLimit(planId)
+}
+
+export function planStoreAdLimitMessage(planId) {
+  if (!planAllowsStoreAds(planId)) return t('plans.premiumAdsOnlyMessage')
+  const limit = getPlanMonthlyAdLimit(planId)
+  return t('plans.monthlyAdLimitMessage', { limit })
+}
+
+export function formatStoreAdLimitHint(planId, adsThisMonth) {
+  const limit = getPlanMonthlyAdLimit(planId)
+  const remaining = Math.max(0, limit - adsThisMonth)
+  return t('plans.monthlyAdLimitHint', { count: adsThisMonth, limit, remaining })
 }
 
 /** @deprecated Use planAllowsStoreBanner — banner exige plano pago; logo é liberado em todos os planos */
@@ -179,7 +223,6 @@ const PLAN_CONFIGS = [
       'plans.featurePlusItems30',
       'plans.featurePlusImagesAll',
       'plans.featureCustomBanner',
-      'plans.featureExpandedAd',
       'plans.featureSearchPriority',
     ],
     cooldownAfterIndex: 3,
@@ -194,6 +237,7 @@ const PLAN_CONFIGS = [
       'plans.featurePremiumItems80',
       'plans.featurePlusImagesAll',
       'plans.featureCustomBanner',
+      'plans.featurePremiumAds4',
       'plans.featureMaxHighlight',
       'plans.featureRotationPriority',
     ],

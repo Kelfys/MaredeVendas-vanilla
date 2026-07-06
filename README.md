@@ -12,7 +12,7 @@ Marketplace local de lojas — **HTML, CSS e JavaScript vanilla** com backend [S
 |-------|------------------|
 | **Visitante** | Ver feed de lojas e produtos (abas **Para você** e **Anúncios**), buscar, adicionar ao carrinho e pedir pelo WhatsApp |
 | **Cliente** | Dashboard em **Minha conta** (`/favoritos`): favoritos, produtos curtidos, histórico de pedidos e perfil editável; curtir/comentar produtos; checkout com dados pré-preenchidos |
-| **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin); **logo da loja** em qualquer plano; **banner personalizado** só em planos pagos |
+| **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin); **logo da loja** em qualquer plano; **banner personalizado** só em planos pagos; **anúncios no feed** só no plano **Premium** (4/mês) |
 | **Moderador** | Aprovações e pedidos **do bairro atribuído**; lojas/produtos somente leitura na região |
 | **Admin** | Métricas globais, gestão de **bairros**, moderadores por região, lojistas e configuração |
 
@@ -346,6 +346,7 @@ O plano **Gratuito** é ativado após aprovação do cadastro da loja. Planos pa
 | **Logo** da loja (foto de perfil) | Sim |
 | **Banner** personalizado da vitrine | Não — apenas cor/tema padrão |
 | **Alteração de preço** | A cada **24 h** |
+| **Anúncios no feed** | **Não** — exclusivo Premium |
 | **Pedidos** | Via WhatsApp |
 | **Ativar/ocultar** itens no catálogo | Sim |
 
@@ -353,12 +354,12 @@ Lojistas no Gratuito podem publicar até **dois** produtos ou serviços **sem fo
 
 ### Comparativo de catálogo (todos os planos)
 
-| Plano | Itens no catálogo | Produtos com imagem | Banner personalizado | Cooldown de preço |
-|-------|-------------------|---------------------|----------------------|-------------------|
-| **Gratuito** | 2 | 0 | Não | 24 h |
-| **Starter** | 15 | 10 | Sim | 12 h |
-| **Plus** | 30 | 30 | Sim | 4 h |
-| **Premium** | 80 | 80 | Sim | Sem limite |
+| Plano | Itens no catálogo | Produtos com imagem | Banner personalizado | Anúncios no feed | Cooldown de preço |
+|-------|-------------------|---------------------|----------------------|------------------|-------------------|
+| **Gratuito** | 2 | 0 | Não | Não | 24 h |
+| **Starter** | 15 | 10 | Sim | Não | 12 h |
+| **Plus** | 30 | 30 | Sim | Não | 4 h |
+| **Premium** | 80 | 80 | Sim | **4/mês** | Sem limite |
 
 Detalhes de preços, destaques no feed e lista completa de benefícios: `#/regras` (seção planos) ou painel **Planos** do lojista.
 
@@ -371,8 +372,10 @@ Detalhes de preços, destaques no feed e lista completa de benefícios: `#/regra
 | `planAllowsProductImages(planId)` | Fotos no catálogo só se `productImages > 0` |
 | `canCreateProduct(planId, count)` | Teto de itens no catálogo |
 | `canAddProductImage(planId, …)` | Teto de imagens (Gratuito sempre `false`) |
+| `planAllowsStoreAds(planId)` | Anúncios no feed só no Premium |
+| `canCreateStoreAd(planId, adsThisMonth)` | Teto de 4 anúncios/mês no Premium |
 
-Testes: `tests/plans.test.js`.
+Testes: `tests/plans.test.js`, `tests/api-premium-ads.test.js`.
 
 ---
 

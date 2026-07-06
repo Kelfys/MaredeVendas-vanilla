@@ -19,6 +19,11 @@ import {
   canAddProductImage,
   planAllowsStoreLogo,
   planAllowsStoreBanner,
+  planAllowsStoreAds,
+  getPlanMonthlyAdLimit,
+  countStoreAdsThisMonth,
+  canCreateStoreAd,
+  formatStoreAdLimitHint,
   renderSubscriptionPlanCards,
 } from '../js/plans.js'
 
@@ -168,6 +173,44 @@ describe('plan catalog limits', () => {
     expect(canAddProductImage('starter', 9)).toBe(true)
     expect(canAddProductImage('starter', 10)).toBe(false)
     expect(canAddProductImage('starter', 10, true)).toBe(true)
+  })
+})
+
+describe('premium store ads limits', () => {
+  it('allows ads only on premium with monthly cap of 4', () => {
+    expect(planAllowsStoreAds('free')).toBe(false)
+    expect(planAllowsStoreAds('starter')).toBe(false)
+    expect(planAllowsStoreAds('plus')).toBe(false)
+    expect(planAllowsStoreAds('premium')).toBe(true)
+    expect(getPlanMonthlyAdLimit('premium')).toBe(4)
+    expect(getPlanMonthlyAdLimit('free')).toBe(0)
+  })
+
+  it('counts ads created in current month', () => {
+    const now = new Date('2026-07-15T12:00:00Z')
+    const ads = [
+      { created_at: '2026-07-01T10:00:00Z' },
+      { created_at: '2026-06-30T10:00:00Z' },
+      { created_at: '2026-07-20T10:00:00Z' },
+    ]
+    expect(countStoreAdsThisMonth(ads, now)).toBe(2)
+  })
+
+  it('blocks creation after monthly limit', () => {
+    expect(canCreateStoreAd('premium', 0)).toBe(true)
+    expect(canCreateStoreAd('premium', 3)).toBe(true)
+    expect(canCreateStoreAd('premium', 4)).toBe(false)
+    expect(canCreateStoreAd('plus', 0)).toBe(false)
+  })
+
+  it('lists premium ads feature and removes expanded ad from plus', () => {
+    expect(getPlanById('plus').features).not.toContain('Anúncio ampliado na vitrine principal')
+    expect(getPlanById('premium').features).toContain('Até 4 anúncios por mês no feed')
+  })
+
+  it('formats monthly ad hint for premium merchants', () => {
+    expect(formatStoreAdLimitHint('premium', 2)).toMatch(/2\/4/)
+    expect(formatStoreAdLimitHint('premium', 2)).toMatch(/2 restante/)
   })
 })
 

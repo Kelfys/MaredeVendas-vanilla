@@ -20,6 +20,8 @@ import {
   countProductsWithImages, canAddProductImage, canCreateProduct,
   planProductImageLimitMessage, planProductLimitMessage,
   formatProductLimitHint, formatProductImageLimitHint,
+  planAllowsStoreAds, canCreateStoreAd, countStoreAdsThisMonth,
+  formatStoreAdLimitHint, getPlanMonthlyAdLimit,
   getPlanById, formatPlanPrice,
   getPriceCooldownRemaining, formatPriceCooldownRemaining,
   getPlanPriceCooldownHours,
@@ -350,9 +352,13 @@ function renderReviewsSection(reviews) {
     </section>`
 }
 
-function renderAdsSummary(ads) {
+function renderAdsSummary(ads, store) {
   const active = ads.filter((a) => a.status === 'approved').length
   const pending = ads.filter((a) => a.status === 'pending').length
+  const planId = store?.plan_id ?? 'free'
+  const premiumHint = planAllowsStoreAds(planId)
+    ? `<p class="form-hint">${escapeHtml(formatStoreAdLimitHint(planId, countStoreAdsThisMonth(ads)))}</p>`
+    : `<p class="form-hint form-hint--info">${escapeHtml(t('merchant.adsPremiumRequired'))}</p>`
 
   return `
     <section class="admin-section">
@@ -360,8 +366,9 @@ function renderAdsSummary(ads) {
         <h2>${t('merchant.adsTitle')}</h2>
         <a href="${merchantHref('anuncios')}" class="btn btn-outline btn-sm">${t('common.manage')}</a>
       </div>
+      ${premiumHint}
       ${ads.length === 0
-        ? merchantEmptyState('📣', t('merchant.noAdsTitle'), t('merchant.noAdsBody'))
+        ? merchantEmptyState('📣', t('merchant.noAdsTitle'), planAllowsStoreAds(planId) ? t('merchant.noAdsBody') : t('merchant.adsPremiumRequired'))
         : `
           <div class="admin-stat-chips">
             <span class="admin-stat-chip admin-stat-chip--approved">${active === 1 ? t('merchant.adActiveOne', { count: active }) : t('merchant.adActiveMany', { count: active })}</span>
@@ -369,6 +376,52 @@ function renderAdsSummary(ads) {
             <span class="admin-stat-chip admin-stat-chip--sent">${t('merchant.adsTotal', { count: ads.length })}</span>
           </div>`}
     </section>`
+}
+
+function merchantAdsCreatePanel(store, ads) {
+  const planId = store.plan_id ?? 'free'
+  const approved = store.status === 'approved' && ['active', 'trialing'].includes(store.subscription_status)
+  const adsThisMonth = countStoreAdsThisMonth(ads)
+
+  if (!approved) {
+    return `<div class="alert alert-error" style="margin-bottom:1rem">${t('merchant.adsApprovalRequired')}</div>`
+  }
+  if (!planAllowsStoreAds(planId)) {
+    return `
+      <div class="alert alert-info" style="margin-bottom:1rem">${t('merchant.adsPremiumRequired')}</div>
+      <p style="margin-bottom:1rem"><a href="${merchantHref('planos')}" class="btn btn-outline btn-sm">${t('merchant.viewPlansUpgrade')}</a></p>`
+  }
+  if (!canCreateStoreAd(planId, adsThisMonth)) {
+    return `<div class="alert alert-info" style="margin-bottom:1rem">${escapeHtml(t('errors.storeAdsMonthlyLimit', { limit: getPlanMonthlyAdLimit(planId) }))}</div>`
+  }
+
+  return `
+    <details class="admin-form-panel" open>
+      <summary>${t('merchant.newAd')}</summary>
+      <form id="ad-form" class="admin-form-grid" style="margin-top:1rem">
+        <div class="form-group admin-form-grid__full">
+          <label class="form-label">${t('common.title')}</label>
+          <input class="form-input" name="title" placeholder="${t('merchant.adTitlePlaceholder')}" minlength="3" maxlength="80" required />
+        </div>
+        <div class="form-group admin-form-grid__full">
+          <label class="form-label">${t('common.message')}</label>
+          <textarea class="form-input" name="message" placeholder="${t('merchant.adMessagePlaceholder')}" minlength="10" maxlength="280" rows="3" required></textarea>
+        </div>
+        <div class="form-group admin-form-grid__full">
+          <label class="form-label">${t('merchant.adImageOptional')}</label>
+          <div class="admin-image-field">
+            <div data-preview-ad-create>${imagePreviewBlock(null, t('merchant.adPreview'), 'banner')}</div>
+            <input class="form-input" type="file" name="image" accept="image/*" />
+            <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
+          </div>
+        </div>
+        <div class="admin-form-grid__full">
+          <button type="submit" class="btn btn-primary btn-sm">${t('merchant.createAd')}</button>
+        </div>
+      </form>
+      <p class="form-hint" style="margin-top:0.75rem">${t('merchant.adsApprovalNote')}</p>
+      <p class="form-hint">${escapeHtml(formatStoreAdLimitHint(planId, adsThisMonth))}</p>
+    </details>`
 }
 
 function priceCooldownHintHtml(planId, product) {
@@ -1124,7 +1177,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
           ${renderRecentOrders(orders)}
         </section>
         ${renderReviewsSection(reviews)}
-        ${renderAdsSummary(ads)}
+        ${renderAdsSummary(ads, store)}
       `,
     )
 
@@ -1372,48 +1425,30 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
   if (tab === 'ads') {
     const ads = await fetchStoreAds(store.id)
     const canCreate = store.status === 'approved'
+      && planAllowsStoreAds(store.plan_id)
+      && canCreateStoreAd(store.plan_id, countStoreAdsThisMonth(ads))
 
     main.innerHTML = merchantPage(
       menuItem.label,
-      canCreate ? t('merchant.adsSubtitle') : t('merchant.adsAfterApproval'),
+      planAllowsStoreAds(store.plan_id)
+        ? t('merchant.adsSubtitle')
+        : (canCreate ? t('merchant.adsSubtitle') : t('merchant.adsAfterApproval')),
       `
         <div id="ad-msg"></div>
-        ${!canCreate ? `
-          <div class="alert alert-error" style="margin-bottom:1rem">
-            ${t('merchant.adsApprovalRequired')}
-          </div>` : `
-          <details class="admin-form-panel" open>
-            <summary>${t('merchant.newAd')}</summary>
-            <form id="ad-form" class="admin-form-grid" style="margin-top:1rem">
-              <div class="form-group admin-form-grid__full">
-                <label class="form-label">${t('common.title')}</label>
-                <input class="form-input" name="title" placeholder="${t('merchant.adTitlePlaceholder')}" minlength="3" maxlength="80" required />
-              </div>
-              <div class="form-group admin-form-grid__full">
-                <label class="form-label">${t('common.message')}</label>
-                <textarea class="form-input" name="message" placeholder="${t('merchant.adMessagePlaceholder')}" minlength="10" maxlength="280" rows="3" required></textarea>
-              </div>
-              <div class="form-group admin-form-grid__full">
-                <label class="form-label">${t('merchant.adImageOptional')}</label>
-                <div class="admin-image-field">
-                  <div data-preview-ad-create>${imagePreviewBlock(null, t('merchant.adPreview'), 'banner')}</div>
-                  <input class="form-input" type="file" name="image" accept="image/*" />
-                  <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
-                </div>
-              </div>
-              <div class="admin-form-grid__full">
-                <button type="submit" class="btn btn-primary btn-sm">${t('merchant.createAd')}</button>
-              </div>
-            </form>
-            <p class="form-hint" style="margin-top:0.75rem">${t('merchant.adsApprovalNote')}</p>
-          </details>`}
+        ${merchantAdsCreatePanel(store, ads)}
         <section class="admin-section">
           <div class="admin-section__head">
             <h2>${t('merchant.yourAds')}</h2>
             <span class="admin-stat-chip admin-stat-chip--sent">${ads.length === 1 ? t('merchant.adsRegisteredOne', { count: ads.length }) : t('merchant.adsRegisteredMany', { count: ads.length })}</span>
           </div>
           ${ads.length === 0
-            ? merchantEmptyState('📣', t('merchant.noAdsTitle'), canCreate ? t('merchant.createFirstAd') : t('merchant.waitStoreApproval'))
+            ? merchantEmptyState(
+              '📣',
+              t('merchant.noAdsTitle'),
+              canCreate
+                ? t('merchant.createFirstAd')
+                : (planAllowsStoreAds(store.plan_id) ? t('merchant.waitStoreApproval') : t('merchant.adsPremiumRequired')),
+            )
             : `<div style="display:flex;flex-direction:column;gap:0.75rem">${renderStoreAdRows(ads)}</div>`}
         </section>
       `,

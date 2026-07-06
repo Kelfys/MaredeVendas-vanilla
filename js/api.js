@@ -30,6 +30,7 @@ import {
   getPlanProductLimit, getPlanProductImageLimit,
   planProductLimitMessage, planProductImageLimitMessage, canAddProductImage,
   getPriceCooldownRemaining, formatPriceCooldownRemaining, getPlanById,
+  planAllowsStoreAds, canCreateStoreAd, getPlanMonthlyAdLimit,
 } from './plans.js'
 
 async function countStoreProductsWithImages(client, storeId) {
@@ -1680,8 +1681,43 @@ export async function fetchStoreAds(storeId) {
   return data ?? []
 }
 
+async function countStoreAdsCreatedThisMonth(client, storeId) {
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const { count, error } = await client
+    .from('store_ads')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+    .gte('created_at', monthStart)
+  if (error) throw error
+  return count ?? 0
+}
+
+async function assertStoreAdAllowed(client, storeId) {
+  const { data: store, error: storeError } = await client
+    .from('stores')
+    .select('plan_id, status, subscription_status')
+    .eq('id', storeId)
+    .single()
+  if (storeError) throw storeError
+
+  const planId = store?.plan_id ?? 'free'
+  if (!planAllowsStoreAds(planId)) {
+    throw new Error(t('errors.storeAdsPremiumOnly'))
+  }
+  if (store.status !== 'approved' || !['active', 'trialing'].includes(store.subscription_status)) {
+    throw new Error(t('merchant.adsApprovalRequired'))
+  }
+
+  const adsThisMonth = await countStoreAdsCreatedThisMonth(client, storeId)
+  if (!canCreateStoreAd(planId, adsThisMonth)) {
+    throw new Error(t('errors.storeAdsMonthlyLimit', { limit: getPlanMonthlyAdLimit(planId) }))
+  }
+}
+
 export async function createStoreAd(storeId, { title, message, image }) {
   const client = await requireClient()
+  await assertStoreAdAllowed(client, storeId)
   let image_url = null
   if (image instanceof File) {
     image_url = await uploadImage(STORAGE_BUCKETS.products, `ads/${storeId}/${Date.now()}`, image)

@@ -474,6 +474,7 @@ export const STRINGS = {
     "adsSubtitle": "Divulgue sua loja no feed principal",
     "adsAfterApproval": "Disponível após aprovação da loja",
     "adsApprovalRequired": "Sua loja precisa estar aprovada e com assinatura ativa para criar anúncios.",
+    "adsPremiumRequired": "Anúncios no feed são exclusivos do plano Premium (até 4 por mês).",
     "adTitlePlaceholder": "Ex: Promoção de fim de semana",
     "adMessagePlaceholder": "Descreva a oferta ou novidade (10–280 caracteres)",
     "adImageOptional": "Imagem (opcional)",
@@ -733,7 +734,9 @@ export const STRINGS = {
     "invalidPlan": "Plano inválido.",
     "planAlreadyCurrent": "Este já é o seu plano atual.",
     "planRequestPending": "Já existe um pedido de plano aguardando aprovação.",
-    "planRequestAlreadyReviewed": "Este pedido já foi analisado."
+    "planRequestAlreadyReviewed": "Este pedido já foi analisado.",
+    "storeAdsPremiumOnly": "Anúncios no feed são exclusivos do plano Premium.",
+    "storeAdsMonthlyLimit": "Limite de {limit} anúncios por mês no plano Premium. Aguarde o próximo mês ou entre em contato com o suporte."
   },
   "uploads": {
     "logoHint": "JPG, PNG, WebP ou GIF — máx. 2 MB.",
@@ -889,9 +892,12 @@ export const STRINGS = {
     "featureHomeHighlight": "Destaque visual na página inicial",
     "featurePlusItems30": "Até 30 itens (produtos ou serviços)",
     "featurePlusImagesAll": "Imagens em todos os produtos (500 KB cada)",
-    "featureExpandedAd": "Anúncio ampliado na vitrine principal",
     "featureSearchPriority": "Prioridade nas buscas",
     "featurePremiumItems80": "Até 80 itens (produtos ou serviços)",
+    "featurePremiumAds4": "Até 4 anúncios por mês no feed",
+    "premiumAdsOnlyMessage": "Anúncios no feed são exclusivos do plano Premium.",
+    "monthlyAdLimitMessage": "Limite de {limit} anúncios por mês no plano Premium.",
+    "monthlyAdLimitHint": "Premium: {count}/{limit} anúncios neste mês ({remaining} restante(s)).",
     "featureMaxHighlight": "Máximo destaque na página inicial",
     "featureRotationPriority": "Rotação de prioridade a cada 15 min",
     "planStarter": "Starter",
