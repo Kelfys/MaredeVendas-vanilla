@@ -1,16 +1,10 @@
 /**
  * Componentes de UI reutilizáveis (renderização imperativa).
  *
- * Gera HTML via template strings e reanexa event listeners a cada render.
- * Padrão "render + bind" — simples, sem framework.
+ * Header: logo, nav-desktop (Lojas/Regras/Entrar), ações (tema, painel, sair)
+ * e nav-mobile (hambúrguer). Entrar fica no menu — não nas ações do header.
  *
- * Componentes: header, store-card, product-card, cart-drawer, checkout.
- *
- * Melhorias futuras:
- * - Extrair partials HTML para funções menores (product-card é grande)
- * - Delegação de eventos no #main em vez de listeners por elemento
- * - Componentes acessíveis (ARIA, foco no drawer, trap de teclado)
- * - Indicador flutuante do carrinho no header
+ * Também: store-card, feed-product-card, cart-drawer e checkout com pagamentos por loja.
  */
 import { APP_NAME } from './config.js'
 import { getStoreThemeColor } from './config.js'

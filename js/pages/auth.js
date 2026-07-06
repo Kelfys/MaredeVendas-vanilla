@@ -1,13 +1,13 @@
 /**
- * Páginas de autenticação (cliente, lojista e admin).
+ * Autenticação — login unificado, cadastros e portais staff.
  *
- * Três fluxos separados com roles distintos no user_metadata do Supabase.
- * Suporta ?redirect= na URL para voltar à página após login.
+ * Login (/conta/entrar e /lojista/entrar): uma tela para todos os papéis;
+ * getPostLoginPath redireciona para favoritos, dashboard, admin ou moderador.
+ * Clientes podem usar ?redirect= na URL.
  *
- * Melhorias futuras:
- * - Recuperação de senha (resetPasswordForEmail)
- * - Login social (Google, magic link)
- * - Validação de CNPJ/telefone no cadastro de lojista
+ * Cadastro cliente: birth_date obrigatório (18+), validado aqui, em api.js e no banco.
+ * Cadastro lojista: conta merchant + formulário da loja em renderMerchantRegister.
+ * Admin/moderador: telas separadas com reset de senha.
  */
 import { signIn, signUpCustomer } from '../api.js'
 import { setUser } from '../state.js'

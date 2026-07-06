@@ -1,5 +1,8 @@
 /**
- * Página inicial — feed misto de lojas, produtos novos e mais curtidos.
+ * Página inicial — feed misto de lojas, produtos e anúncios.
+ *
+ * Ranking em js/feed.js (plano, engajamento, diversidade entre lojas).
+ * Busca e filtros por categoria substituem o feed padrão.
  */
 import { fetchCategories, fetchStores, fetchNewProducts, fetchTopLikedProducts, fetchActiveFeedAds } from '../api.js'
 import { renderStoreCard, renderFeedProductCard, renderFeedAdCard, openCart } from '../ui.js'

@@ -1,5 +1,8 @@
 /**
- * Algoritmo do feed da home — ranking de lojas, produtos e anúncios.
+ * Algoritmo do feed da home — ranking de lojas, produtos e anúncios patrocinados.
+ *
+ * Score por plano da loja, curtidas, novidade, busca e rotação diária.
+ * Anúncios aprovados entram a cada N slots; diversidade entre lojas no mix.
  */
 import { getPlanFeedWeight } from './plans.js'
 import { getProductEngagementWeight } from './utils.js'

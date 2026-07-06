@@ -10,18 +10,21 @@ Marketplace local de lojas — **HTML, CSS e JavaScript vanilla** com backend [S
 
 | Papel | O que pode fazer |
 |-------|------------------|
-| **Visitante** | Ver lojas, buscar por nome/cidade, adicionar ao carrinho e pedir pelo WhatsApp |
-| **Cliente** | Tudo do visitante + favoritar lojas, curtir/comentar produtos, dados pré-preenchidos no checkout |
-| **Lojista** | Painel com produtos, pedidos e configurações da loja (após aprovação do admin) |
-| **Admin** | Métricas da plataforma e aprovação/rejeição de cadastros de lojas |
+| **Visitante** | Ver feed de lojas e produtos, buscar, adicionar ao carrinho e pedir pelo WhatsApp |
+| **Cliente** | Favoritar lojas, curtir/comentar produtos, dados pré-preenchidos no checkout |
+| **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin) |
+| **Moderador** | Aprovações, lojas, produtos e pedidos (somente leitura em lojas/produtos) |
+| **Admin** | Métricas, moderação, gestão de lojistas/moderadores e configuração da plataforma |
 
 ---
 
 ## Stack
 
-- **Frontend:** ES Modules nativos, roteamento por hash (`#/`), sem bundler
-- **Backend:** Supabase (Auth, PostgreSQL, Row Level Security)
-- **Deploy:** GitHub Pages via GitHub Actions
+- **Frontend:** ES Modules nativos, lazy-load de páginas, sem bundler
+- **Roteamento:** History API em produção (GitHub Pages); hash (`#/`) em localhost na raiz
+- **Backend:** Supabase (Auth, PostgreSQL, Storage, Row Level Security)
+- **Deploy:** GitHub Pages via `peaceiris/actions-gh-pages` (branch `gh-pages`)
+- **Testes:** Vitest (`npm test`)
 - **Fonte:** [Inter](https://fonts.google.com/specimen/Inter) (Google Fonts)
 
 ---
@@ -30,29 +33,25 @@ Marketplace local de lojas — **HTML, CSS e JavaScript vanilla** com backend [S
 
 ```
 maredevendas-vanilla/
-├── index.html              # Shell HTML — ponto de entrada
+├── index.html              # Shell HTML — cache bust em app.js/styles.css no deploy
+├── 404.html                # Fallback SPA para rotas diretas no GitHub Pages
 ├── css/styles.css          # Estilos globais e componentes
 ├── js/
-│   ├── app.js              # Boot da aplicação e registro de rotas
-│   ├── router.js           # Roteador SPA (hash-based)
+│   ├── app.js              # Boot, registro de rotas e lazy-load de páginas
+│   ├── router.js           # Roteador SPA (History ou hash)
 │   ├── state.js            # Estado global (tema, auth, carrinho)
 │   ├── config.js           # Credenciais Supabase e constantes
-│   ├── db.js               # Cliente Supabase (singleton)
+│   ├── db.js               # Cliente Supabase (CDN ESM)
 │   ├── api.js              # Camada de acesso a dados
-│   ├── ui.js               # Componentes de UI reutilizáveis
-│   ├── utils.js            # Formatação, escape HTML, ranking de produtos
-│   ├── whatsapp.js         # Montagem de mensagem e link wa.me
+│   ├── feed.js             # Algoritmo do feed da home
+│   ├── payment.js          # Formas de pagamento no checkout
+│   ├── ui.js               # Header, carrinho, cards e checkout
+│   ├── utils.js            # Formatação, escape HTML, validação de idade
+│   ├── merchant-nav.js     # Menu do painel do lojista
+│   ├── staff-nav.js        # Menu dos painéis admin e moderador
 │   └── pages/              # Uma página por rota
-│       ├── home.js
-│       ├── store-page.js
-│       ├── auth.js
-│       ├── merchant.js
-│       ├── admin.js
-│       ├── favorites.js
-│       └── rules.js
-├── supabase/
-│   ├── setup.sql           # Instruções de setup
-│   └── migrations/         # Migrations SQL (rodar em ordem numérica)
+├── supabase/migrations/    # Migrations SQL (001 → 024)
+├── tests/                  # Testes unitários (Vitest)
 └── .github/workflows/
     └── deploy.yml          # Pipeline de deploy para GitHub Pages
 ```
@@ -70,53 +69,81 @@ maredevendas-vanilla/
 ### 1. Subir servidor local
 
 ```bash
-# Opção A — Python
 python -m http.server 8080
-
-# Opção B — Node (npx)
-npx serve -l 8080
+# ou: npx serve -l 8080
 ```
 
 Acesse: http://localhost:8080
 
 ### 2. Configurar Supabase
 
-**Projeto atual:** `ulpjsxmilumqedkkfuqw` — https://ulpjsxmilumqedkkfuqw.supabase.co
-
-> **Nota:** No dashboard Supabase, as abas *Next.js*, *Prisma* e *Server* não se aplicam a este projeto. Aqui usamos **JavaScript vanilla** com `@supabase/supabase-js` via CDN em `js/db.js` e credenciais em `js/config.js` (equivalente ao `NEXT_PUBLIC_SUPABASE_*` do Next.js).
-
-**Via CLI (recomendado):**
+**Projeto:** `ulpjsxmilumqedkkfuqw` — https://ulpjsxmilumqedkkfuqw.supabase.co
 
 ```bash
 npx supabase login
-npx supabase init          # já feito neste repo
 npx supabase link --project-ref ulpjsxmilumqedkkfuqw
-npx supabase db push       # aplica migrations 001–015
+npx supabase db push
 ```
 
-**Ou manualmente:** execute cada arquivo em `supabase/migrations/` no **SQL Editor** (ordem 001 → 015).
+Ou execute cada arquivo em `supabase/migrations/` no **SQL Editor** (ordem numérica).
 
-Depois:
+**Authentication → URL Configuration:**
 
-1. Em **Authentication → URL Configuration**, adicione:
-   - `http://localhost:8080`
-   - `https://kelfys.github.io/MaredeVendas-vanilla/`
-2. Credenciais em `js/config.js` (chave **publishable** / anon — pública por design):
+- `http://localhost:8080`
+- `https://kelfys.github.io/MaredeVendas-vanilla/`
+
+Credenciais em `js/config.js` (chave **publishable** / anon — pública por design):
 
 ```js
 export const SUPABASE_URL = 'https://ulpjsxmilumqedkkfuqw.supabase.co'
 export const SUPABASE_ANON_KEY = 'sb_publishable_...'
 ```
 
-Veja `.env.example` só como referência de nomes de variáveis. **Nunca** commite `SUPABASE_SECRET_KEY` nem `service_role`.
+**Nunca** commite `service_role` nem secret keys.
 
-> O RLS no banco protege os dados. Skills/MCP do Supabase (`npx skills add supabase/agent-skills`) são opcionais para o editor, não fazem parte do deploy do site.
+### 3. Testes
+
+```bash
+npm test
+```
+
+---
+
+## Contas demo (produção / migrations 012, 021, 023, 024)
+
+| Papel | Email | Senha |
+|-------|-------|-------|
+| Cliente | `cliente@maredevendas.com` | `DemoCliente2026!` |
+| Lojista | `demo-pet-2@maredevendas.com` | `DemoLojista2026!` |
+| Admin | `brunopdaraujo@gmail.com` | `MarecAdmin2026!` |
+| Moderador | `moderador@maredevendas.com` | `DemoModerador2026!` |
+
+---
+
+## Autenticação
+
+- **Login unificado** em `/conta/entrar` (e alias `/lojista/entrar`): mesma tela para cliente, lojista, admin e moderador
+- Após login, redirecionamento automático por papel: `/favoritos`, `/dashboard`, `/admin` ou `/moderador`
+- Parâmetro `?redirect=` funciona para clientes (ex.: voltar à loja após login)
+- **Cadastro de cliente** em `/conta/criar` exige data de nascimento (18+), validada no front, API e banco
+- **Cadastro de loja** em `/lojista/cadastro` (link na tela de login)
+- Admin e moderador têm telas dedicadas em `/admin/entrar` e `/moderador/entrar` (com recuperação de senha)
+
+### Navegação (header)
+
+- **Desktop:** `Lojas · Regras · Entrar` no menu superior (sem botão Entrar nas ações do header)
+- **Mobile:** `Lojas · Regras · 🔑 Entrar` no menu hambúrguer (☰)
+- Logado: ícones de favoritos, painel ou sair conforme o papel
 
 ---
 
 ## Deploy
 
-O deploy é automático via GitHub Actions ao fazer push na branch `main`.
+Deploy automático ao fazer push na `main`. O workflow:
+
+1. Copia `index.html`, `css/`, `js/`, `favicon.svg` e `404.html` para `dist/`
+2. Injeta `?v=<commit>` em `app.js` e `styles.css` (cache bust)
+3. Publica na branch `gh-pages` via Peaceiris
 
 **Deploy manual:**
 
@@ -124,24 +151,24 @@ O deploy é automático via GitHub Actions ao fazer push na branch `main`.
 gh workflow run deploy.yml
 ```
 
-O workflow copia `index.html`, `css/`, `js/` e `favicon.svg` para `dist/` e publica no GitHub Pages.
-
 ---
 
-## Rotas
+## Rotas principais
 
 | Rota | Página |
 |------|--------|
-| `#/` | Feed de lojas |
-| `#/loja/:slug` | Página pública da loja |
-| `#/conta/entrar` | Login do cliente |
-| `#/conta/criar` | Cadastro do cliente |
-| `#/lojista/entrar` | Login do lojista |
-| `#/lojista/cadastro` | Cadastro de loja |
-| `#/dashboard` | Painel do lojista |
-| `#/admin` | Painel admin |
-| `#/favoritos` | Lojas favoritas |
-| `#/regras` | Regras da plataforma |
+| `/` | Feed de lojas e produtos |
+| `/loja/:slug` | Página pública da loja |
+| `/conta/entrar` | Login unificado |
+| `/conta/criar` | Cadastro do cliente (com data de nascimento) |
+| `/lojista/cadastro` | Cadastro de loja |
+| `/dashboard` | Painel do lojista |
+| `/admin` | Painel admin |
+| `/moderador` | Painel moderador |
+| `/favoritos` | Lojas favoritas |
+| `/regras` | Regras e planos |
+
+> Em localhost as rotas usam hash (`#/conta/entrar`). Em produção (GitHub Pages) usam URLs limpas com base `/MaredeVendas-vanilla/`.
 
 ---
 
@@ -149,7 +176,7 @@ O workflow copia `index.html`, `css/`, `js/` e `favicon.svg` para `dist/` e publ
 
 1. Cliente navega até uma loja aprovada
 2. Adiciona produtos ao carrinho (uma loja por vez)
-3. Clica em "Finalizar Pedido" e preenche nome, telefone e endereço
+3. Escolhe forma de pagamento e preenche nome, telefone e endereço
 4. O pedido é salvo no Supabase (`orders` + `order_items`)
 5. WhatsApp abre com a mensagem formatada para o lojista
 
@@ -157,44 +184,27 @@ O workflow copia `index.html`, `css/`, `js/` e `favicon.svg` para `dist/` e publ
 
 ## Manutenção
 
-### Adicionar uma nova página
+### Nova página
 
 1. Crie `js/pages/minha-pagina.js` com `export async function renderMinhaPagina(main) { ... }`
-2. Importe e registre em `js/app.js`:
+2. Registre em `js/app.js` com `registerRoute`
+3. Adicione link em `js/ui.js` se for rota pública
 
-```js
-import { renderMinhaPagina } from './pages/minha-pagina.js'
-registerRoute('/minha-rota', renderMinhaPagina)
-```
+### Nova migration
 
-3. Adicione link no header em `js/ui.js` se necessário
-
-### Adicionar endpoint de API
-
-1. Crie a função em `js/api.js` usando `requireClient()`
-2. Consuma na página correspondente em `js/pages/`
-
-### Nova migration do banco
-
-1. Crie `supabase/migrations/012_descricao.sql`
-2. Execute no SQL Editor do Supabase
+1. Crie `supabase/migrations/025_descricao.sql`
+2. `npx supabase db push` ou SQL Editor
 3. Atualize `api.js` e a UI conforme necessário
 
 ---
 
 ## Melhorias futuras
 
-Ideias documentadas nos comentários do código:
-
-- [ ] Migrar roteamento de hash para History API (`pushState`)
-- [ ] Lazy-load de páginas com `import()` dinâmico
-- [ ] Upload de imagens via Supabase Storage
-- [ ] Paginação no feed de lojas e listagem de produtos
 - [ ] Notificações em tempo real (Supabase Realtime) para novos pedidos
-- [ ] Recuperação de senha e login social
 - [ ] Integração de pagamento/assinatura (Stripe)
 - [ ] Service Worker para cache offline
-- [ ] Testes automatizados (Vitest + Playwright)
+- [ ] Testes E2E automatizados no CI (Playwright)
+- [ ] Paginação no feed e listagens longas
 
 ---
 

@@ -1,5 +1,8 @@
 /**
  * Ponto de entrada da aplicação MaredeVendas.
+ *
+ * Inicializa tema, header, carrinho e roteador. Páginas carregadas sob demanda
+ * via import() dinâmico (lazy). Rotas públicas, painéis e auth em registerRoute.
  */
 import { setTheme, loadUser } from './state.js'
 import { initHeader, initCart } from './ui.js'

@@ -1,5 +1,6 @@
 /**
  * Navegação do painel do lojista.
+ * loginPath aponta para o login unificado em /conta/entrar.
  */
 import { getCurrentPath, routeHref } from './router.js'
 

@@ -5,8 +5,8 @@
  * getSupabase() diretamente. Erros do Supabase são propagados para
  * quem chamou tratar na UI.
  *
- * Domínios: Auth, Categories, Stores, Products (incl. feed marketplace),
- * Orders, Reviews, Favorites, Admin.
+ * Domínios: Auth (login unificado, signUpCustomer com birth_date), Categories,
+ * Stores, Products (feed marketplace), Orders, Reviews, Favorites, Admin/Moderador.
  *
  * Melhorias futuras:
  * - Paginação em fetchStores / fetchOrdersByStore

@@ -1,4 +1,5 @@
 # Deploy automático para GitHub Pages (branch gh-pages via peaceiris).
+# Injeta ?v=<commit> em app.js e styles.css para cache bust no mobile.
 # Dispara em push na main ou manualmente: gh workflow run deploy.yml
 name: Deploy GitHub Pages
 
