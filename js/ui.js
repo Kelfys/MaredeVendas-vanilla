@@ -66,6 +66,8 @@ export function renderHeader() {
   const onMerchant = user?.role === 'merchant' && isMerchantPath(currentPath)
   const staffTab = onStaff ? getStaffTab(currentPath, staffPanel) : null
   const merchantTab = onMerchant ? getMerchantTab(currentPath) : null
+  const onHome = currentPath === '/' || currentPath === ''
+  const onLogin = currentPath === '/conta/entrar'
 
   header.innerHTML = `
     <div class="header__inner">
@@ -75,8 +77,14 @@ export function renderHeader() {
       </a>
 
       <nav class="nav-desktop">
-        <a href="${routeHref('/')}">Início</a>
-        ${!user ? '<a href="#/conta/entrar">Entrar</a>' : ''}
+        <a href="${routeHref('/')}" class="nav-btn nav-btn--ghost${onHome ? ' active' : ''}">
+          <span class="nav-btn__icon" aria-hidden="true">🏠</span>
+          <span>Início</span>
+        </a>
+        ${!user ? `<a href="${routeHref('/conta/entrar')}" class="nav-btn nav-btn--primary${onLogin ? ' active' : ''}">
+          <span class="nav-btn__icon" aria-hidden="true">🔑</span>
+          <span>Entrar</span>
+        </a>` : ''}
       </nav>
 
       <div class="header__actions">
@@ -107,7 +115,16 @@ export function renderHeader() {
     </div>
 
     <nav class="nav-mobile ${menuOpen ? 'open' : ''}" id="nav-mobile">
-      <a href="${routeHref('/')}">Início</a>
+      <div class="nav-mobile__actions${user ? ' nav-mobile__actions--single' : ''}">
+        <a href="${routeHref('/')}" class="nav-btn nav-btn--ghost nav-btn--block${onHome ? ' active' : ''}">
+          <span class="nav-btn__icon" aria-hidden="true">🏠</span>
+          <span>Início</span>
+        </a>
+        ${!user ? `<a href="${routeHref('/conta/entrar')}" class="nav-btn nav-btn--primary nav-btn--block${onLogin ? ' active' : ''}">
+          <span class="nav-btn__icon" aria-hidden="true">🔑</span>
+          <span>Entrar</span>
+        </a>` : ''}
+      </div>
       ${user?.role === 'customer' ? '<a href="#/favoritos">❤️ Favoritos</a>' : ''}
       ${user?.role === 'merchant' ? `
         <p class="nav-mobile__section">Painel do Lojista</p>
@@ -128,7 +145,7 @@ export function renderHeader() {
         ${renderStaffMenuItems('moderator', staffTab, { compact: true })}
         <a href="${routeHref('/')}">← Voltar ao site</a>
       ` : ''}
-      ${user ? '<button type="button" id="logout-mobile">🚪 Sair</button>' : '<a href="#/conta/entrar">🔑 Entrar</a>'}
+      ${user ? '<button type="button" id="logout-mobile">🚪 Sair</button>' : ''}
     </nav>
 
     ${onStaff ? `
