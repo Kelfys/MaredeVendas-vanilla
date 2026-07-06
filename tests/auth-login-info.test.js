@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderRulesAndPlansContent } from '../js/pages/rules.js'
+import { renderRulesAndPlansContent } from '../js/rules-plans-panel.js'
 
 describe('login page rules and plans', () => {
   beforeEach(() => {
@@ -25,6 +25,14 @@ describe('login page rules and plans', () => {
     vi.doMock('../js/router.js', () => ({
       navigate: vi.fn(),
       getHashSection: () => null,
+    }))
+    vi.doMock('../js/rules-plans-panel.js', () => ({
+      renderRulesAndPlansContent: () => `
+        <div class="auth-info-panel">
+          <h2 id="regras">Regras</h2>
+          <section id="planos">Enviar comprovante — Starter</section>
+          <p>Conduta</p>
+        </div>`,
     }))
 
     const formStub = { addEventListener: vi.fn() }

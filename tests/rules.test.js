@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderRulesAndPlansContent } from '../js/pages/rules.js'
+import { renderRulesAndPlansContent } from '../js/rules-plans-panel.js'
 
 describe('renderRulesAndPlansContent', () => {
   it('includes rules and plan cards for login page', () => {

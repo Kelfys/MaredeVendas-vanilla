@@ -13,7 +13,6 @@ import { signIn, signUpCustomer } from '../api.js'
 import { setUser } from '../state.js'
 import { navigate, getHashSection } from '../router.js'
 import { escapeHtml, getMaxBirthDateForRegistration, validateRegistrationBirthDate } from '../utils.js'
-import { renderRulesAndPlansContent } from './rules.js'
 
 function parseQuery() {
   const hash = window.location.hash
@@ -21,8 +20,8 @@ function parseQuery() {
   return new URLSearchParams(q)
 }
 
-function authLayout(title, description, body, { showRulesAndPlans = false } = {}) {
-  const pageClass = showRulesAndPlans ? 'auth-page auth-page--with-info' : 'auth-page'
+function authLayout(title, description, body, { infoPanelHtml = '' } = {}) {
+  const pageClass = infoPanelHtml ? 'auth-page auth-page--with-info' : 'auth-page'
 
   return `
     <div class="${pageClass}">
@@ -34,7 +33,7 @@ function authLayout(title, description, body, { showRulesAndPlans = false } = {}
           ${body}
         </div>
       </div>
-      ${showRulesAndPlans ? `<aside class="auth-page__info">${renderRulesAndPlansContent()}</aside>` : ''}
+      ${infoPanelHtml ? `<aside class="auth-page__info">${infoPanelHtml}</aside>` : ''}
     </div>
   `
 }
@@ -66,6 +65,7 @@ function getPostLoginPath(user, redirect) {
 export async function renderLogin(main) {
   const params = parseQuery()
   const redirect = params.get('redirect')
+  const { renderRulesAndPlansContent } = await import('../rules-plans-panel.js')
 
   main.innerHTML = authLayout(
     'Entrar',
@@ -89,7 +89,7 @@ export async function renderLogin(main) {
         <a href="#/conta/entrar?sec=planos">Planos</a>
       </div>
     `,
-    { showRulesAndPlans: true },
+    { infoPanelHtml: renderRulesAndPlansContent() },
   )
 
   main.querySelector('#login-form').addEventListener('submit', async (e) => {
