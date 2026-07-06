@@ -13,6 +13,7 @@ import { signIn, signUpCustomer } from '../api.js'
 import { setUser } from '../state.js'
 import { navigate } from '../router.js'
 import { escapeHtml, getMaxBirthDateForRegistration, validateRegistrationBirthDate } from '../utils.js'
+import { renderPublicPlansPanel } from '../plans.js'
 
 function parseQuery() {
   const hash = window.location.hash
@@ -20,15 +21,20 @@ function parseQuery() {
   return new URLSearchParams(q)
 }
 
-function authLayout(title, description, body) {
+function authLayout(title, description, body, { showPlans = false } = {}) {
+  const pageClass = showPlans ? 'auth-page auth-page--with-plans' : 'auth-page'
+
   return `
-    <div class="auth-page">
-      <div class="auth-card">
-        <h1>${escapeHtml(title)}</h1>
-        <p>${escapeHtml(description)}</p>
-        <div id="auth-error"></div>
-        ${body}
+    <div class="${pageClass}">
+      <div class="auth-page__login">
+        <div class="auth-card">
+          <h1>${escapeHtml(title)}</h1>
+          <p>${escapeHtml(description)}</p>
+          <div id="auth-error"></div>
+          ${body}
+        </div>
       </div>
+      ${showPlans ? `<aside class="auth-page__plans" id="planos">${renderPublicPlansPanel()}</aside>` : ''}
     </div>
   `
 }
@@ -71,6 +77,8 @@ export async function renderLogin(main) {
       <div class="auth-links">
         <a href="#/conta/criar">Criar conta de cliente</a>
         <a href="#/lojista/cadastro">Cadastrar minha loja</a>
+        <a href="#/lojista/entrar#planos">Ver planos para lojistas</a>
+        <a href="#/regras">Regras da plataforma</a>
       </div>
     `
   )
@@ -156,7 +164,58 @@ export async function renderCustomerRegister(main) {
   })
 }
 
-export const renderMerchantLogin = renderLogin
+export async function renderMerchantLogin(main) {
+  const params = parseQuery()
+  const redirect = params.get('redirect')
+
+  main.innerHTML = authLayout(
+    'Entrar como lojista',
+    'Acesse seu painel ou conheça os planos disponíveis para sua loja.',
+    `
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" name="email" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input class="form-input" type="password" name="password" required minlength="6" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+      <div class="auth-links">
+        <a href="#/lojista/cadastro">Cadastrar minha loja</a>
+        <a href="#/conta/entrar">Entrar como cliente</a>
+        <a href="#/regras">Regras da plataforma</a>
+      </div>
+    `,
+    { showPlans: true },
+  )
+
+  main.querySelector('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const errEl = main.querySelector('#auth-error')
+    errEl.innerHTML = ''
+
+    try {
+      await signIn(form.email.value, form.password.value)
+      const { loadUser, getUser } = await import('../state.js')
+      await loadUser()
+      const user = getUser()
+      if (!user) throw new Error('Não foi possível carregar sua conta.')
+      navigate(getPostLoginPath(user, redirect))
+    } catch (err) {
+      errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    }
+  })
+
+  if (window.location.hash.includes('#planos')) {
+    requestAnimationFrame(() => {
+      main.querySelector('#planos')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+}
 
 export async function renderAdminLogin(main) {
   main.innerHTML = authLayout(

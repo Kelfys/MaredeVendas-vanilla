@@ -45,7 +45,7 @@ function boot() {
   registerRoute('/loja/:slug', lazy(() => import('./pages/store-page.js').then((m) => ({ default: m.renderStorePage }))))
   registerRoute('/conta/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderLogin }))))
   registerRoute('/conta/criar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderCustomerRegister }))))
-  registerRoute('/lojista/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderLogin }))))
+  registerRoute('/lojista/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderMerchantLogin }))))
   registerRoute('/lojista/cadastro', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderMerchantRegister }))))
   registerRoute('/admin/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderAdminLogin }))))
   registerRoute('/admin', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'overview') }))))

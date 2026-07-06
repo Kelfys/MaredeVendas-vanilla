@@ -1,9 +1,5 @@
-import { renderSubscriptionPlanCards } from '../plans.js'
-
-/** Página estática com regras, termos e planos da plataforma. */
+/** Página estática com regras e termos da plataforma. */
 export async function renderRules(main) {
-  const planCards = renderSubscriptionPlanCards()
-
   main.innerHTML = `
     <div class="container-wide rules-page">
       <a href="#/" class="rules-page__back">← Voltar para as lojas</a>
@@ -31,26 +27,12 @@ export async function renderRules(main) {
             <li>Informações da loja devem ser verdadeiras e atualizadas.</li>
             <li>Produtos com preço e estoque corretos.</li>
             <li>WhatsApp deve estar ativo para receber pedidos.</li>
+            <li>Planos pagos exigem comprovante e aprovação — veja os valores em <a href="#/lojista/entrar">Entrar como lojista</a>.</li>
           </ul>
         </section>
 
         <section class="rules-section">
-          <h2>4. Planos para lojistas</h2>
-          <p>Escolha o plano que melhor se encaixa no tamanho da sua loja. O plano <strong>Gratuito</strong> é ativado após aprovação do cadastro. Para planos pagos, realize o pagamento e envie o comprovante pelo WhatsApp.</p>
-          <div class="plan-grid">${planCards}</div>
-          <div class="plan-payment-info">
-            <p><strong>Como assinar um plano pago:</strong></p>
-            <ol>
-              <li>Realize o pagamento do valor mensal do plano escolhido.</li>
-              <li>Clique no botão do plano escolhido acima para enviar o comprovante pelo WhatsApp.</li>
-              <li>Informe o nome da loja e o email cadastrado na mensagem.</li>
-              <li>Após confirmação, seu plano será ativado pelo administrador.</li>
-            </ol>
-          </div>
-        </section>
-
-        <section class="rules-section">
-          <h2>5. Conduta</h2>
+          <h2>4. Conduta</h2>
           <p>Conteúdo ilegal, discriminatório ou enganoso será removido. Lojas podem ser bloqueadas em caso de violação.</p>
         </section>
       </div>

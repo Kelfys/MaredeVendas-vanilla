@@ -77,6 +77,7 @@ export function renderHeader() {
       <nav class="nav-desktop">
         <a href="#/">Lojas</a>
         <a href="#/regras">Regras</a>
+        ${!user ? '<a href="#/lojista/entrar#planos">Planos</a>' : ''}
         ${!user ? '<a href="#/conta/entrar">Entrar</a>' : ''}
       </nav>
 
@@ -110,6 +111,7 @@ export function renderHeader() {
     <nav class="nav-mobile ${menuOpen ? 'open' : ''}" id="nav-mobile">
       <a href="#/">Lojas</a>
       <a href="#/regras">Regras</a>
+      ${!user ? '<a href="#/lojista/entrar#planos">Planos</a>' : ''}
       ${user?.role === 'customer' ? '<a href="#/favoritos">❤️ Favoritos</a>' : ''}
       ${user?.role === 'merchant' ? `
         <p class="nav-mobile__section">Painel do Lojista</p>
