@@ -9,7 +9,7 @@ import {
   fetchProductPriceHistory, countUnreadMerchantOrders, subscribeToStoreOrders,
   createPlanChangeRequest, fetchStorePendingPlanChangeRequest,
 } from '../api.js'
-import { getUser, setMerchantNewOrdersCount } from '../state.js'
+import { getUser, loadUser, setMerchantNewOrdersCount } from '../state.js'
 import {
   escapeHtml, formatCurrency, formatDate, formatDateTimeCsv,
   buildCsv, downloadTextFile, showToast,
@@ -41,6 +41,7 @@ import {
   getPaymentMethodLabel, PAYMENT_METHODS, normalizeStorePaymentMethods,
 } from '../payment.js'
 import { t } from '../strings.js'
+import { bindPasswordToggles } from '../password-field.js'
 
 const LOW_STOCK_THRESHOLD = 3
 const PRODUCTS_PAGE_SIZE = 15
@@ -77,10 +78,11 @@ function bindImagePreview(input, previewEl) {
   })
 }
 
-function guardMerchant(main) {
-  const user = getUser()
+async function guardMerchant(main) {
+  let user = getUser()
+  if (!user) user = await loadUser()
   if (!user || user.role !== 'merchant') {
-    main.innerHTML = `<div class="empty-state"><h2>${t('merchant.restrictedAccess')}</h2><p><a href="${routeHref('/conta/entrar')}">${t('nav.login')}</a></p></div>`
+    main.innerHTML = `<div class="empty-state"><h2>${t('merchant.restrictedAccess')}</h2><p><a href="${routeHref('/lojista/entrar')}">${t('nav.login')}</a></p></div>`
     return null
   }
   return user
@@ -1009,6 +1011,7 @@ function bindAdForm(main, store) {
 }
 
 function bindPasswordForm(main) {
+  bindPasswordToggles(main)
   main.querySelector('#merchant-password-form')?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const form = e.target
@@ -1071,7 +1074,7 @@ function buildOrdersSubscription(store, tab, main) {
 }
 
 export async function renderMerchantDashboard(main, tab = 'overview') {
-  const user = guardMerchant(main)
+  const user = await guardMerchant(main)
   if (!user) return
 
   const store = await fetchStoreByOwner(user.id)

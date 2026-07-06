@@ -1624,6 +1624,28 @@ img { max-width: 100%; display: block; }
 
 .form-input:focus { outline: none; border-color: var(--primary-600); }
 
+.password-field {
+  position: relative;
+}
+
+.password-field__input {
+  padding-right: 2.75rem;
+}
+
+.password-field__toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%);
+  width: 2rem;
+  height: 2rem;
+  color: var(--text-secondary);
+}
+
+.password-field__toggle:hover {
+  color: var(--text);
+}
+
 .form-label {
   display: block;
   margin-bottom: 0.375rem;

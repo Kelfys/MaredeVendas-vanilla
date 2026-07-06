@@ -320,6 +320,8 @@ export const STRINGS = {
     "defaultUser": "Usuário",
     "defaultStore": "Loja",
     "closeCart": "Fechar carrinho",
+    "showPassword": "Mostrar senha",
+    "hidePassword": "Ocultar senha",
     "removeItem": "Remover item",
     "decreaseQty": "Diminuir quantidade",
     "increaseQty": "Aumentar quantidade",

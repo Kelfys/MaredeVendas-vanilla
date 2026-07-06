@@ -4,11 +4,51 @@
  * Inicializa tema, header, carrinho e roteador. Páginas carregadas sob demanda
  * via import() dinâmico (lazy). Rotas públicas, painéis e auth em registerRoute.
  */
-import { setTheme, loadUser } from './state.js'
+import { setTheme, loadUser, onAuthChange } from './state.js'
 import { initHeader, initCart } from './ui.js'
-import { registerRoute, initRouter, routeHref, navigate } from './router.js'
+import { registerRoute, initRouter, routeHref, navigate, getCurrentPath, render } from './router.js'
 import { getSupabase } from './db.js'
 import { completeOAuthSignup } from './api.js'
+
+const PROTECTED_ROUTE_PREFIXES = ['/dashboard', '/admin', '/moderador']
+
+function isProtectedRoute(path) {
+  return PROTECTED_ROUTE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
+}
+
+/** Aguarda a sessão do Supabase ser restaurada do storage antes do primeiro loadUser. */
+async function waitForInitialSession() {
+  const client = getSupabase()
+  if (!client) return
+
+  await new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      resolve()
+    }
+
+    const { data: { subscription } } = client.auth.onAuthStateChange((event) => {
+      if (event === 'INITIAL_SESSION') {
+        subscription.unsubscribe()
+        finish()
+      }
+    })
+
+    client.auth.getSession().finally(() => {
+      setTimeout(() => {
+        subscription.unsubscribe()
+        finish()
+      }, 100)
+    })
+
+    setTimeout(() => {
+      subscription.unsubscribe()
+      finish()
+    }, 8000)
+  })
+}
 
 const lazy = (loader) => async (main, params) => {
   const mod = await loader()
@@ -87,11 +127,19 @@ function normalizePathnameToHash() {
   history.replaceState(null, '', `${m[1]}/#${subpath}${window.location.search}`)
 }
 
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((resolve) => setTimeout(() => resolve(null), ms)),
-  ])
+function setupAuthListeners() {
+  const client = getSupabase()
+  if (!client) return
+
+  client.auth.onAuthStateChange(async (event) => {
+    if (!['SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) return
+    await loadUser()
+  })
+
+  onAuthChange(() => {
+    const path = getCurrentPath()
+    if (isProtectedRoute(path)) render()
+  })
 }
 
 function boot() {
@@ -139,11 +187,16 @@ function boot() {
 
   initHeader()
   initCart()
+  setupAuthListeners()
   initRouter()
   delete window.__MV_INITIAL_ROUTE__
 }
 
 handleAuthCallback()
-  .then(() => withTimeout(loadUser(), 5000))
+  .then(() => waitForInitialSession())
+  .then(() => loadUser())
   .then(boot)
-  .catch(boot)
+  .catch((err) => {
+    console.error('Boot error:', err)
+    boot()
+  })

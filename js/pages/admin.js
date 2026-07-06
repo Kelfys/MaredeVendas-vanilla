@@ -15,7 +15,7 @@ import {
   fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood,
 } from '../api.js'
 import { getStaffNeighborhoodScope, formatNeighborhoodLabel } from '../neighborhood.js'
-import { getUser, setAdminPendingCount } from '../state.js'
+import { getUser, loadUser, setAdminPendingCount } from '../state.js'
 import { navigate } from '../router.js'
 import {
   escapeHtml, formatDate, formatCurrency, showToast,
@@ -43,9 +43,11 @@ import {
   catalogItemTypeFieldHtml, catalogStockFieldHtml, bindCatalogItemTypeForm, readCatalogItemForm,
 } from '../catalog.js'
 import { t } from '../strings.js'
+import { bindPasswordToggles } from '../password-field.js'
 
-function guardStaff(main, panel = 'admin') {
-  const user = getUser()
+async function guardStaff(main, panel = 'admin') {
+  let user = getUser()
+  if (!user) user = await loadUser()
   const panelConfig = STAFF_PANELS[panel]
   if (!canAccessPanel(user, panel)) {
     main.innerHTML = `<div class="empty-state"><h2>${t('admin.restrictedAccess')}</h2><p><a href="#${panelConfig.loginPath}">${t('nav.login')}</a></p></div>`
@@ -1167,7 +1169,7 @@ function metricCards(metrics, pendingCount, orderMetrics = null, panel = 'admin'
 }
 
 export async function renderStaffDashboard(main, tab = 'overview', selectedStoreId = null, panel = 'admin') {
-  const user = guardStaff(main, panel)
+  const user = await guardStaff(main, panel)
   if (!user) return
 
   main.dataset.staffPanel = panel
@@ -2644,6 +2646,7 @@ function bindEmailForm(main) {
 }
 
 function bindPasswordForm(main) {
+  bindPasswordToggles(main)
   main.querySelector('#admin-password-form')?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const form = e.target

@@ -293,7 +293,12 @@ export async function requestPasswordReset(email) {
 export async function getCurrentUser() {
   if (!isSupabaseConfigured()) return null
   const client = getSupabase()
-  const { data: { user } } = await client.auth.getUser()
+  const { data: { session } } = await client.auth.getSession()
+  let user = session?.user ?? null
+  if (!user) {
+    const { data: { user: fetched } } = await client.auth.getUser()
+    user = fetched
+  }
   if (!user) return null
 
   const { data, error } = await client

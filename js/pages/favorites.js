@@ -14,6 +14,7 @@ import { escapeHtml, formatCurrency, formatDate, showToast } from '../utils.js'
 import { routeHref } from '../router.js'
 import { normalizeStorePaymentMethods, getPaymentMethodLabel } from '../payment.js'
 import { t, deliveryPeriodLabel, orderStatusLabel } from '../strings.js'
+import { bindPasswordToggles } from '../password-field.js'
 
 const DELIVERY_LABELS = {
   manha: deliveryPeriodLabel('manha'),
@@ -398,6 +399,7 @@ export async function renderFavorites(main) {
 
     main.querySelector('[data-open-cart]')?.addEventListener('click', openCart)
     bindProductCartEvents()
+    bindPasswordToggles(main)
 
     const profileForm = main.querySelector('#customer-profile-form')
     profileForm?.addEventListener('submit', async (e) => {
