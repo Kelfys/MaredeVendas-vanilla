@@ -24,7 +24,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p dist
-          cp index.html favicon.svg 404.html dist/
+          cp index.html favicon.svg 404.html README.md dist/
           cp -r css js dist/
           touch dist/.nojekyll
           BUILD_ID="${GITHUB_SHA::7}"
