@@ -134,7 +134,10 @@ export function formatAuthError(error) {
 
 export async function signIn(email, password) {
   const client = await requireClient()
-  const { data, error } = await client.auth.signInWithPassword({ email, password })
+  const { data, error } = await client.auth.signInWithPassword({
+    email: String(email ?? '').trim(),
+    password: String(password ?? '').trim(),
+  })
   if (error) throw new Error(formatAuthError(error))
   return data
 }
