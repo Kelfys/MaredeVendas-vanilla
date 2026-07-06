@@ -32,16 +32,16 @@ async function handleAuthCallback() {
     const clean = new URL(window.location.href)
     clean.searchParams.delete('code')
     clean.searchParams.delete('state')
-    window.history.replaceState({}, '', clean.pathname + clean.search)
+    window.history.replaceState({}, '', clean.pathname + clean.search + clean.hash)
   } catch (err) {
     console.error('Auth callback error:', err)
   }
 }
 
-/** Converte /repo/rota → /repo/#/rota (GitHub Pages não roteia SPA sem hash). */
+/** Converte /repo/rota → /repo/#/rota sem recarregar (evita tela branca no F5). */
 function normalizePathnameToHash() {
-  const hash = window.location.hash.replace(/^#/, '')
-  if (hash && hash !== '/') return false
+  const currentHash = window.location.hash.replace(/^#/, '')
+  if (currentHash && currentHash !== '/') return
 
   try {
     const stored = sessionStorage.getItem('spa-redirect')
@@ -50,8 +50,8 @@ function normalizePathnameToHash() {
       const parts = stored.match(/^(\/[^/]+)(\/.*)?$/)
       const sub = parts?.[2]?.replace(/\/$/, '') || ''
       if (sub && sub !== '/') {
-        window.location.replace(`${parts[1]}/#${sub}${window.location.search}`)
-        return true
+        history.replaceState(null, '', `${parts[1]}/#${sub}${window.location.search}`)
+        return
       }
     }
   } catch {
@@ -60,10 +60,9 @@ function normalizePathnameToHash() {
 
   const m = window.location.pathname.match(/^(\/[^/]+)(\/.*)?$/)
   const subpath = m?.[2]?.replace(/\/$/, '') || ''
-  if (!subpath || subpath === '/') return false
+  if (!subpath || subpath === '/') return
 
-  window.location.replace(`${m[1]}/#${subpath}${window.location.search}`)
-  return true
+  history.replaceState(null, '', `${m[1]}/#${subpath}${window.location.search}`)
 }
 
 function withTimeout(promise, ms) {
@@ -74,7 +73,7 @@ function withTimeout(promise, ms) {
 }
 
 function boot() {
-  if (normalizePathnameToHash()) return
+  normalizePathnameToHash()
   setTheme(localStorage.getItem('maredevendas-theme') || 'light')
 
   registerRoute('/', lazy(() => import('./pages/home.js').then((m) => ({ default: m.renderHome }))))

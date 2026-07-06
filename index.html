@@ -13,6 +13,14 @@
     (function () {
       var match = location.pathname.match(/^(\/[^/]+)/)
       window.__MV_BASE__ = (match && !match[1].includes('.')) ? match[1] + '/' : './'
+      var hash = location.hash.replace(/^#/, '')
+      if (!hash || hash === '/') {
+        var deep = location.pathname.match(/^(\/[^/]+)(\/.*)?$/)
+        var sub = deep && deep[2] ? deep[2].replace(/\/$/, '') : ''
+        if (sub && sub !== '/') {
+          history.replaceState(null, '', deep[1] + '/#' + sub + location.search)
+        }
+      }
     })()
   </script>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
@@ -33,7 +41,7 @@
 <body>
   <div id="app">
     <header id="header" class="header"></header>
-    <main id="main" class="main"></main>
+    <main id="main" class="main"><div class="loading"><div class="spinner"></div></div></main>
     <div id="cart-root"></div>
     <div id="toast" class="toast hidden" role="status"></div>
   </div>
