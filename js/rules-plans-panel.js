@@ -1,6 +1,6 @@
 import { renderSubscriptionPlanCards } from './plans.js'
 
-/** Painel de regras e planos exibido na página Entrar. */
+/** Painel de regras e planos nas páginas Entrar e Criar conta (colapsável). */
 export function renderRulesAndPlansContent() {
   const planCards = renderSubscriptionPlanCards({ infoOnly: true })
 

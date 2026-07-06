@@ -9,6 +9,8 @@
  * Cadastro lojista: conta merchant + formulário da loja em renderMerchantRegister.
  * Admin/moderador: telas separadas com reset de senha.
  *
+ * Regras/planos: painel colapsável em /conta/entrar e /conta/criar (botão Ver regras…).
+ *
  * Google OAuth (opcional — requer provider ativo no Supabase):
  * - /conta/entrar → Entrar com Google
  * - /conta/criar → Criar conta com Google (cliente)
@@ -169,11 +171,7 @@ export async function renderLogin(main) {
         <a href="${routeHref('/lojista/cadastro')}">Cadastrar minha loja</a>
         <a href="${routeHref('/admin/entrar')}">Acesso admin</a>
       </div>
-      <p class="auth-rules-toggle">
-        <button type="button" class="btn btn-outline btn-sm btn-block" id="toggle-rules-panel" aria-expanded="false" aria-controls="auth-page-info">
-          Ver regras e planos da plataforma
-        </button>
-      </p>
+      ${renderRulesToggleButton()}
     `,
     { infoPanelHtml: renderRulesAndPlansContent(), infoPanelCollapsed: true },
   )
@@ -207,7 +205,19 @@ export async function renderLogin(main) {
 
 export const renderCustomerLogin = renderLogin
 
+function renderRulesToggleButton() {
+  return `
+    <p class="auth-rules-toggle">
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="toggle-rules-panel" aria-expanded="false" aria-controls="auth-page-info">
+        Ver regras e planos da plataforma
+      </button>
+    </p>
+  `
+}
+
 export async function renderCustomerRegister(main) {
+  const { renderRulesAndPlansContent } = await import('../rules-plans-panel.js')
+
   main.innerHTML = authLayout(
     'Criar Conta',
     'Cadastre-se para favoritar lojas e agilizar seus pedidos.',
@@ -238,12 +248,17 @@ export async function renderCustomerRegister(main) {
         <button type="submit" class="btn btn-primary btn-block">Criar conta</button>
       </form>
       <p style="margin-top:1rem;font-size:0.875rem;text-align:center;color:var(--text-secondary)">
-        <a href="#/conta/entrar">Já tenho conta</a>
+        <a href="${routeHref('/conta/entrar')}">Já tenho conta</a>
       </p>
-    `
+      ${renderRulesToggleButton()}
+    `,
+    { infoPanelHtml: renderRulesAndPlansContent(), infoPanelCollapsed: true },
   )
 
+  const rulesSection = getHashSection()
+  bindRulesPanelToggle(main, { open: Boolean(rulesSection) })
   bindGoogleAuth(main, { nextPath: '/favoritos' })
+  scrollToAuthSection(main, rulesSection)
 
   main.querySelector('#register-form').addEventListener('submit', async (e) => {
     e.preventDefault()

@@ -45,13 +45,23 @@ describe('google auth', () => {
       routeHref: (path) => `#${path}`,
     }))
 
+    vi.doMock('../js/rules-plans-panel.js', () => ({
+      renderRulesAndPlansContent: () => '<div class="auth-info-panel"><h2 id="regras">Regras</h2></div>',
+    }))
+
     const formStub = { addEventListener: vi.fn() }
     const googleBtn = { addEventListener: vi.fn(), disabled: false }
+    const toggleBtn = { addEventListener: vi.fn(), setAttribute: vi.fn(), textContent: '' }
+    const panel = { hidden: true }
+    const root = { classList: { toggle: vi.fn() } }
     const main = {
       innerHTML: '',
       querySelector: (sel) => {
         if (sel === '#register-form') return formStub
         if (sel === '#google-auth-btn') return googleBtn
+        if (sel === '#toggle-rules-panel') return toggleBtn
+        if (sel === '#auth-page-info') return panel
+        if (sel === '#auth-page-root') return root
         if (sel === '#auth-error') return { innerHTML: '' }
         return null
       },
@@ -61,8 +71,9 @@ describe('google auth', () => {
     await renderCustomerRegister(main)
 
     expect(main.innerHTML).toContain('Criar conta com Google')
-    expect(main.innerHTML).toContain('btn-google')
-    expect(main.innerHTML).toContain('ou preencha o formulário')
+    expect(main.innerHTML).toContain('toggle-rules-panel')
+    expect(main.innerHTML).toContain('hidden')
+    expect(main.innerHTML).not.toContain('auth-page--with-info')
     expect(googleBtn.addEventListener).toHaveBeenCalled()
   })
 
