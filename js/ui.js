@@ -77,8 +77,6 @@ export function renderHeader() {
       <nav class="nav-desktop">
         <a href="#/">Lojas</a>
         ${!user ? '<a href="#/conta/entrar">Entrar</a>' : ''}
-        ${!user ? '<a href="#/conta/entrar?sec=regras">Regras</a>' : ''}
-        ${!user ? '<a href="#/conta/entrar?sec=planos">Planos</a>' : ''}
       </nav>
 
       <div class="header__actions">
@@ -110,8 +108,6 @@ export function renderHeader() {
 
     <nav class="nav-mobile ${menuOpen ? 'open' : ''}" id="nav-mobile">
       <a href="#/">Lojas</a>
-      ${!user ? '<a href="#/conta/entrar?sec=regras">Regras</a>' : ''}
-      ${!user ? '<a href="#/conta/entrar?sec=planos">Planos</a>' : ''}
       ${user?.role === 'customer' ? '<a href="#/favoritos">❤️ Favoritos</a>' : ''}
       ${user?.role === 'merchant' ? `
         <p class="nav-mobile__section">Painel do Lojista</p>
