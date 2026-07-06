@@ -1155,7 +1155,7 @@ export async function fetchUserByEmail(email) {
   return data
 }
 
-export async function promoteUserToModerator(email, neighborhoodId) {
+export async function promoteUserToModerator(email, neighborhoodId, permissions = {}) {
   const trimmed = email.trim()
   if (!trimmed) throw new Error('Informe o email do usuário.')
   if (!neighborhoodId) throw new Error('Selecione o bairro do moderador.')
@@ -1168,9 +1168,43 @@ export async function promoteUserToModerator(email, neighborhoodId) {
   const client = await requireClient()
   const { data, error } = await client
     .from('users')
-    .update({ role: 'moderator', neighborhood_id: neighborhoodId })
+    .update({
+      role: 'moderator',
+      neighborhood_id: neighborhoodId,
+      can_approve_plan_changes: Boolean(permissions.canApprovePlanChanges),
+    })
     .eq('id', user.id)
-    .select('id, name, email, role, created_at, neighborhood_id, neighborhood:neighborhoods(id, name, slug, city, state)')
+    .select('id, name, email, role, created_at, can_approve_plan_changes, neighborhood_id, neighborhood:neighborhoods(id, name, slug, city, state)')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateModeratorPermissions(moderatorId, { neighborhoodId, canApprovePlanChanges } = {}) {
+  const client = await requireClient()
+  const { data: user, error: fetchError } = await client
+    .from('users')
+    .select('id, role')
+    .eq('id', moderatorId)
+    .single()
+  if (fetchError) throw fetchError
+  if (user.role !== 'moderator') throw new Error('Usuário não é moderador.')
+
+  const payload = {}
+  if (neighborhoodId !== undefined) {
+    if (!neighborhoodId) throw new Error('Selecione o bairro do moderador.')
+    payload.neighborhood_id = neighborhoodId
+  }
+  if (canApprovePlanChanges !== undefined) {
+    payload.can_approve_plan_changes = Boolean(canApprovePlanChanges)
+  }
+  if (Object.keys(payload).length === 0) throw new Error('Nenhuma permissão informada.')
+
+  const { data, error } = await client
+    .from('users')
+    .update(payload)
+    .eq('id', moderatorId)
+    .select('id, name, email, role, created_at, can_approve_plan_changes, neighborhood_id, neighborhood:neighborhoods(id, name, slug, city, state)')
     .single()
   if (error) throw error
   return data
@@ -1318,7 +1352,11 @@ export async function demoteModerator(userId) {
 
   const { data, error } = await client
     .from('users')
-    .update({ role: newRole })
+    .update({
+      role: newRole,
+      neighborhood_id: null,
+      can_approve_plan_changes: false,
+    })
     .eq('id', userId)
     .select('id, name, email, role, created_at')
     .single()

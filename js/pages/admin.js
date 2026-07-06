@@ -7,12 +7,12 @@ import {
   fetchPendingStoreApprovals,
   approveStoreRegistration, rejectStoreRegistration,
   fetchPendingPlanChangeRequests, approvePlanChangeRequest, rejectPlanChangeRequest,
-  setModeratorPlanApprovalPermission,
+  updateModeratorPermissions,
   updatePassword, updateEmail, fetchMerchants, fetchModerators, promoteUserToModerator, demoteModerator,
   fetchAllStoresAdmin,
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteProduct, fetchCategories,
-  fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood, setModeratorNeighborhood,
+  fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood,
 } from '../api.js'
 import { getStaffNeighborhoodScope, formatNeighborhoodLabel } from '../neighborhood.js'
 import { getUser, setAdminPendingCount } from '../state.js'
@@ -23,7 +23,10 @@ import {
 } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
 import { STAFF_PANELS, staffHref, getStaffMenuItem } from '../staff-nav.js'
-import { canAccessPanel, isReadOnlyStaffTab, canApprovePlanChanges } from '../roles.js'
+import {
+  canAccessPanel, isReadOnlyStaffTab, canApprovePlanChanges,
+  MODERATOR_PERMISSIONS, getModeratorPermissionValue,
+} from '../roles.js'
 import {
   planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE,
   countProductsWithImages, canAddProductImage, canCreateProduct,
@@ -60,6 +63,36 @@ function renderNeighborhoodOptions(neighborhoods, selectedId = '') {
   return neighborhoods.map((n) => `
     <option value="${n.id}" ${selectedId === n.id ? 'selected' : ''}>${escapeHtml(formatNeighborhoodLabel(n))}</option>
   `).join('')
+}
+
+function renderModeratorPermissionBadges(moderator) {
+  const active = MODERATOR_PERMISSIONS.filter((permission) => getModeratorPermissionValue(moderator, permission.id))
+  if (active.length === 0) {
+    return '<span class="admin-permission-badge admin-permission-badge--muted">Somente aprovações de loja</span>'
+  }
+  return active.map((permission) => `
+    <span class="admin-permission-badge">${escapeHtml(permission.label)}</span>
+  `).join('')
+}
+
+function renderModeratorPermissionFields(moderator = null, { idPrefix = '' } = {}) {
+  return MODERATOR_PERMISSIONS.map((permission) => {
+    const inputId = `${idPrefix}${permission.id}`
+    const checked = moderator ? getModeratorPermissionValue(moderator, permission.id) : false
+    return `
+      <label class="admin-check admin-permission-option" for="${inputId}">
+        <input
+          type="checkbox"
+          id="${inputId}"
+          name="${permission.id}"
+          ${checked ? 'checked' : ''}
+        />
+        <span>
+          <strong>${escapeHtml(permission.label)}</strong>
+          <small>${escapeHtml(permission.description)}</small>
+        </span>
+      </label>`
+  }).join('')
 }
 
 async function loadStaffApprovalQueue(user, panel = 'admin') {
@@ -1787,7 +1820,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
 
     main.innerHTML = adminPage(
       menuItem.label,
-      'Promova usuários e vincule cada moderador a um bairro/região',
+      'Promova usuários, defina o bairro e configure as permissões de cada moderador',
       `
         <section class="admin-section admin-moderators-promote">
           <div class="admin-section__head">
@@ -1809,6 +1842,12 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                 ${renderNeighborhoodOptions(neighborhoods.filter((n) => n.active))}
               </select>
             </div>
+            <div class="form-group admin-form-grid__full">
+              <span class="form-label">Permissões</span>
+              <div class="admin-permission-list">
+                ${renderModeratorPermissionFields(null, { idPrefix: 'promote-' })}
+              </div>
+            </div>
             <div id="promote-moderator-msg"></div>
             <button type="submit" class="btn btn-primary btn-sm">Promover a moderador</button>
           </form>
@@ -1818,7 +1857,9 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             <h2>Moderadores ativos</h2>
             <span class="admin-stat-chip admin-stat-chip--sent" id="admin-moderators-count">${moderators.length} cadastrado${moderators.length === 1 ? '' : 's'}</span>
           </div>
-          <p class="form-hint" style="margin-bottom:1rem">Marque quais moderadores podem aprovar pedidos de mudança de plano na aba Aprovações.</p>
+          <p class="form-hint" style="margin-bottom:1rem">
+            Todos aprovam cadastros de loja do bairro. Use <strong>Permissões</strong> para liberar mudanças de plano e alterar a região.
+          </p>
           ${moderators.length === 0
             ? adminEmptyState('🛡️', 'Nenhum moderador', 'Promova o primeiro usuário usando o formulário acima.')
             : `
@@ -1845,12 +1886,12 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                       </button>
                     </th>
                     <th>Bairro</th>
+                    <th>Permissões</th>
                     <th class="admin-table-sortable">
                       <button type="button" class="admin-table-sort active" id="admin-moderators-sort-created" data-moderator-sort="created" data-moderator-sort-dir="desc" aria-label="Ordenar por data, mais recentes primeiro">
                         Desde <span class="admin-table-sort__icon" aria-hidden="true">↓</span>
                       </button>
                     </th>
-                    <th>Aprovar planos</th>
                     <th></th>
                   </tr></thead>
                   <tbody id="admin-moderators-tbody">
@@ -2250,23 +2291,41 @@ function renderModeratorTableRows(moderators, neighborhoods = []) {
     >
       <td><strong>${escapeHtml(m.name)}</strong></td>
       <td>${escapeHtml(m.email)}</td>
-      <td>
-        <select class="form-input" data-moderator-neighborhood="${m.id}" style="min-width:10rem">
-          <option value="">—</option>
-          ${renderNeighborhoodOptions(neighborhoods.filter((n) => n.active), m.neighborhood_id)}
-        </select>
-      </td>
+      <td>${m.neighborhood ? escapeHtml(formatNeighborhoodLabel(m.neighborhood)) : '<span class="admin-permission-badge admin-permission-badge--muted">Sem bairro</span>'}</td>
+      <td><div class="admin-permission-badges">${renderModeratorPermissionBadges(m)}</div></td>
       <td>${formatDate(m.created_at)}</td>
-      <td>
-        <label class="admin-check">
-          <input type="checkbox" data-moderator-plan-approval="${m.id}" ${m.can_approve_plan_changes ? 'checked' : ''} />
-          Pode aprovar
-        </label>
-      </td>
-      <td>
+      <td style="white-space:nowrap">
+        <button type="button" class="btn btn-outline btn-sm" data-edit-moderator="${m.id}">Permissões</button>
         <button type="button" class="btn btn-outline btn-sm" data-demote-moderator="${m.id}" data-moderator-name="${escapeHtml(m.name)}">
           Remover acesso
         </button>
+      </td>
+    </tr>
+    <tr class="admin-edit-row" id="edit-moderator-row-${m.id}" hidden>
+      <td colspan="6">
+        <form class="admin-edit-panel admin-moderator-permissions-form" data-moderator-edit="${m.id}">
+          <h3 class="admin-account-card__section-title">Permissões de ${escapeHtml(m.name)}</h3>
+          <div class="admin-form-grid">
+            <div class="form-group">
+              <label class="form-label">Bairro / região</label>
+              <select class="form-input" name="neighborhood_id" required>
+                <option value="">Selecione...</option>
+                ${renderNeighborhoodOptions(neighborhoods.filter((n) => n.active), m.neighborhood_id)}
+              </select>
+            </div>
+            <div class="form-group admin-form-grid__full">
+              <span class="form-label">Permissões extras</span>
+              <div class="admin-permission-list">
+                ${renderModeratorPermissionFields(m, { idPrefix: `edit-${m.id}-` })}
+              </div>
+              <p class="form-hint">Aprovação de cadastro de loja é sempre permitida no bairro atribuído.</p>
+            </div>
+          </div>
+          <div class="admin-edit-panel__actions">
+            <button type="submit" class="btn btn-primary btn-sm">Salvar permissões</button>
+            <button type="button" class="btn btn-outline btn-sm" data-cancel-moderator="${m.id}">Cancelar</button>
+          </div>
+        </form>
       </td>
     </tr>
   `).join('')
@@ -2471,32 +2530,49 @@ function bindNeighborhoodManagement(main) {
   })
 }
 
+function readModeratorPermissionForm(form) {
+  return {
+    canApprovePlanChanges: Boolean(form.can_approve_plan_changes?.checked),
+  }
+}
+
 function bindModeratorManagement(main, neighborhoods = []) {
   bindModeratorsList(main)
 
-  main.querySelectorAll('[data-moderator-neighborhood]').forEach((select) => {
-    select.addEventListener('change', async () => {
-      const prev = select.dataset.prevValue ?? select.value
-      select.dataset.prevValue = select.value
-      try {
-        await setModeratorNeighborhood(select.dataset.moderatorNeighborhood, select.value)
-        showToast('Região do moderador atualizada')
-      } catch (err) {
-        select.value = prev
-        showToast(err.message)
-      }
+  main.querySelectorAll('[data-edit-moderator]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.editModerator
+      main.querySelectorAll('.admin-edit-row[id^="edit-moderator-row-"]').forEach((row) => {
+        row.hidden = row.id !== `edit-moderator-row-${id}`
+      })
+      main.querySelector(`#edit-moderator-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
   })
 
-  main.querySelectorAll('[data-moderator-plan-approval]').forEach((checkbox) => {
-    checkbox.addEventListener('change', async () => {
-      const moderatorId = checkbox.dataset.moderatorPlanApproval
+  main.querySelectorAll('[data-cancel-moderator]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      main.querySelector(`#edit-moderator-row-${btn.dataset.cancelModerator}`).hidden = true
+    })
+  })
+
+  main.querySelectorAll('[data-moderator-edit]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const id = form.dataset.moderatorEdit
+      const submitBtn = form.querySelector('button[type="submit"]')
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Salvando...' }
       try {
-        await setModeratorPlanApprovalPermission(moderatorId, checkbox.checked)
-        showToast(checkbox.checked ? 'Moderador pode aprovar mudanças de plano' : 'Permissão de plano removida')
+        const permissions = readModeratorPermissionForm(form)
+        await updateModeratorPermissions(id, {
+          neighborhoodId: form.neighborhood_id.value,
+          canApprovePlanChanges: permissions.canApprovePlanChanges,
+        })
+        showToast('Permissões do moderador atualizadas')
+        rerenderStaff(main, 'moderators')
       } catch (err) {
-        checkbox.checked = !checkbox.checked
         showToast(err.message)
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Salvar permissões' }
       }
     })
   })
@@ -2508,7 +2584,10 @@ function bindModeratorManagement(main, neighborhoods = []) {
     const submitBtn = form.querySelector('button[type="submit"]')
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Promovendo...' }
     try {
-      const promoted = await promoteUserToModerator(form.email.value, form.neighborhood_id.value)
+      const permissions = readModeratorPermissionForm(form)
+      const promoted = await promoteUserToModerator(form.email.value, form.neighborhood_id.value, {
+        canApprovePlanChanges: permissions.canApprovePlanChanges,
+      })
       showToast(`${promoted.name} agora é moderador`)
       rerenderStaff(main, 'moderators')
     } catch (err) {
