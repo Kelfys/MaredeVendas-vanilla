@@ -1,6 +1,5 @@
 /**
- * Roteador SPA — History API em produção (GitHub Pages) ou hash em localhost.
- * 404.html + sessionStorage redirecionam rotas diretas para o shell da SPA.
+ * Roteador SPA — hash (#/rota). 404.html e shells por rota no deploy (GitHub Pages).
  */
 import { APP_BASE_PATH, USE_HISTORY_ROUTER } from './config.js'
 

@@ -27,8 +27,8 @@ export function detectAppBasePath() {
 
 export const APP_BASE_PATH = detectAppBasePath()
 
-/** true = URLs limpas (/dashboard); false = hash (#/dashboard) */
-export const USE_HISTORY_ROUTER = Boolean(APP_BASE_PATH)
+/** Hash (#/rota) — único modo confiável no GitHub Pages (rotas diretas dão 404). */
+export const USE_HISTORY_ROUTER = false
 export const CART_STORAGE_KEY = 'maredevendas-cart'
 export const THEME_STORAGE_KEY = 'maredevendas-theme'
 

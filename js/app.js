@@ -38,15 +38,32 @@ async function handleAuthCallback() {
   }
 }
 
-function restoreSpaDeepLink() {
+/** Converte /repo/rota → /repo/#/rota (GitHub Pages não roteia SPA sem hash). */
+function normalizePathnameToHash() {
+  const hash = window.location.hash.replace(/^#/, '')
+  if (hash && hash !== '/') return false
+
   try {
-    const target = sessionStorage.getItem('spa-redirect')
-    if (!target) return
-    sessionStorage.removeItem('spa-redirect')
-    history.replaceState(null, '', target)
+    const stored = sessionStorage.getItem('spa-redirect')
+    if (stored) {
+      sessionStorage.removeItem('spa-redirect')
+      const parts = stored.match(/^(\/[^/]+)(\/.*)?$/)
+      const sub = parts?.[2]?.replace(/\/$/, '') || ''
+      if (sub && sub !== '/') {
+        window.location.replace(`${parts[1]}/#${sub}${window.location.search}`)
+        return true
+      }
+    }
   } catch {
-    // sessionStorage indisponível (modo privado restrito)
+    // sessionStorage indisponível
   }
+
+  const m = window.location.pathname.match(/^(\/[^/]+)(\/.*)?$/)
+  const subpath = m?.[2]?.replace(/\/$/, '') || ''
+  if (!subpath || subpath === '/') return false
+
+  window.location.replace(`${m[1]}/#${subpath}${window.location.search}`)
+  return true
 }
 
 function withTimeout(promise, ms) {
@@ -57,7 +74,7 @@ function withTimeout(promise, ms) {
 }
 
 function boot() {
-  restoreSpaDeepLink()
+  if (normalizePathnameToHash()) return
   setTheme(localStorage.getItem('maredevendas-theme') || 'light')
 
   registerRoute('/', lazy(() => import('./pages/home.js').then((m) => ({ default: m.renderHome }))))
