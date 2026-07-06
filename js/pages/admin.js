@@ -8,7 +8,7 @@ import {
   approveStoreRegistration, rejectStoreRegistration,
   fetchPendingPlanChangeRequests, approvePlanChangeRequest, rejectPlanChangeRequest,
   setModeratorPlanApprovalPermission,
-  updatePassword, fetchMerchants, fetchModerators, promoteUserToModerator, demoteModerator,
+  updatePassword, updateEmail, fetchMerchants, fetchModerators, promoteUserToModerator, demoteModerator,
   fetchAllStoresAdmin,
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteProduct, fetchCategories,
@@ -1529,30 +1529,49 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
   }
 
   if (tab === 'account') {
+    const emailSection = panel === 'admin'
+      ? `
+          <form id="admin-email-form" class="admin-password-form">
+            <h3 class="admin-account-card__section-title">Alterar email</h3>
+            <div class="form-group">
+              <label class="form-label">Novo email</label>
+              <input class="form-input" type="email" name="email" required autocomplete="email" placeholder="seu@email.com" />
+            </div>
+            <p class="form-hint">Enviaremos um link de confirmação para o novo endereço.</p>
+            <div id="admin-email-msg"></div>
+            <button type="submit" class="btn btn-primary btn-sm">Alterar email</button>
+          </form>
+          <hr class="admin-account-card__divider" />
+        `
+      : ''
+
     main.innerHTML = adminPage(
       menuItem.label,
-      'Altere sua senha de acesso ao painel',
+      panel === 'admin' ? 'Altere seu email e senha de acesso ao painel' : 'Altere sua senha de acesso ao painel',
       `
         <div class="admin-account-card">
           <p class="admin-account-card__email"><span>Conta</span> ${escapeHtml(user.email)}</p>
-        <form id="admin-password-form" class="admin-password-form">
-          <div class="form-group">
-            <label class="form-label">Nova senha</label>
-            <input class="form-input" type="password" name="password" required minlength="6" autocomplete="new-password" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Confirmar nova senha</label>
-            <input class="form-input" type="password" name="confirm" required minlength="6" autocomplete="new-password" />
-          </div>
-          <div id="admin-password-msg"></div>
-          <button type="submit" class="btn btn-primary btn-sm">Alterar senha</button>
-        </form>
+          ${emailSection}
+          <form id="admin-password-form" class="admin-password-form">
+            <h3 class="admin-account-card__section-title">Alterar senha</h3>
+            <div class="form-group">
+              <label class="form-label">Nova senha</label>
+              <input class="form-input" type="password" name="password" required minlength="6" autocomplete="new-password" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirmar nova senha</label>
+              <input class="form-input" type="password" name="confirm" required minlength="6" autocomplete="new-password" />
+            </div>
+            <div id="admin-password-msg"></div>
+            <button type="submit" class="btn btn-primary btn-sm">Alterar senha</button>
+          </form>
         </div>
       `,
       '',
       panel
     )
 
+    bindEmailForm(main)
     bindPasswordForm(main)
   }
 }
@@ -2053,6 +2072,37 @@ function bindModeratorManagement(main) {
         showToast(err.message)
       }
     })
+  })
+}
+
+function bindEmailForm(main) {
+  main.querySelector('#admin-email-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const msgEl = main.querySelector('#admin-email-msg')
+    const submitBtn = form.querySelector('button[type="submit"]')
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Enviando...' }
+
+    try {
+      const result = await updateEmail(form.email.value)
+      form.reset()
+      const { loadUser } = await import('../state.js')
+      await loadUser()
+
+      if (result.pendingEmail) {
+        msgEl.innerHTML = `<div class="alert" style="background:var(--primary-50);color:var(--primary-700);padding:0.75rem;border-radius:var(--radius)">Confirme o novo email em <strong>${escapeHtml(result.pendingEmail)}</strong> pelo link enviado.</div>`
+        showToast('Link de confirmação enviado!')
+      } else {
+        msgEl.innerHTML = '<div class="alert alert-success">Email alterado com sucesso.</div>'
+        showToast('Email atualizado!')
+        rerenderStaff(main, 'account')
+      }
+    } catch (err) {
+      msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Alterar email' }
+    }
   })
 }
 

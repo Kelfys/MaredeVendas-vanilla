@@ -129,7 +129,43 @@ export function formatAuthError(error) {
   if (/email not confirmed/i.test(msg)) {
     return 'Confirme seu email antes de entrar.'
   }
-  return msg || 'Não foi possível entrar. Tente novamente.'
+  if (/already registered|already been registered/i.test(msg)) {
+    return 'Este email já está em uso.'
+  }
+  if (/invalid email/i.test(msg)) {
+    return 'Email inválido.'
+  }
+  return msg || 'Não foi possível concluir a operação. Tente novamente.'
+}
+
+export async function updateEmail(newEmail) {
+  const email = String(newEmail ?? '').trim().toLowerCase()
+  if (!email) throw new Error('Informe o novo email.')
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Email inválido.')
+
+  const client = await requireClient()
+  const { data: { user: before } } = await client.auth.getUser()
+  if (!before) throw new Error('Sessão expirada. Entre novamente.')
+  if ((before.email ?? '').toLowerCase() === email) {
+    throw new Error('Este já é o seu email atual.')
+  }
+
+  const { data, error } = await client.auth.updateUser({ email })
+  if (error) throw new Error(formatAuthError(error))
+
+  const authUser = data?.user
+  if (authUser?.email?.toLowerCase() === email) {
+    const { error: syncError } = await client
+      .from('users')
+      .update({ email })
+      .eq('id', authUser.id)
+    if (syncError) throw syncError
+  }
+
+  return {
+    email: authUser?.email ?? before.email,
+    pendingEmail: authUser?.new_email ?? (authUser?.email?.toLowerCase() === email ? null : email),
+  }
 }
 
 export async function signIn(email, password) {
