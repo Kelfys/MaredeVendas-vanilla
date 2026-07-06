@@ -6,7 +6,7 @@
  */
 import { setTheme, loadUser } from './state.js'
 import { initHeader, initCart } from './ui.js'
-import { registerRoute, initRouter, routeHref } from './router.js'
+import { registerRoute, initRouter, routeHref, navigate } from './router.js'
 import { getSupabase } from './db.js'
 
 const lazy = (loader) => async (main, params) => {
@@ -15,26 +15,41 @@ const lazy = (loader) => async (main, params) => {
   return fn(main, params)
 }
 
+let postAuthRedirect = null
+
 async function handleAuthCallback() {
   const params = new URLSearchParams(window.location.search)
-  if (!params.get('code') && !params.get('error')) return
-
-  const path = window.location.pathname + window.location.hash
-  if (!path.includes('auth/callback')) return
+  const code = params.get('code')
+  const oauthError = params.get('error')
+  if (!code && !oauthError) return null
 
   try {
     const client = getSupabase()
-    if (client) {
-      const code = params.get('code')
-      if (code) await client.auth.exchangeCodeForSession(code)
-      await loadUser()
+    if (oauthError) {
+      throw new Error(params.get('error_description') || oauthError)
+    }
+    if (client && code) {
+      await client.auth.exchangeCodeForSession(code)
+      try {
+        postAuthRedirect = sessionStorage.getItem('oauth-next') || '/favoritos'
+        sessionStorage.removeItem('oauth-next')
+      } catch {
+        postAuthRedirect = '/favoritos'
+      }
     }
     const clean = new URL(window.location.href)
     clean.searchParams.delete('code')
     clean.searchParams.delete('state')
+    clean.searchParams.delete('error')
+    clean.searchParams.delete('error_description')
+    if (!clean.hash || clean.hash === '#') {
+      clean.hash = '#/auth/callback'
+    }
     window.history.replaceState({}, '', clean.pathname + clean.search + clean.hash)
+    return postAuthRedirect
   } catch (err) {
     console.error('Auth callback error:', err)
+    return null
   }
 }
 
@@ -110,8 +125,8 @@ function boot() {
   registerRoute('/regras', lazy(() => import('./pages/rules.js').then((m) => ({ default: m.renderRules }))))
   registerRoute('/auth/callback', async (main) => {
     main.innerHTML = '<div class="loading"><div class="spinner"></div></div>'
-    await handleAuthCallback()
-    window.location.href = routeHref('/')
+    const next = postAuthRedirect || '/favoritos'
+    navigate(next.startsWith('/') ? next : '/favoritos')
   })
 
   initHeader()

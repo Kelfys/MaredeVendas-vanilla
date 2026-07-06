@@ -198,10 +198,36 @@ export async function updatePassword(newPassword) {
   return data
 }
 
+export function getAuthRedirectUrl() {
+  return `${window.location.origin}${window.location.pathname}#/auth/callback`
+}
+
+export async function signInWithGoogle({ nextPath = '/favoritos' } = {}) {
+  const client = await requireClient()
+  try {
+    sessionStorage.setItem('oauth-next', nextPath)
+  } catch {
+    // sessionStorage indisponível
+  }
+
+  const { data, error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: getAuthRedirectUrl(),
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'select_account',
+      },
+      scopes: 'email profile',
+    },
+  })
+  if (error) throw new Error(formatAuthError(error))
+  return data
+}
+
 export async function requestPasswordReset(email) {
   const client = await requireClient()
-  const redirectTo = `${window.location.origin}${window.location.pathname}#/auth/callback`
-  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo })
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: getAuthRedirectUrl() })
   if (error) throw error
 }
 

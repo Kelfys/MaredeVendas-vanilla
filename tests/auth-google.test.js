@@ -1,0 +1,68 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+describe('google auth', () => {
+  beforeEach(() => {
+    vi.stubGlobal('window', {
+      location: {
+        origin: 'https://example.github.io',
+        pathname: '/MaredeVendas-vanilla/',
+        hash: '#/conta/criar',
+      },
+    })
+    vi.stubGlobal('sessionStorage', {
+      setItem: vi.fn(),
+      getItem: vi.fn(),
+      removeItem: vi.fn(),
+    })
+    vi.stubGlobal('document', {
+      getElementById: () => ({ innerHTML: '' }),
+      createElement: () => ({ innerHTML: '' }),
+    })
+    vi.stubGlobal('requestAnimationFrame', (fn) => fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  })
+
+  it('getAuthRedirectUrl points to auth callback hash route', async () => {
+    vi.doMock('../js/db.js', () => ({
+      requireClient: vi.fn(),
+      isSupabaseConfigured: () => true,
+      getSupabase: vi.fn(),
+    }))
+    const { getAuthRedirectUrl } = await import('../js/api.js')
+    expect(getAuthRedirectUrl()).toBe('https://example.github.io/MaredeVendas-vanilla/#/auth/callback')
+  })
+
+  it('renderCustomerRegister includes Google signup button', async () => {
+    vi.doMock('../js/api.js', () => ({ signUpCustomer: vi.fn(), signInWithGoogle: vi.fn() }))
+    vi.doMock('../js/state.js', () => ({ setUser: vi.fn(), loadUser: vi.fn() }))
+    vi.doMock('../js/router.js', () => ({
+      navigate: vi.fn(),
+      getHashSection: () => null,
+      routeHref: (path) => `#${path}`,
+    }))
+
+    const formStub = { addEventListener: vi.fn() }
+    const googleBtn = { addEventListener: vi.fn(), disabled: false }
+    const main = {
+      innerHTML: '',
+      querySelector: (sel) => {
+        if (sel === '#register-form') return formStub
+        if (sel === '#google-auth-btn') return googleBtn
+        if (sel === '#auth-error') return { innerHTML: '' }
+        return null
+      },
+    }
+
+    const { renderCustomerRegister } = await import('../js/pages/auth.js')
+    await renderCustomerRegister(main)
+
+    expect(main.innerHTML).toContain('Criar conta com Google')
+    expect(main.innerHTML).toContain('btn-google')
+    expect(main.innerHTML).toContain('ou preencha o formulário')
+    expect(googleBtn.addEventListener).toHaveBeenCalled()
+  })
+})
