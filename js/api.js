@@ -20,7 +20,8 @@ import { DEFAULT_THEME_COLOR } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import {
   planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
-  FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
+  getPlanProductLimit, getPlanProductImageLimit,
+  planProductLimitMessage, planProductImageLimitMessage,
   getPriceCooldownRemaining, formatPriceCooldownRemaining,
 } from './plans.js'
 
@@ -33,6 +34,30 @@ async function countStoreProductsWithImages(client, storeId) {
   return (data ?? []).filter((p) => Boolean(p.image?.trim?.() ?? p.image)).length
 }
 
+async function countStoreProducts(client, storeId) {
+  const { count, error } = await client
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+  if (error) throw error
+  return count ?? 0
+}
+
+async function assertProductCountAllowed(client, storeId) {
+  const { data: store, error: storeError } = await client
+    .from('stores')
+    .select('plan_id')
+    .eq('id', storeId)
+    .single()
+  if (storeError) throw storeError
+
+  const planId = store?.plan_id ?? 'free'
+  const count = await countStoreProducts(client, storeId)
+  if (count >= getPlanProductLimit(planId)) {
+    throw new Error(planProductLimitMessage(planId))
+  }
+}
+
 async function assertProductImageAllowed(client, storeId, { productHadImage = false } = {}) {
   if (productHadImage) return
 
@@ -42,11 +67,11 @@ async function assertProductImageAllowed(client, storeId, { productHadImage = fa
     .eq('id', storeId)
     .single()
   if (storeError) throw storeError
-  if (store?.plan_id !== 'free') return
 
+  const planId = store?.plan_id ?? 'free'
   const count = await countStoreProductsWithImages(client, storeId)
-  if (count >= FREE_PLAN_PRODUCT_IMAGE_LIMIT) {
-    throw new Error(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)
+  if (count >= getPlanProductImageLimit(planId)) {
+    throw new Error(planProductImageLimitMessage(planId))
   }
 }
 
@@ -500,6 +525,7 @@ export async function fetchMerchantProducts(storeId) {
 
 export async function createProduct(storeId, form) {
   const client = await requireClient()
+  await assertProductCountAllowed(client, storeId)
   let imageUrl = null
   if (form.image instanceof File) {
     await assertProductImageAllowed(client, storeId)

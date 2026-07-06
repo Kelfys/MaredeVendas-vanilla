@@ -1,6 +1,6 @@
 /**
  * Planos de assinatura para lojistas.
- * Fonte de verdade para exibição na página de regras e futuros fluxos de billing.
+ * Fonte de verdade para limites, exibição na página de regras e fluxos de billing.
  */
 import { formatCurrency } from './utils.js'
 import { buildWhatsAppUrl } from './whatsapp.js'
@@ -23,28 +23,67 @@ export function planAllowsStoreBranding(planId) {
   return Boolean(planId && planId !== 'free')
 }
 
-export const FREE_PLAN_PRODUCT_IMAGE_LIMIT = 4
+/** Limites de catálogo por plano (produtos totais e produtos com imagem). */
+export const PLAN_LIMITS = {
+  free: { products: 6, productImages: 2 },
+  starter: { products: 15, productImages: 10 },
+  growth: { products: 30, productImages: 30 },
+  premium: { products: 80, productImages: 80 },
+}
 
-export const FREE_PLAN_PRODUCT_IMAGE_MESSAGE =
-  `O plano Gratuito permite imagens em até ${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos. Assine um plano pago para liberar mais.`
+export function getPlanProductLimit(planId) {
+  return PLAN_LIMITS[planId]?.products ?? PLAN_LIMITS.free.products
+}
 
-export function planAllowsUnlimitedProductImages(planId) {
-  return Boolean(planId && planId !== 'free')
+export function getPlanProductImageLimit(planId) {
+  return PLAN_LIMITS[planId]?.productImages ?? PLAN_LIMITS.free.productImages
+}
+
+export function planProductLimitMessage(planId) {
+  const plan = getPlanById(planId)
+  const limit = getPlanProductLimit(planId)
+  return `O plano ${plan.name} permite até ${limit} produto${limit === 1 ? '' : 's'}. Assine um plano superior para ampliar o catálogo.`
+}
+
+export function planProductImageLimitMessage(planId) {
+  const plan = getPlanById(planId)
+  const limit = getPlanProductImageLimit(planId)
+  return `O plano ${plan.name} permite imagens em até ${limit} produto${limit === 1 ? '' : 's'}. Assine um plano superior para liberar mais.`
 }
 
 export function countProductsWithImages(products) {
   return (products ?? []).filter((p) => Boolean(p.image?.trim?.() ?? p.image)).length
 }
 
-export function freePlanProductImagesRemaining(planId, productsWithImages) {
-  if (planAllowsUnlimitedProductImages(planId)) return null
-  return Math.max(0, FREE_PLAN_PRODUCT_IMAGE_LIMIT - productsWithImages)
+export function planProductsRemaining(planId, productCount) {
+  return Math.max(0, getPlanProductLimit(planId) - productCount)
+}
+
+export function planProductImagesRemaining(planId, productsWithImages) {
+  return Math.max(0, getPlanProductImageLimit(planId) - productsWithImages)
+}
+
+export function canCreateProduct(planId, productCount) {
+  return productCount < getPlanProductLimit(planId)
 }
 
 export function canAddProductImage(planId, productsWithImages, productAlreadyHasImage = false) {
   if (productAlreadyHasImage) return true
-  if (planAllowsUnlimitedProductImages(planId)) return true
-  return productsWithImages < FREE_PLAN_PRODUCT_IMAGE_LIMIT
+  return productsWithImages < getPlanProductImageLimit(planId)
+}
+
+export function formatProductLimitHint(planId, productCount) {
+  const plan = getPlanById(planId)
+  const limit = getPlanProductLimit(planId)
+  const remaining = planProductsRemaining(planId, productCount)
+  return `${plan.name}: ${productCount}/${limit} produtos${remaining > 0 ? ` — restam ${remaining}` : ''}`
+}
+
+export function formatProductImageLimitHint(planId, productsWithImages) {
+  const plan = getPlanById(planId)
+  const limit = getPlanProductImageLimit(planId)
+  const remaining = planProductImagesRemaining(planId, productsWithImages)
+  return `${plan.name}: ${productsWithImages}/${limit} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}`
 }
 
 const PLAN_COOLDOWN_HOURS = {
@@ -58,12 +97,12 @@ export const SUBSCRIPTION_PLANS = [
   {
     id: 'free',
     name: 'Gratuito',
-    description: 'Ideal para começar com vitrine enxuta no marketplace.',
+    description: 'Para testar a vitrine com catálogo enxuto.',
     priceMonthly: 0,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.free,
     features: [
-      'Até 10 produtos',
-      'Imagens em até 4 produtos (500 KB cada)',
+      'Até 6 produtos',
+      'Imagens em até 2 produtos (500 KB cada)',
       'Vitrine com tema padrão (sem logo nem banner)',
       priceCooldownLabel(24),
       'Ativar ou ocultar produtos à venda',
@@ -73,12 +112,12 @@ export const SUBSCRIPTION_PLANS = [
   {
     id: 'starter',
     name: 'Starter',
-    description: 'Mais produtos e preços mais flexíveis.',
+    description: 'Catálogo inicial com branding e mais flexibilidade de preços.',
     priceMonthly: 5,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.starter,
     features: [
-      'Até 30 produtos',
-      'Imagens em todos os produtos',
+      'Até 15 produtos',
+      'Imagens em até 10 produtos (500 KB cada)',
       'Logo e banner personalizados',
       priceCooldownLabel(12),
       'Destaque visual na página inicial',
@@ -87,13 +126,13 @@ export const SUBSCRIPTION_PLANS = [
   },
   {
     id: 'growth',
-    name: 'Growth',
-    description: 'Para lojas em expansão com catálogo maior.',
+    name: 'Plus',
+    description: 'Para lojas em crescimento com vitrine completa.',
     priceMonthly: 15,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.growth,
     features: [
-      'Até 80 produtos',
-      'Imagens em todos os produtos',
+      'Até 30 produtos',
+      'Imagens em todos os produtos (500 KB cada)',
       'Logo e banner personalizados',
       priceCooldownLabel(4),
       'Anúncio ampliado na vitrine principal',
@@ -103,12 +142,12 @@ export const SUBSCRIPTION_PLANS = [
   {
     id: 'premium',
     name: 'Premium',
-    description: 'Sem limites para lojas consolidadas.',
+    description: 'Catálogo ampliado para lojas consolidadas.',
     priceMonthly: 35,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.premium,
     features: [
-      'Produtos ilimitados',
-      'Imagens em todos os produtos',
+      'Até 80 produtos',
+      'Imagens em todos os produtos (500 KB cada)',
       'Logo e banner personalizados',
       priceCooldownLabel(null),
       'Máximo destaque na página inicial',

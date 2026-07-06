@@ -22,9 +22,10 @@ import { STAFF_PANELS, staffHref, getStaffMenuItem } from '../staff-nav.js'
 import { canAccessPanel, isReadOnlyStaffTab } from '../roles.js'
 import {
   planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
-  FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
-  countProductsWithImages, freePlanProductImagesRemaining, canAddProductImage,
-  planAllowsUnlimitedProductImages,
+  countProductsWithImages, canAddProductImage, canCreateProduct,
+  planProductImageLimitMessage, planProductLimitMessage,
+  formatProductLimitHint, formatProductImageLimitHint,
+  getPlanById,
 } from '../plans.js'
 import {
   PRODUCT_IMAGE_UPLOAD_HINT, STORE_BRANDING_UPLOAD_HINT,
@@ -619,17 +620,16 @@ function productCountMap(products) {
 }
 
 function productImageLimitHintHtml(store, products, product = null) {
-  if (!store || planAllowsUnlimitedProductImages(store.plan_id)) return ''
+  if (!store) return ''
 
   const withImages = countProductsWithImages(products)
-  const remaining = freePlanProductImagesRemaining(store.plan_id, withImages)
   const allowed = canAddProductImage(store.plan_id, withImages, Boolean(product?.image))
 
   if (!allowed) {
-    return `<p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)}</p>`
+    return `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))}</p>`
   }
 
-  return `<p class="form-hint">Plano Gratuito: ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}</p>`
+  return `<p class="form-hint">${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}</p>`
 }
 
 function renderProductTableRows(products, categories, store = null, { readOnly = false } = {}) {
@@ -747,11 +747,17 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'ad
     </aside>`
 }
 
-function renderStoreProductsPanel({ store, products, categories, canCreate, readOnly = false }) {
+function renderStoreProductsPanel({ store, products, categories, readOnly = false }) {
   const withImages = store ? countProductsWithImages(products) : 0
   const canAddImageOnCreate = store
     ? canAddProductImage(store.plan_id, withImages)
     : true
+  const canCreate = Boolean(
+    store
+    && store.status === 'approved'
+    && !readOnly
+    && canCreateProduct(store.plan_id, products.length),
+  )
 
   if (!store) {
     return `
@@ -771,8 +777,8 @@ function renderStoreProductsPanel({ store, products, categories, canCreate, read
           <p class="admin-store-products-main__meta">
             ${escapeHtml(store.city)}, ${escapeHtml(store.state)}
             · ${statusBadge(store.status)}
-            · ${products.length} produto${products.length === 1 ? '' : 's'}
-            ${store.plan_id === 'free' ? ` · ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} com imagem` : ''}
+            · ${escapeHtml(formatProductLimitHint(store.plan_id, products.length))}
+            · ${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}
           </p>
         </div>
         <div class="admin-store-products-main__actions">
@@ -821,10 +827,13 @@ function renderStoreProductsPanel({ store, products, categories, canCreate, read
               <button type="submit" class="btn btn-primary">Criar produto</button>
             </div>
           </form>
-        </details>` : `
+        </details>` : (!readOnly && store.status !== 'approved' ? `
         <div class="alert" style="margin-bottom:1rem">
           Esta loja ainda não está aprovada. Aprove-a em Aprovações para cadastrar novos produtos.
-        </div>`}
+        </div>` : (!readOnly && store.status === 'approved' ? `
+        <div class="alert" style="margin-bottom:1rem">
+          ${escapeHtml(planProductLimitMessage(store.plan_id))}
+        </div>` : ''))}
 
       ${products.length > 0 ? `
         <div class="admin-filter-bar admin-filter-bar--compact">
@@ -1122,7 +1131,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
               <select class="form-input" name="plan_id">
                 <option value="free">Gratuito</option>
                 <option value="starter">Starter</option>
-                <option value="growth">Growth</option>
+                <option value="growth">Plus</option>
                 <option value="premium">Premium</option>
               </select>
             </div>
@@ -1166,7 +1175,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                   <td>${escapeHtml(s.owner?.name ?? '—')}<br><small>${escapeHtml(s.owner?.email ?? '')}</small></td>
                   <td>${escapeHtml(s.city)}, ${escapeHtml(s.state)}</td>
                   <td>${statusBadge(s.status)}</td>
-                  <td>${escapeHtml(s.plan_id)}</td>
+                  <td>${escapeHtml(getPlanById(s.plan_id).name)}</td>
                   <td style="white-space:nowrap">
                     <a href="#${staffProductsPath(panel, s.id)}" class="btn btn-outline btn-sm">Produtos</a>
                     ${storesReadOnly ? '' : `<button type="button" class="btn btn-outline btn-sm" data-edit-store="${s.id}">Editar</button>`}
@@ -1215,7 +1224,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                       <div class="form-group">
                         <label class="form-label">Plano</label>
                         <select class="form-input" name="plan_id">
-                          ${['free', 'starter', 'growth', 'premium'].map((p) => `<option value="${p}" ${s.plan_id === p ? 'selected' : ''}>${p}</option>`).join('')}
+                          ${['free', 'starter', 'growth', 'premium'].map((p) => `<option value="${p}" ${s.plan_id === p ? 'selected' : ''}>${escapeHtml(getPlanById(p).name)}</option>`).join('')}
                         </select>
                       </div>
                       <div class="form-group admin-form-grid__full">
@@ -1301,7 +1310,6 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             store: selectedStore,
             products: storeProducts,
             categories,
-            canCreate: !productsReadOnly && selectedStore?.status === 'approved',
             readOnly: productsReadOnly,
           })}
         </div>

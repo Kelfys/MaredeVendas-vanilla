@@ -4,6 +4,10 @@ import {
   getPriceCooldownRemaining,
   formatPriceCooldownRemaining,
   getPlanById,
+  getPlanProductLimit,
+  getPlanProductImageLimit,
+  canCreateProduct,
+  canAddProductImage,
 } from '../js/plans.js'
 
 describe('plan price cooldown', () => {
@@ -31,5 +35,32 @@ describe('plan price cooldown', () => {
 
   it('resolves plan by id', () => {
     expect(getPlanById('starter').name).toBe('Starter')
+    expect(getPlanById('growth').name).toBe('Plus')
+  })
+})
+
+describe('plan catalog limits', () => {
+  it('defines product and image limits per plan', () => {
+    expect(getPlanProductLimit('free')).toBe(6)
+    expect(getPlanProductImageLimit('free')).toBe(2)
+    expect(getPlanProductLimit('starter')).toBe(15)
+    expect(getPlanProductImageLimit('starter')).toBe(10)
+    expect(getPlanProductLimit('growth')).toBe(30)
+    expect(getPlanProductImageLimit('growth')).toBe(30)
+    expect(getPlanProductLimit('premium')).toBe(80)
+    expect(getPlanProductImageLimit('premium')).toBe(80)
+  })
+
+  it('blocks product creation at plan cap', () => {
+    expect(canCreateProduct('free', 5)).toBe(true)
+    expect(canCreateProduct('free', 6)).toBe(false)
+    expect(canCreateProduct('premium', 79)).toBe(true)
+    expect(canCreateProduct('premium', 80)).toBe(false)
+  })
+
+  it('blocks new product images at plan cap', () => {
+    expect(canAddProductImage('starter', 9)).toBe(true)
+    expect(canAddProductImage('starter', 10)).toBe(false)
+    expect(canAddProductImage('starter', 10, true)).toBe(true)
   })
 })

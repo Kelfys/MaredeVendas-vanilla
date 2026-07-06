@@ -16,9 +16,10 @@ import {
 import { STORE_THEME_COLORS } from '../config.js'
 import {
   planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
-  FREE_PLAN_PRODUCT_IMAGE_LIMIT, FREE_PLAN_PRODUCT_IMAGE_MESSAGE,
-  countProductsWithImages, freePlanProductImagesRemaining, canAddProductImage,
-  planAllowsUnlimitedProductImages, getPlanById, formatPlanPrice,
+  countProductsWithImages, canAddProductImage, canCreateProduct,
+  planProductImageLimitMessage, planProductLimitMessage,
+  formatProductLimitHint, formatProductImageLimitHint,
+  getPlanById, formatPlanPrice,
   getPriceCooldownRemaining, formatPriceCooldownRemaining,
   getPlanPriceCooldownHours, buildPlanPaymentUrl,
 } from '../plans.js'
@@ -389,17 +390,16 @@ function renderPriceHistoryHtml(history) {
 }
 
 function productImageLimitHintHtml(store, products, product = null) {
-  if (!store || planAllowsUnlimitedProductImages(store.plan_id)) return ''
+  if (!store) return ''
 
   const withImages = countProductsWithImages(products)
-  const remaining = freePlanProductImagesRemaining(store.plan_id, withImages)
   const allowed = canAddProductImage(store.plan_id, withImages, Boolean(product?.image))
 
   if (!allowed) {
-    return `<p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)} <a href="${routeHref('/regras')}">Ver planos</a></p>`
+    return `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))} <a href="${routeHref('/regras')}">Ver planos</a></p>`
   }
 
-  return `<p class="form-hint">Plano Gratuito: ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}</p>`
+  return `<p class="form-hint">${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}</p>`
 }
 
 function renderProductTableRows(products, categories, store) {
@@ -1042,20 +1042,23 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
     ])
     const withImages = countProductsWithImages(products)
     const canAddImage = canAddProductImage(store.plan_id, withImages)
-    const remaining = freePlanProductImagesRemaining(store.plan_id, withImages)
-    const imageLimitHint = !planAllowsUnlimitedProductImages(store.plan_id)
-      ? (canAddImage
-        ? `<p class="form-hint">Plano Gratuito: ${withImages}/${FREE_PLAN_PRODUCT_IMAGE_LIMIT} produtos com imagem${remaining > 0 ? ` — restam ${remaining}` : ''}</p>`
-        : `<p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_PRODUCT_IMAGE_MESSAGE)} <a href="${routeHref('/regras')}">Ver planos</a></p>`)
-      : ''
+    const canCreate = canCreateProduct(store.plan_id, products.length)
+    const imageLimitHint = canAddImage
+      ? `<p class="form-hint">${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}</p>`
+      : `<p class="form-hint form-hint--info">${escapeHtml(planProductImageLimitMessage(store.plan_id))} <a href="${routeHref('/regras')}">Ver planos</a></p>`
+    const productLimitHint = canCreate
+      ? `<p class="form-hint">${escapeHtml(formatProductLimitHint(store.plan_id, products.length))}</p>`
+      : `<p class="form-hint form-hint--info">${escapeHtml(planProductLimitMessage(store.plan_id))} <a href="${routeHref('/regras')}">Ver planos</a></p>`
 
     main.innerHTML = merchantPage(
       menuItem.label,
       `${products.length} produto${products.length === 1 ? '' : 's'} cadastrado${products.length === 1 ? '' : 's'}`,
       `
         <div id="product-msg"></div>
+        ${canCreate ? `
         <details class="admin-form-panel" open>
           <summary>Novo produto</summary>
+          ${productLimitHint}
           <form id="product-form" class="admin-form-grid" style="margin-top:1rem">
             <div class="form-group admin-form-grid__full">
               <label class="form-label">Nome</label>
@@ -1094,6 +1097,10 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
             </div>
           </form>
         </details>
+        ` : `
+        <div class="admin-form-panel" style="padding:1rem">
+          ${productLimitHint}
+        </div>`}
 
         <section class="admin-section">
           <div class="admin-section__head">
