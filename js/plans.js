@@ -42,7 +42,7 @@ export function getPlanProductImageLimit(planId) {
 export function planProductLimitMessage(planId) {
   const plan = getPlanById(planId)
   const limit = getPlanProductLimit(planId)
-  return `O plano ${plan.name} permite até ${limit} produto${limit === 1 ? '' : 's'}. Assine um plano superior para ampliar o catálogo.`
+  return `O plano ${plan.name} permite até ${limit} itens no catálogo (produtos e serviços). Assine um plano superior para ampliar.`
 }
 
 export function planProductImageLimitMessage(planId) {
@@ -76,7 +76,7 @@ export function formatProductLimitHint(planId, productCount) {
   const plan = getPlanById(planId)
   const limit = getPlanProductLimit(planId)
   const remaining = planProductsRemaining(planId, productCount)
-  return `${plan.name}: ${productCount}/${limit} produtos${remaining > 0 ? ` — restam ${remaining}` : ''}`
+  return `${plan.name}: ${productCount}/${limit} itens no catálogo${remaining > 0 ? ` — restam ${remaining}` : ''}`
 }
 
 export function formatProductImageLimitHint(planId, productsWithImages) {
@@ -101,7 +101,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 0,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.free,
     features: [
-      'Até 6 produtos',
+      'Até 6 itens (produtos ou serviços)',
       'Imagens em até 2 produtos (500 KB cada)',
       'Vitrine com tema padrão (sem logo nem banner)',
       priceCooldownLabel(24),
@@ -116,7 +116,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 5,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.starter,
     features: [
-      'Até 15 produtos',
+      'Até 15 itens (produtos ou serviços)',
       'Imagens em até 10 produtos (500 KB cada)',
       'Logo e banner personalizados',
       priceCooldownLabel(12),
@@ -131,7 +131,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 15,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.plus,
     features: [
-      'Até 30 produtos',
+      'Até 30 itens (produtos ou serviços)',
       'Imagens em todos os produtos (500 KB cada)',
       'Logo e banner personalizados',
       priceCooldownLabel(4),
@@ -146,7 +146,7 @@ export const SUBSCRIPTION_PLANS = [
     priceMonthly: 35,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.premium,
     features: [
-      'Até 80 produtos',
+      'Até 80 itens (produtos ou serviços)',
       'Imagens em todos os produtos (500 KB cada)',
       'Logo e banner personalizados',
       priceCooldownLabel(null),

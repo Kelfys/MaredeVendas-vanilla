@@ -14,7 +14,7 @@ export const MERCHANT_PANEL = {
 
 export const MERCHANT_MENU = [
   { id: 'overview', label: 'Visão Geral', icon: '📊', href: '#/dashboard' },
-  { id: 'products', label: 'Produtos', icon: '📦', href: '#/dashboard/produtos' },
+  { id: 'products', label: 'Catálogo', icon: '📦', href: '#/dashboard/produtos' },
   { id: 'orders', label: 'Pedidos', icon: '🛒', href: '#/dashboard/pedidos' },
   { id: 'ads', label: 'Anúncios', icon: '📣', href: '#/dashboard/anuncios' },
   { id: 'settings', label: 'Configurações', icon: '⚙️', href: '#/dashboard/configuracoes' },

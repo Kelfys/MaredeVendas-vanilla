@@ -11,6 +11,7 @@
  */
 import { formatCurrency } from './utils.js'
 import { getPaymentMethodLabel } from './payment.js'
+import { isService } from './catalog.js'
 
 export function buildOrderMessage({
   items,
@@ -21,14 +22,15 @@ export function buildOrderMessage({
   deliveryPeriod,
   paymentMethod,
 }) {
-  const lines = items.map(
-    (item) => `${item.product.name} (${item.quantity}x) - ${formatCurrency(item.product.price * item.quantity)}`
-  )
+  const lines = items.map((item) => {
+    const kind = isService(item.product) ? 'Serviço' : 'Produto'
+    return `${kind}: ${item.product.name} (${item.quantity}x) - ${formatCurrency(item.product.price * item.quantity)}`
+  })
 
   return [
     'Olá!',
     '',
-    'Gostaria de fazer o seguinte pedido:',
+    'Gostaria de fazer o seguinte pedido (produtos e/ou serviços):',
     '',
     ...lines,
     '',

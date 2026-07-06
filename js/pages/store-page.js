@@ -122,11 +122,11 @@ export async function renderStorePage(main, { slug }) {
         </div>
 
         <div class="products-header">
-          <h2 class="section-title">Produtos</h2>
+          <h2 class="section-title">Produtos e serviços</h2>
           <p class="products-header__hint">Ordenados por popularidade — os mais curtidos aparecem com mais destaque.</p>
         </div>
         ${products.length === 0
-          ? '<div class="empty-state"><h2>Nenhum produto disponível</h2></div>'
+          ? '<div class="empty-state"><h2>Nenhum item disponível no catálogo</h2></div>'
           : `<div class="product-grid" id="products">${products.map((product) => renderProductCard(product, {
               user: currentUser,
               commentsOpen: openComments.has(product.id),

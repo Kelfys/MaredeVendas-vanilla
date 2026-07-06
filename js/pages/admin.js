@@ -31,6 +31,10 @@ import {
   PRODUCT_IMAGE_UPLOAD_HINT, STORE_BRANDING_UPLOAD_HINT,
   validateImageFile, STORAGE_BUCKETS,
 } from '../uploads.js'
+import {
+  isService, getCatalogItemIcon, getCatalogItemLabel,
+  catalogItemTypeFieldHtml, catalogStockFieldHtml, bindCatalogItemTypeForm, readCatalogItemForm,
+} from '../catalog.js'
 
 function guardStaff(main, panel = 'admin') {
   const user = getUser()
@@ -646,12 +650,13 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
     <tr data-product-row data-product-name="${escapeHtml(p.name.toLowerCase())}">
       <td>
         <div class="admin-table-thumb">
-          ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<span>📦</span>'}
+          ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : `<span>${getCatalogItemIcon(p)}</span>`}
         </div>
         ${escapeHtml(p.name)}
+        <br><small class="form-hint">${escapeHtml(getCatalogItemLabel(p))}</small>
       </td>
       <td>${formatCurrency(p.price)}</td>
-      <td>${p.stock}</td>
+      <td>${isService(p) ? '—' : (p.stock ?? 0)}</td>
       <td>${p.active ? '✓' : '✗'}</td>
       <td style="white-space:nowrap">
         ${readOnly ? '—' : `
@@ -662,6 +667,7 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
     ${readOnly ? '' : `<tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
       <td colspan="5">
         <form class="admin-edit-panel admin-form-grid" data-product-edit="${p.id}">
+          ${catalogItemTypeFieldHtml(p.item_type)}
           <div class="form-group">
             <label class="form-label">Nome</label>
             <input class="form-input" name="name" value="${escapeHtml(p.name)}" required />
@@ -670,10 +676,7 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
             <label class="form-label">Preço (R$)</label>
             <input class="form-input" name="price" type="number" step="0.01" min="0" value="${p.price}" required />
           </div>
-          <div class="form-group">
-            <label class="form-label">Estoque</label>
-            <input class="form-input" name="stock" type="number" min="0" value="${p.stock}" required />
-          </div>
+          ${catalogStockFieldHtml(p.stock ?? 0, p.item_type)}
           <div class="form-group">
             <label class="form-label">Categoria</label>
             <select class="form-input" name="category_id">
@@ -788,9 +791,10 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
 
       ${canCreate ? `
         <details class="admin-form-panel">
-          <summary>+ Novo produto em ${escapeHtml(store.name)}</summary>
+          <summary>+ Novo item em ${escapeHtml(store.name)}</summary>
           <form id="admin-product-form" class="admin-form-grid">
             <input type="hidden" name="store_id" value="${escapeHtml(store.id)}" />
+            ${catalogItemTypeFieldHtml('product')}
             <div class="form-group">
               <label class="form-label">Nome</label>
               <input class="form-input" name="name" required />
@@ -799,10 +803,7 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
               <label class="form-label">Preço (R$)</label>
               <input class="form-input" name="price" type="number" step="0.01" min="0" required />
             </div>
-            <div class="form-group">
-              <label class="form-label">Estoque</label>
-              <input class="form-input" name="stock" type="number" min="0" value="10" required />
-            </div>
+            ${catalogStockFieldHtml(10, 'product')}
             <div class="form-group">
               <label class="form-label">Categoria</label>
               <select class="form-input" name="category_id">
@@ -824,7 +825,7 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
               </div>
             </div>
             <div class="admin-form-grid__full">
-              <button type="submit" class="btn btn-primary">Criar produto</button>
+              <button type="submit" class="btn btn-primary">Criar item</button>
             </div>
           </form>
         </details>` : (!readOnly && store.status !== 'approved' ? `
@@ -1639,6 +1640,7 @@ function bindProductForm(main, selectedStoreId = null) {
   const createForm = main.querySelector('#admin-product-form')
   const createImageInput = createForm?.querySelector('input[name="image"]')
   bindImagePreview(createImageInput, main.querySelector('[data-preview-product-create]'))
+  bindCatalogItemTypeForm(createForm)
 
   createForm?.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -1653,16 +1655,18 @@ function bindProductForm(main, selectedStoreId = null) {
         if (err) throw new Error(err)
       }
       const storeId = f.store_id.value
+      const catalogFields = readCatalogItemForm(f)
       await createProduct(storeId, {
         name: f.name.value.trim(),
         description: f.description.value.trim(),
         price: parseFloat(f.price.value),
-        stock: parseInt(f.stock.value, 10),
+        item_type: catalogFields.item_type,
+        stock: catalogFields.stock,
         category_id: f.category_id.value,
         active: true,
         image: imageFile,
       })
-      showToast('Produto criado!')
+      showToast('Item criado!')
       navigate(staffProductsPath(main.dataset.staffPanel || 'admin', storeId || selectedStoreId))
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
@@ -1696,6 +1700,7 @@ function bindProductEdits(main, selectedStoreId = null) {
     const id = form.dataset.productEdit
     const imageInput = form.querySelector('input[name="image"]')
     bindImagePreview(imageInput, form.querySelector(`[data-preview-product="${id}"]`))
+    bindCatalogItemTypeForm(form)
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -1707,16 +1712,18 @@ function bindProductEdits(main, selectedStoreId = null) {
           const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
           if (err) throw new Error(err)
         }
+        const catalogFields = readCatalogItemForm(form)
         await updateProduct(id, {
           name: form.name.value.trim(),
           description: form.description.value.trim(),
           price: parseFloat(form.price.value),
-          stock: parseInt(form.stock.value, 10),
+          item_type: catalogFields.item_type,
+          stock: catalogFields.stock,
           category_id: form.category_id.value,
           active: form.active.value === 'true',
           image: imageFile,
         })
-        showToast('Produto atualizado!')
+        showToast('Item atualizado!')
         rerenderStaff(main, 'products', selectedStoreId)
       } catch (err) {
         showToast(err.message)

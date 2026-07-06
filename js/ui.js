@@ -9,6 +9,7 @@
 import { APP_NAME } from './config.js'
 import { getStoreThemeColor } from './config.js'
 import { escapeHtml, formatCurrency, formatPhone } from './utils.js'
+import { isCatalogItemAvailable, getCatalogItemIcon, getCatalogItemLabel } from './catalog.js'
 import { getPlanById } from './plans.js'
 import {
   getUser, logout, onAuthChange, toggleTheme, getTheme, getAdminPendingCount,
@@ -302,7 +303,7 @@ export function renderFeedAdCard(ad) {
 /** Card horizontal de produto no feed da home. */
 export function renderFeedProductCard(product, options = {}) {
   const { badge = 'new' } = options
-  const oos = product.stock <= 0
+  const oos = !isCatalogItemAvailable(product)
   const likesCount = product.likes_count ?? 0
   const badgeLabels = {
     liked: 'Mais curtido',
@@ -324,7 +325,7 @@ export function renderFeedProductCard(product, options = {}) {
         <a href="#/loja/${escapeHtml(store?.slug ?? '')}" class="feed-product-card__media">
           ${product.image
             ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
-            : '<div class="feed-product-card__placeholder">📦</div>'}
+            : `<div class="feed-product-card__placeholder">${getCatalogItemIcon(product)}</div>`}
           ${oos ? '<span class="product-card__oos">Indisponível</span>' : ''}
         </a>
         <div class="feed-product-card__body">
@@ -353,9 +354,10 @@ export function renderProductCard(product, options = {}) {
     comments = [],
     commentsLoading = false,
   } = options
-  const oos = product.stock <= 0
+  const oos = !isCatalogItemAvailable(product)
   const likesCount = product.likes_count ?? 0
   const commentsCount = product.comments_count ?? 0
+  const typeLabel = getCatalogItemLabel(product)
   const liked = Boolean(product.liked_by_user)
   const canEngage = Boolean(user)
 
@@ -364,8 +366,9 @@ export function renderProductCard(product, options = {}) {
       <div class="product-card__img">
         ${product.image
           ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" />`
-          : '<div class="product-card__placeholder">📦</div>'}
+          : `<div class="product-card__placeholder">${getCatalogItemIcon(product)}</div>`}
         ${oos ? '<span class="product-card__oos">Indisponível</span>' : ''}
+        <span class="product-card__type">${escapeHtml(typeLabel)}</span>
       </div>
       <div class="product-card__body">
         <h3 class="product-card__name">${escapeHtml(product.name)}</h3>
@@ -430,7 +433,7 @@ function renderCartItem(item) {
       <div class="cart-item__media">
         ${item.product.image
           ? `<img src="${escapeHtml(item.product.image)}" alt="" loading="lazy" />`
-          : '<span class="cart-item__placeholder" aria-hidden="true">📦</span>'}
+          : `<span class="cart-item__placeholder" aria-hidden="true">${getCatalogItemIcon(item.product)}</span>`}
       </div>
       <div class="cart-item__content">
         <div class="cart-item__top">

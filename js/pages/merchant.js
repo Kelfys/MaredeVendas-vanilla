@@ -32,6 +32,10 @@ import { renderOrdersChart, bindOrdersChart } from '../order-charts.js'
 import { bindPaginatedSortableList } from '../list-utils.js'
 import { routeHref } from '../router.js'
 import {
+  isService, getCatalogItemIcon, getCatalogItemLabel,
+  catalogItemTypeFieldHtml, catalogStockFieldHtml, bindCatalogItemTypeForm, readCatalogItemForm,
+} from '../catalog.js'
+import {
   getPaymentMethodLabel, PAYMENT_METHODS, normalizeStorePaymentMethods,
 } from '../payment.js'
 
@@ -224,7 +228,7 @@ function merchantOnboardingChecklist(store, products) {
     },
     {
       done: activeCount >= 3,
-      label: 'Pelo menos 3 produtos ativos',
+      label: 'Pelo menos 3 itens ativos no catálogo',
       action: `<a href="${merchantHref('produtos')}" class="btn btn-outline btn-sm">Cadastrar</a>`,
     },
     {
@@ -281,7 +285,7 @@ function renderRecentOrders(orders) {
 }
 
 function renderLowStockAlert(products) {
-  const lowStock = products.filter((p) => p.active && p.stock <= LOW_STOCK_THRESHOLD)
+  const lowStock = products.filter((p) => p.active && !isService(p) && (p.stock ?? 0) <= LOW_STOCK_THRESHOLD)
   if (lowStock.length === 0) return ''
 
   return `
@@ -414,17 +418,18 @@ function renderProductTableRows(products, categories, store) {
         data-product-row
         data-product-name="${escapeHtml(p.name.toLowerCase())}"
         data-product-price="${p.price}"
-        data-product-stock="${p.stock}"
+        data-product-stock="${isService(p) ? '' : (p.stock ?? 0)}"
         data-product-active="${p.active ? '1' : '0'}"
       >
         <td>
           <div class="admin-table-thumb">
-            ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : '<span>📦</span>'}
+            ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : `<span>${getCatalogItemIcon(p)}</span>`}
           </div>
           <strong>${escapeHtml(p.name)}</strong>
+          <br><small class="form-hint">${escapeHtml(getCatalogItemLabel(p))}</small>
         </td>
         <td>${formatCurrency(p.price)}</td>
-        <td>${p.stock <= LOW_STOCK_THRESHOLD ? `<span class="badge badge-pending">${p.stock}</span>` : p.stock}</td>
+        <td>${isService(p) ? '—' : ((p.stock ?? 0) <= LOW_STOCK_THRESHOLD ? `<span class="badge badge-pending">${p.stock}</span>` : p.stock)}</td>
         <td>${p.active ? '<span class="badge badge-approved">Ativo</span>' : '<span class="badge badge-blocked">Inativo</span>'}</td>
         <td style="white-space:nowrap">
           <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">Editar</button>
@@ -438,15 +443,13 @@ function renderProductTableRows(products, categories, store) {
               <label class="form-label">Nome</label>
               <input class="form-input" name="name" value="${escapeHtml(p.name)}" required />
             </div>
+            ${catalogItemTypeFieldHtml(p.item_type)}
             <div class="form-group">
               <label class="form-label">Preço (R$)</label>
               <input class="form-input" name="price" type="number" step="0.01" min="0" value="${p.price}" required />
               ${priceCooldownHintHtml(store.plan_id, p)}
             </div>
-            <div class="form-group">
-              <label class="form-label">Estoque</label>
-              <input class="form-input" name="stock" type="number" min="0" value="${p.stock}" required />
-            </div>
+            ${catalogStockFieldHtml(p.stock ?? 0, p.item_type)}
             <div class="form-group">
               <label class="form-label">Categoria</label>
               <select class="form-input" name="category_id">
@@ -729,6 +732,7 @@ function bindProductEdits(main, store) {
     const id = form.dataset.productEdit
     const imageInput = form.querySelector('input[name="image"]')
     bindImagePreview(imageInput, form.querySelector(`[data-preview-product="${id}"]`))
+    bindCatalogItemTypeForm(form)
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -740,11 +744,13 @@ function bindProductEdits(main, store) {
           const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
           if (err) throw new Error(err)
         }
+        const catalogFields = readCatalogItemForm(form)
         await updateProduct(id, {
           name: form.name.value.trim(),
           description: form.description.value.trim(),
           price: parseFloat(form.price.value),
-          stock: parseInt(form.stock.value, 10),
+          item_type: catalogFields.item_type,
+          stock: catalogFields.stock,
           category_id: form.category_id.value,
           active: form.active.value === 'true',
           image: imageFile,
@@ -775,6 +781,7 @@ function bindProductForm(main, store) {
     productForm?.querySelector('input[name="image"]'),
     main.querySelector('[data-preview-product-create]'),
   )
+  bindCatalogItemTypeForm(productForm)
 
   productForm?.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -787,16 +794,18 @@ function bindProductForm(main, store) {
         const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
         if (err) throw new Error(err)
       }
+      const catalogFields = readCatalogItemForm(f)
       await createProduct(store.id, {
         name: f.name.value.trim(),
         description: f.description.value.trim(),
         price: parseFloat(f.price.value),
-        stock: parseInt(f.stock.value, 10),
+        item_type: catalogFields.item_type,
+        stock: catalogFields.stock,
         category_id: f.category_id.value,
         active: true,
         image: imageFile,
       })
-      showToast('Produto criado!')
+      showToast('Item cadastrado!')
       renderMerchantDashboard(main, 'products')
     } catch (err) {
       main.querySelector('#product-msg').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
@@ -1052,17 +1061,18 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
 
     main.innerHTML = merchantPage(
       menuItem.label,
-      `${products.length} produto${products.length === 1 ? '' : 's'} cadastrado${products.length === 1 ? '' : 's'}`,
+      `${products.length} item${products.length === 1 ? '' : 's'} no catálogo`,
       `
         <div id="product-msg"></div>
         ${canCreate ? `
         <details class="admin-form-panel" open>
-          <summary>Novo produto</summary>
+          <summary>Novo item do catálogo</summary>
           ${productLimitHint}
           <form id="product-form" class="admin-form-grid" style="margin-top:1rem">
+            ${catalogItemTypeFieldHtml('product')}
             <div class="form-group admin-form-grid__full">
               <label class="form-label">Nome</label>
-              <input class="form-input" name="name" placeholder="Nome do produto" required />
+              <input class="form-input" name="name" placeholder="Nome do produto ou serviço" required />
             </div>
             <div class="form-group admin-form-grid__full">
               <label class="form-label">Descrição</label>
@@ -1072,10 +1082,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
               <label class="form-label">Preço (R$)</label>
               <input class="form-input" name="price" type="number" step="0.01" min="0" required />
             </div>
-            <div class="form-group">
-              <label class="form-label">Estoque</label>
-              <input class="form-input" name="stock" type="number" min="0" required />
-            </div>
+            ${catalogStockFieldHtml(0, 'product')}
             <div class="form-group admin-form-grid__full">
               <label class="form-label">Categoria</label>
               <select class="form-input" name="category_id">
@@ -1084,7 +1091,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
               </select>
             </div>
             <div class="form-group admin-form-grid__full">
-              <label class="form-label">Imagem do produto</label>
+              <label class="form-label">Imagem</label>
               <div class="admin-image-field">
                 <div data-preview-product-create>${imagePreviewBlock(null, 'Novo produto', 'square')}</div>
                 ${imageLimitHint}
@@ -1093,7 +1100,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
               </div>
             </div>
             <div class="admin-form-grid__full">
-              <button type="submit" class="btn btn-primary btn-sm">Salvar produto</button>
+              <button type="submit" class="btn btn-primary btn-sm">Salvar item</button>
             </div>
           </form>
         </details>
@@ -1108,10 +1115,10 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
             <span class="admin-stat-chip admin-stat-chip--sent">${products.filter((p) => p.active).length} ativos</span>
           </div>
           ${products.length === 0
-            ? merchantEmptyState('📦', 'Nenhum produto', 'Cadastre seu primeiro produto usando o formulário acima.')
+            ? merchantEmptyState('📦', 'Catálogo vazio', 'Cadastre seu primeiro produto ou serviço usando o formulário acima.')
             : `
               <div class="admin-filter-bar admin-filter-bar--compact">
-                <input type="search" class="form-input admin-filter-bar__search" id="merchant-products-search" placeholder="Buscar produto..." autocomplete="off" />
+                <input type="search" class="form-input admin-filter-bar__search" id="merchant-products-search" placeholder="Buscar no catálogo..." autocomplete="off" />
                 <div class="admin-filter-chips" role="group">
                   <button type="button" class="admin-filter-chip active" data-filter="all">Todos</button>
                   <button type="button" class="admin-filter-chip" data-filter="1">Ativos</button>
@@ -1123,7 +1130,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
                   <thead><tr>
                     <th class="admin-table-sortable">
                       <button type="button" class="admin-table-sort active" data-sort-field="name" aria-label="Ordenar por nome">
-                        Produto <span class="admin-table-sort__icon" aria-hidden="true">↑</span>
+                        Item <span class="admin-table-sort__icon" aria-hidden="true">↑</span>
                       </button>
                     </th>
                     <th class="admin-table-sortable">

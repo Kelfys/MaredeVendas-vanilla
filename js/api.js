@@ -18,6 +18,7 @@ import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
 import { generateSlug, sanitizeSearch } from './utils.js'
 import { DEFAULT_THEME_COLOR } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
+import { normalizeItemType } from './catalog.js'
 import {
   planAllowsStoreBranding, FREE_PLAN_BRANDING_MESSAGE,
   getPlanProductLimit, getPlanProductImageLimit,
@@ -532,13 +533,17 @@ export async function createProduct(storeId, form) {
     imageUrl = await uploadImage(STORAGE_BUCKETS.products, `${storeId}/${Date.now()}`, form.image)
   }
 
+  const itemType = normalizeItemType(form.item_type)
+  const stock = itemType === 'service' ? null : Number(form.stock ?? 0)
+
   const { data, error } = await client.from('products').insert({
     store_id: storeId,
     name: form.name,
     description: form.description,
     price: form.price,
     category_id: form.category_id || null,
-    stock: form.stock,
+    item_type: itemType,
+    stock,
     active: form.active ?? true,
     image: imageUrl,
   }).select().single()
@@ -568,10 +573,20 @@ export async function updateProduct(productId, form) {
   }
 
   const updates = {}
-  for (const key of ['name', 'description', 'price', 'category_id', 'stock', 'active']) {
+  for (const key of ['name', 'description', 'price', 'category_id', 'active']) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
   if (form.category_id === '') updates.category_id = null
+  if (form.item_type !== undefined) {
+    updates.item_type = normalizeItemType(form.item_type)
+    if (updates.item_type === 'service') updates.stock = null
+  }
+  if (form.stock !== undefined) {
+    const nextType = form.item_type !== undefined
+      ? normalizeItemType(form.item_type)
+      : normalizeItemType((await client.from('products').select('item_type').eq('id', productId).single()).data?.item_type)
+    if (nextType !== 'service') updates.stock = Number(form.stock)
+  }
 
   if (form.image instanceof File) {
     const { data: existing, error: fetchError } = await client
