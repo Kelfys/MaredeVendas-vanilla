@@ -40,9 +40,9 @@ function boot() {
 
   registerRoute('/', lazy(() => import('./pages/home.js').then((m) => ({ default: m.renderHome }))))
   registerRoute('/loja/:slug', lazy(() => import('./pages/store-page.js').then((m) => ({ default: m.renderStorePage }))))
-  registerRoute('/conta/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderCustomerLogin }))))
+  registerRoute('/conta/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderLogin }))))
   registerRoute('/conta/criar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderCustomerRegister }))))
-  registerRoute('/lojista/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderMerchantLogin }))))
+  registerRoute('/lojista/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderLogin }))))
   registerRoute('/lojista/cadastro', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderMerchantRegister }))))
   registerRoute('/admin/entrar', lazy(() => import('./pages/auth.js').then((m) => ({ default: m.renderAdminLogin }))))
   registerRoute('/admin', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'overview') }))))

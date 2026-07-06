@@ -33,13 +33,29 @@ function authLayout(title, description, body) {
   `
 }
 
-export async function renderCustomerLogin(main) {
+const ROLE_HOME = {
+  customer: '/favoritos',
+  merchant: '/dashboard',
+  admin: '/admin',
+  moderator: '/moderador',
+}
+
+function getPostLoginPath(user, redirect) {
+  if (!user) return '/'
+  if (user.role === 'customer') {
+    if (redirect?.startsWith('/')) return redirect
+    return ROLE_HOME.customer
+  }
+  return ROLE_HOME[user.role] ?? '/'
+}
+
+export async function renderLogin(main) {
   const params = parseQuery()
-  const redirect = params.get('redirect') ?? '/favoritos'
+  const redirect = params.get('redirect')
 
   main.innerHTML = authLayout(
-    'Minha Conta',
-    'Entre para salvar lojas favoritas. Comprar e pedir pelo WhatsApp não exige login.',
+    'Entrar',
+    'Use o mesmo login para conta de cliente ou lojista.',
     `
       <form id="login-form">
         <div class="form-group">
@@ -52,9 +68,10 @@ export async function renderCustomerLogin(main) {
         </div>
         <button type="submit" class="btn btn-primary btn-block">Entrar</button>
       </form>
-      <p style="margin-top:1rem;font-size:0.875rem;text-align:center;color:var(--text-secondary)">
-        <a href="#/conta/criar">Criar conta gratuita</a>
-      </p>
+      <div class="auth-links">
+        <a href="#/conta/criar">Criar conta de cliente</a>
+        <a href="#/lojista/cadastro">Cadastrar minha loja</a>
+      </div>
     `
   )
 
@@ -66,19 +83,18 @@ export async function renderCustomerLogin(main) {
 
     try {
       await signIn(form.email.value, form.password.value)
-      const { loadUser, getUser, logout } = await import('../state.js')
+      const { loadUser, getUser } = await import('../state.js')
       await loadUser()
-      if (getUser()?.role !== 'customer') {
-        await logout()
-        errEl.innerHTML = '<div class="alert alert-error">Use a área do lojista ou admin para esse tipo de conta.</div>'
-        return
-      }
-      navigate(redirect.startsWith('/') ? redirect : `/${redirect}`)
+      const user = getUser()
+      if (!user) throw new Error('Não foi possível carregar sua conta.')
+      navigate(getPostLoginPath(user, redirect))
     } catch (err) {
       errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
     }
   })
 }
+
+export const renderCustomerLogin = renderLogin
 
 export async function renderCustomerRegister(main) {
   main.innerHTML = authLayout(
@@ -140,42 +156,7 @@ export async function renderCustomerRegister(main) {
   })
 }
 
-export async function renderMerchantLogin(main) {
-  main.innerHTML = authLayout(
-    'Área do Lojista',
-    'Gerencie produtos, pedidos e configurações da sua loja.',
-    `
-      <form id="login-form">
-        <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" name="email" required /></div>
-        <div class="form-group"><label class="form-label">Senha</label><input class="form-input" type="password" name="password" required /></div>
-        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
-      </form>
-      <p style="margin-top:1rem;font-size:0.875rem;text-align:center;color:var(--text-secondary)">
-        <a href="#/lojista/cadastro">Cadastrar minha loja</a>
-      </p>
-    `
-  )
-
-  main.querySelector('#login-form').addEventListener('submit', async (e) => {
-    e.preventDefault()
-    const form = e.target
-    const errEl = main.querySelector('#auth-error')
-
-    try {
-      await signIn(form.email.value, form.password.value)
-      const { loadUser, getUser, logout } = await import('../state.js')
-      await loadUser()
-      if (getUser()?.role !== 'merchant') {
-        await logout()
-        errEl.innerHTML = '<div class="alert alert-error">Esta conta não é de lojista.</div>'
-        return
-      }
-      navigate('/dashboard')
-    } catch (err) {
-      errEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
-    }
-  })
-}
+export const renderMerchantLogin = renderLogin
 
 export async function renderAdminLogin(main) {
   main.innerHTML = authLayout(

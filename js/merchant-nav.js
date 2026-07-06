@@ -7,7 +7,7 @@ export const MERCHANT_PANEL = {
   id: 'merchant',
   label: 'Painel do Lojista',
   basePath: '/dashboard',
-  loginPath: '/lojista/entrar',
+  loginPath: '/conta/entrar',
   icon: '📊',
 }
 

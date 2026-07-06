@@ -81,7 +81,7 @@ export function renderHeader() {
 
       <nav class="nav-desktop">
         <a href="#/">Lojas</a>
-        <a href="#/lojista/entrar">Área do Lojista</a>
+        <a href="#/lojista/cadastro">Vender aqui</a>
         <a href="#/regras">Regras</a>
       </nav>
 
@@ -115,7 +115,7 @@ export function renderHeader() {
 
     <nav class="nav-mobile ${menuOpen ? 'open' : ''}" id="nav-mobile">
       <a href="#/">Lojas</a>
-      <a href="#/lojista/entrar">Área do Lojista</a>
+      <a href="#/lojista/cadastro">Vender aqui</a>
       <a href="#/regras">Regras</a>
       ${user?.role === 'customer' ? '<a href="#/favoritos">❤️ Favoritos</a>' : ''}
       ${user?.role === 'merchant' ? `

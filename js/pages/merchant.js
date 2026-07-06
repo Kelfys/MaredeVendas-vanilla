@@ -69,7 +69,7 @@ function bindImagePreview(input, previewEl) {
 function guardMerchant(main) {
   const user = getUser()
   if (!user || user.role !== 'merchant') {
-    main.innerHTML = `<div class="empty-state"><h2>Acesso restrito</h2><p><a href="${routeHref('/lojista/entrar')}">Entrar como lojista</a></p></div>`
+    main.innerHTML = `<div class="empty-state"><h2>Acesso restrito</h2><p><a href="${routeHref('/conta/entrar')}">Entrar</a></p></div>`
     return null
   }
   return user
