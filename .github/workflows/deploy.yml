@@ -26,6 +26,9 @@ jobs:
           cp index.html favicon.svg 404.html dist/
           cp -r css js dist/
           touch dist/.nojekyll
+          BUILD_ID="${GITHUB_SHA::7}"
+          sed -i "s|href=\"css/styles.css\"|href=\"css/styles.css?v=${BUILD_ID}\"|" dist/index.html
+          sed -i "s|src=\"js/app.js\"|src=\"js/app.js?v=${BUILD_ID}\"|" dist/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
