@@ -31,6 +31,7 @@ import { MERCHANT_PANEL, MERCHANT_MENU, isMerchantPath, getMerchantTab, merchant
 let menuOpen = false
 let staffMenuOpen = false
 
+/** Links fora do SPA (ex.: strings-editor.html) abrem em nova aba. */
 function staffMenuLinkAttrs(item) {
   return item.external ? ' target="_blank" rel="noopener noreferrer"' : ''
 }

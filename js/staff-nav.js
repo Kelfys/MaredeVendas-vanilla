@@ -30,6 +30,7 @@ export const ADMIN_MENU = [
   { id: 'approvals', label: t('nav.staffApprovals'), icon: '✅', href: '#/admin/aprovacoes' },
   { id: 'neighborhoods', label: t('nav.staffNeighborhoods'), icon: '📍', href: '#/admin/bairros' },
   { id: 'moderators', label: t('nav.staffModerators'), icon: '🛡️', href: '#/admin/moderadores' },
+  // external: true → ui.js abre strings-editor.html em nova aba (fora do hash router)
   { id: 'strings', label: t('nav.staffStringsEditor'), icon: '✏️', href: stringsEditorHref(), external: true },
   { id: 'account', label: t('nav.staffAccount'), icon: '🔑', href: '#/admin/conta' },
 ]

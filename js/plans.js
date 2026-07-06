@@ -46,7 +46,7 @@ export function planAllowsStoreBanner(planId) {
   return Boolean(planId && planId !== 'free')
 }
 
-/** Anúncios patrocinados no feed — somente plano Premium. */
+/** Anúncios no feed (store_ads): Premium = 4/mês calendário; demais = 0. */
 export const PLAN_MONTHLY_AD_LIMIT = {
   free: 0,
   starter: 0,

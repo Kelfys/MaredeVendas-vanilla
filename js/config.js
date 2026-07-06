@@ -27,12 +27,18 @@ export function detectAppBasePath() {
 
 export const APP_BASE_PATH = detectAppBasePath()
 
-/** URL do editor visual de textos (strings-editor.html). */
+/**
+ * Editor visual de textos — página estática fora do SPA (admin abre em nova aba).
+ * @see js/staff-nav.js (item strings, external: true)
+ */
 export function stringsEditorHref() {
   return `${APP_BASE_PATH}/strings-editor.html`
 }
 
-/** URL de arquivo estático em assets/ (ex.: assetHref('images/logo.png')). */
+/**
+ * Arquivos estáticos versionados em assets/ (imagens, fontes, etc.).
+ * Respeita APP_BASE_PATH no GitHub Pages. Copiado para dist/ no deploy.
+ */
 export function assetHref(relativePath = '') {
   const normalized = String(relativePath).replace(/^\//, '')
   return `${APP_BASE_PATH}/assets/${normalized}`

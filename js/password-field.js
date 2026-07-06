@@ -34,7 +34,10 @@ function wrapPasswordInput(input) {
   wrapper.appendChild(toggle)
 }
 
-/** Envolve inputs de senha no container e adiciona o botão de visibilidade. */
+/**
+ * Envolve inputs .form-input[type=password] e adiciona toggle de visibilidade.
+ * Chamar após innerHTML em auth, merchant, admin e favoritos.
+ */
 export function bindPasswordToggles(root) {
   if (!root?.querySelectorAll) return
   root.querySelectorAll('input[type="password"].form-input').forEach(wrapPasswordInput)

@@ -127,6 +127,7 @@ function normalizePathnameToHash() {
   history.replaceState(null, '', `${m[1]}/#${subpath}${window.location.search}`)
 }
 
+/** Mantém state.js sincronizado com Supabase e re-renderiza rotas protegidas ao trocar sessão. */
 function setupAuthListeners() {
   const client = getSupabase()
   if (!client) return
@@ -192,6 +193,7 @@ function boot() {
   delete window.__MV_INITIAL_ROUTE__
 }
 
+// Ordem: OAuth → sessão restaurada → perfil carregado → rotas (evita "Acesso restrito" no F5)
 handleAuthCallback()
   .then(() => waitForInitialSession())
   .then(() => loadUser())

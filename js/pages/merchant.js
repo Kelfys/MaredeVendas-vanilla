@@ -80,6 +80,7 @@ function bindImagePreview(input, previewEl) {
   })
 }
 
+/** Aguarda loadUser() antes de negar acesso — corrige race no boot pós-login. */
 async function guardMerchant(main) {
   let user = getUser()
   if (!user) user = await loadUser()
@@ -352,6 +353,7 @@ function renderReviewsSection(reviews) {
     </section>`
 }
 
+/** Resumo de anúncios no overview; exibe limite Premium ou aviso de upgrade. */
 function renderAdsSummary(ads, store) {
   const active = ads.filter((a) => a.status === 'approved').length
   const pending = ads.filter((a) => a.status === 'pending').length
@@ -378,6 +380,7 @@ function renderAdsSummary(ads, store) {
     </section>`
 }
 
+/** Formulário de novo anúncio ou bloqueios (aprovação, plano, limite 4/mês). */
 function merchantAdsCreatePanel(store, ads) {
   const planId = store.plan_id ?? 'free'
   const approved = store.status === 'approved' && ['active', 'trialing'].includes(store.subscription_status)
@@ -1116,6 +1119,7 @@ function refreshHeader() {
   import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 }
 
+/** Badge de pedidos novos + toast; re-renderiza painel ao receber INSERT realtime. */
 function buildOrdersSubscription(store) {
   return subscribeToStoreOrders(store.id, async () => {
     const count = await countUnreadMerchantOrders(store.id)

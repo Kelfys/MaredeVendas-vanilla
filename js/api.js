@@ -1693,6 +1693,7 @@ async function countStoreAdsCreatedThisMonth(client, storeId) {
   return count ?? 0
 }
 
+/** Premium + loja aprovada/ativa + limite mensal (PLAN_MONTHLY_AD_LIMIT em plans.js). */
 async function assertStoreAdAllowed(client, storeId) {
   const { data: store, error: storeError } = await client
     .from('stores')
@@ -1750,6 +1751,7 @@ export async function countUnreadMerchantOrders(storeId) {
 
 const activeStoreOrderChannels = new Map()
 
+/** Remove canal duplicado antes de novo subscribe (evita erro postgres_changes). */
 function removeStoreOrderChannel(client, storeId) {
   const topic = `realtime:orders-store-${storeId}`
   if (typeof client.getChannels === 'function') {
@@ -1760,6 +1762,7 @@ function removeStoreOrderChannel(client, storeId) {
   activeStoreOrderChannels.delete(storeId)
 }
 
+/** Realtime de novos pedidos da loja. Retorna função de cleanup para unmount. */
 export function subscribeToStoreOrders(storeId, onInsert) {
   const client = getSupabase()
   if (!client) return () => {}
