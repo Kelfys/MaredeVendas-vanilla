@@ -1,11 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import {
+  PLAN_LIMITS,
+  FREE_PLAN_BANNER_MESSAGE,
   getPlanPriceCooldownHours,
   getPriceCooldownRemaining,
   formatPriceCooldownRemaining,
   getPlanById,
   getPlanProductLimit,
   getPlanProductImageLimit,
+  planAllowsProductImages,
+  planProductLimitMessage,
+  planProductImageLimitMessage,
+  planProductsRemaining,
+  planProductImagesRemaining,
+  formatProductLimitHint,
+  countProductsWithImages,
   canCreateProduct,
   canAddProductImage,
   planAllowsStoreLogo,
@@ -52,6 +61,85 @@ describe('plan store images', () => {
     expect(planAllowsStoreBanner('free')).toBe(false)
     expect(planAllowsStoreBanner('starter')).toBe(true)
     expect(planAllowsStoreBanner('premium')).toBe(true)
+  })
+})
+
+describe('free plan limits', () => {
+  it('exposes PLAN_LIMITS.free as 2 products and 0 images', () => {
+    expect(PLAN_LIMITS.free).toEqual({ products: 2, productImages: 0 })
+  })
+
+  it('resolves free plan metadata', () => {
+    const plan = getPlanById('free')
+    expect(plan.id).toBe('free')
+    expect(plan.name).toBe('Gratuito')
+    expect(plan.priceMonthly).toBe(0)
+    expect(plan.priceCooldownHours).toBe(24)
+  })
+
+  it('lists free plan features without product images', () => {
+    const plan = getPlanById('free')
+    expect(plan.features).toContain('Até 2 itens (produtos ou serviços)')
+    expect(plan.features).toContain('Sem imagens nos produtos (planos pagos liberam fotos)')
+    expect(plan.features.some((f) => /Alteração de preços/i.test(f))).toBe(true)
+  })
+
+  it('allows logo but not banner or product images', () => {
+    expect(planAllowsStoreLogo('free')).toBe(true)
+    expect(planAllowsStoreBanner('free')).toBe(false)
+    expect(planAllowsProductImages('free')).toBe(false)
+    expect(planAllowsProductImages('starter')).toBe(true)
+  })
+
+  it('allows creating only while under 2 catalog items', () => {
+    expect(canCreateProduct('free', 0)).toBe(true)
+    expect(canCreateProduct('free', 1)).toBe(true)
+    expect(canCreateProduct('free', 2)).toBe(false)
+    expect(planProductsRemaining('free', 0)).toBe(2)
+    expect(planProductsRemaining('free', 1)).toBe(1)
+    expect(planProductsRemaining('free', 2)).toBe(0)
+  })
+
+  it('never allows product image upload on free', () => {
+    expect(canAddProductImage('free', 0)).toBe(false)
+    expect(canAddProductImage('free', 0, true)).toBe(false)
+    expect(canAddProductImage('free', 5, true)).toBe(false)
+    expect(planProductImagesRemaining('free', 0)).toBe(0)
+  })
+
+  it('returns free-specific limit messages', () => {
+    expect(planProductLimitMessage('free')).toContain('2')
+    expect(planProductLimitMessage('free')).toContain('Gratuito')
+    expect(planProductImageLimitMessage('free')).toBe(
+      'O plano Gratuito não permite imagens nos produtos. Assine um plano pago para enviar fotos no catálogo.',
+    )
+    expect(FREE_PLAN_BANNER_MESSAGE).toContain('banner personalizado')
+  })
+
+  it('formats catalog hint for free merchants', () => {
+    expect(formatProductLimitHint('free', 1)).toMatch(/Gratuito: 1\/2/)
+    expect(formatProductLimitHint('free', 1)).toMatch(/restam 1/)
+    expect(formatProductLimitHint('free', 2)).toMatch(/Gratuito: 2\/2/)
+    expect(formatProductLimitHint('free', 2)).not.toMatch(/restam/)
+  })
+
+  it('counts products with non-empty image URLs', () => {
+    const products = [
+      { image: 'https://example.com/a.jpg' },
+      { image: '' },
+      { image: null },
+      { image: '  ' },
+    ]
+    expect(countProductsWithImages(products)).toBe(1)
+  })
+
+  it('renders free plan in info-only cards without payment CTA', () => {
+    const html = renderSubscriptionPlanCards({ infoOnly: true })
+    expect(html).toContain('Gratuito')
+    expect(html).toContain('Até 2 itens (produtos ou serviços)')
+    expect(html).toContain('Sem imagens nos produtos')
+    expect(html).toContain('Incluso na aprovação do cadastro')
+    expect(html).not.toMatch(/Enviar comprovante — Gratuito/)
   })
 })
 
