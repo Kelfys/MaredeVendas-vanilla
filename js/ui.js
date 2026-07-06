@@ -31,9 +31,13 @@ import { MERCHANT_PANEL, MERCHANT_MENU, isMerchantPath, getMerchantTab, merchant
 let menuOpen = false
 let staffMenuOpen = false
 
+function staffMenuLinkAttrs(item) {
+  return item.external ? ' target="_blank" rel="noopener noreferrer"' : ''
+}
+
 function renderStaffMenuItems(panel, activeTab, { compact = false } = {}) {
   return getStaffMenu(panel).map((item) => `
-    <a href="${item.href}" class="admin-menu__item ${activeTab === item.id ? 'active' : ''} ${compact ? 'admin-menu__item--compact' : ''}">
+    <a href="${item.href}"${staffMenuLinkAttrs(item)} class="admin-menu__item ${activeTab === item.id ? 'active' : ''} ${compact ? 'admin-menu__item--compact' : ''}">
       <span class="admin-menu__icon">${item.icon}</span>
       <span>${item.label}</span>
     </a>
@@ -156,7 +160,7 @@ export function renderHeader() {
             ${getStaffMenu(staffPanel).map((item) => {
               const pending = item.id === 'approvals' ? getAdminPendingCount() : 0
               return `
-              <a href="${item.href}" class="admin-toolbar__tab ${staffTab === item.id ? 'active' : ''}">
+              <a href="${item.href}"${staffMenuLinkAttrs(item)} class="admin-toolbar__tab ${staffTab === item.id ? 'active' : ''}">
                 <span>${item.icon}</span> ${item.label}
                 ${pending > 0 ? `<span class="admin-toolbar__badge">${pending}</span>` : ''}
               </a>`

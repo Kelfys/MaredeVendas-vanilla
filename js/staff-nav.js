@@ -2,6 +2,7 @@
  * Navegação dos painéis admin e moderador.
  */
 import { getCurrentPath } from './router.js'
+import { stringsEditorHref } from './config.js'
 import { t } from './strings.js'
 
 export const STAFF_PANELS = {
@@ -29,6 +30,7 @@ export const ADMIN_MENU = [
   { id: 'approvals', label: t('nav.staffApprovals'), icon: '✅', href: '#/admin/aprovacoes' },
   { id: 'neighborhoods', label: t('nav.staffNeighborhoods'), icon: '📍', href: '#/admin/bairros' },
   { id: 'moderators', label: t('nav.staffModerators'), icon: '🛡️', href: '#/admin/moderadores' },
+  { id: 'strings', label: t('nav.staffStringsEditor'), icon: '✏️', href: stringsEditorHref(), external: true },
   { id: 'account', label: t('nav.staffAccount'), icon: '🔑', href: '#/admin/conta' },
 ]
 

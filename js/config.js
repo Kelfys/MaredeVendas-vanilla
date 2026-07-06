@@ -27,6 +27,11 @@ export function detectAppBasePath() {
 
 export const APP_BASE_PATH = detectAppBasePath()
 
+/** URL do editor visual de textos (strings-editor.html). */
+export function stringsEditorHref() {
+  return `${APP_BASE_PATH}/strings-editor.html`
+}
+
 /** Hash (#/rota) — único modo confiável no GitHub Pages (rotas diretas dão 404). */
 export const USE_HISTORY_ROUTER = false
 export const CART_STORAGE_KEY = 'maredevendas-cart'

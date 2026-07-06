@@ -21,7 +21,7 @@ import {
   escapeHtml, formatDate, formatCurrency, showToast,
   formatDateTimeCsv, buildCsv, downloadTextFile, validateInstagramHandle,
 } from '../utils.js'
-import { STORE_THEME_COLORS } from '../config.js'
+import { STORE_THEME_COLORS, stringsEditorHref } from '../config.js'
 import { STAFF_PANELS, staffHref, getStaffMenuItem } from '../staff-nav.js'
 import {
   canAccessPanel, isReadOnlyStaffTab, canApprovePlanChanges,
@@ -1120,6 +1120,7 @@ function quickActions(panel = 'admin') {
       { href: staffHref(panel, 'produtos'), icon: '📦', title: t('admin.newProduct'), text: t('admin.addToCatalog') },
       { href: staffHref(panel, 'bairros'), icon: '📍', title: t('nav.staffNeighborhoods'), text: t('admin.marketplaceRegions') },
       { href: staffHref(panel, 'moderadores'), icon: '🛡️', title: t('nav.staffModerators'), text: t('admin.regionalTeam') },
+      { href: stringsEditorHref(), icon: '✏️', title: t('admin.stringsEditor'), text: t('admin.stringsEditorDesc'), external: true },
     )
   }
   cards.push(
@@ -1131,7 +1132,7 @@ function quickActions(panel = 'admin') {
   return `
     <div class="admin-quick-actions">
       ${cards.map((card) => `
-        <a href="${card.href}" class="admin-quick-card ${card.muted ? 'admin-quick-card--muted' : ''}">
+        <a href="${card.href}"${card.external ? ' target="_blank" rel="noopener noreferrer"' : ''} class="admin-quick-card ${card.muted ? 'admin-quick-card--muted' : ''}">
           <span class="admin-quick-card__icon">${card.icon}</span>
           <strong>${card.title}</strong>
           <span>${card.text}</span>
