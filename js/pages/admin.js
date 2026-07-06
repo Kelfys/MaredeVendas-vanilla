@@ -12,7 +12,7 @@ import {
   fetchAllStoresAdmin,
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteProduct, fetchCategories,
-  fetchNeighborhoods, createNeighborhood, updateNeighborhood, setModeratorNeighborhood,
+  fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood, setModeratorNeighborhood,
 } from '../api.js'
 import { getStaffNeighborhoodScope, formatNeighborhoodLabel } from '../neighborhood.js'
 import { getUser, setAdminPendingCount } from '../state.js'
@@ -1704,8 +1704,14 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                       const storeCount = row?.storeCount ?? 0
                       const pendingCount = row?.pendingCount ?? 0
                       const moderatorCount = row?.moderatorCount ?? 0
+                      const canDelete = storeCount === 0 && moderatorCount === 0
+                      const deleteTitle = !canDelete
+                        ? (storeCount > 0
+                          ? `Há ${storeCount} loja(s) neste bairro`
+                          : `Há ${moderatorCount} moderador(es) neste bairro`)
+                        : 'Excluir bairro permanentemente'
                       return `
-                      <tr>
+                      <tr data-neighborhood-row data-neighborhood-id="${n.id}">
                         <td><strong>${escapeHtml(n.name)}</strong></td>
                         <td>${escapeHtml(n.city)}, ${escapeHtml(n.state)}</td>
                         <td>
@@ -1714,10 +1720,44 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                         <td>${moderatorCount > 0 ? moderatorCount : '<span class="admin-stat-chip admin-stat-chip--pending">0</span>'}</td>
                         <td><code>/${escapeHtml(n.slug)}</code></td>
                         <td>${n.active ? '<span class="badge badge-approved">Ativo</span>' : '<span class="badge badge-blocked">Inativo</span>'}</td>
-                        <td>
+                        <td style="white-space:nowrap">
+                          <button type="button" class="btn btn-outline btn-sm" data-edit-neighborhood="${n.id}">Editar</button>
                           <button type="button" class="btn btn-outline btn-sm" data-toggle-neighborhood="${n.id}" data-active="${n.active ? '0' : '1'}">
                             ${n.active ? 'Desativar' : 'Ativar'}
                           </button>
+                          <button
+                            type="button"
+                            class="btn btn-outline btn-sm"
+                            data-delete-neighborhood="${n.id}"
+                            data-neighborhood-name="${escapeHtml(n.name)}"
+                            ${canDelete ? '' : 'disabled'}
+                            title="${escapeHtml(deleteTitle)}"
+                          >Excluir</button>
+                        </td>
+                      </tr>
+                      <tr class="admin-edit-row" id="edit-neighborhood-row-${n.id}" hidden>
+                        <td colspan="7">
+                          <form class="admin-edit-panel admin-form-grid" data-neighborhood-edit="${n.id}">
+                            <div class="form-group">
+                              <label class="form-label">Nome</label>
+                              <input class="form-input" name="name" value="${escapeHtml(n.name)}" required />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">Cidade</label>
+                              <input class="form-input" name="city" value="${escapeHtml(n.city)}" required />
+                            </div>
+                            <div class="form-group">
+                              <label class="form-label">UF</label>
+                              <input class="form-input" name="state" value="${escapeHtml(n.state)}" maxlength="2" required />
+                            </div>
+                            <div class="form-group admin-form-grid__full">
+                              <p class="form-hint">O slug da URL é atualizado automaticamente ao salvar o nome.</p>
+                            </div>
+                            <div class="admin-form-grid__full admin-edit-panel__actions">
+                              <button type="submit" class="btn btn-primary btn-sm">Salvar bairro</button>
+                              <button type="button" class="btn btn-outline btn-sm" data-cancel-neighborhood="${n.id}">Cancelar</button>
+                            </div>
+                          </form>
                         </td>
                       </tr>`
                     }).join('')}
@@ -2366,11 +2406,63 @@ function bindNeighborhoodManagement(main) {
     }
   })
 
+  main.querySelectorAll('[data-edit-neighborhood]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.editNeighborhood
+      main.querySelectorAll('.admin-edit-row[id^="edit-neighborhood-row-"]').forEach((row) => {
+        row.hidden = row.id !== `edit-neighborhood-row-${id}`
+      })
+      main.querySelector(`#edit-neighborhood-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  })
+
+  main.querySelectorAll('[data-cancel-neighborhood]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      main.querySelector(`#edit-neighborhood-row-${btn.dataset.cancelNeighborhood}`).hidden = true
+    })
+  })
+
+  main.querySelectorAll('[data-neighborhood-edit]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const id = form.dataset.neighborhoodEdit
+      const submitBtn = form.querySelector('button[type="submit"]')
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Salvando...' }
+      try {
+        await updateNeighborhood(id, {
+          name: form.name.value,
+          city: form.city.value,
+          state: form.state.value,
+        })
+        showToast('Bairro atualizado')
+        rerenderStaff(main, 'neighborhoods')
+      } catch (err) {
+        showToast(err.message)
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Salvar bairro' }
+      }
+    })
+  })
+
   main.querySelectorAll('[data-toggle-neighborhood]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       try {
         await updateNeighborhood(btn.dataset.toggleNeighborhood, { active: btn.dataset.active === '1' })
         showToast(btn.dataset.active === '1' ? 'Bairro ativado' : 'Bairro desativado')
+        rerenderStaff(main, 'neighborhoods')
+      } catch (err) {
+        showToast(err.message)
+      }
+    })
+  })
+
+  main.querySelectorAll('[data-delete-neighborhood]:not([disabled])').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.neighborhoodName || 'este bairro'
+      if (!window.confirm(`Excluir o bairro "${name}"? Esta ação não pode ser desfeita.`)) return
+      try {
+        await deleteNeighborhood(btn.dataset.deleteNeighborhood)
+        showToast('Bairro excluído')
         rerenderStaff(main, 'neighborhoods')
       } catch (err) {
         showToast(err.message)

@@ -358,6 +358,8 @@ export async function updateNeighborhood(neighborhoodId, updates) {
   }
   if (updates.active !== undefined) payload.active = Boolean(updates.active)
 
+  if (Object.keys(payload).length === 0) throw new Error('Nenhuma alteração informada.')
+
   const { data, error } = await client
     .from('neighborhoods')
     .update(payload)
@@ -366,6 +368,37 @@ export async function updateNeighborhood(neighborhoodId, updates) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function deleteNeighborhood(neighborhoodId) {
+  const client = await requireClient()
+  if (!neighborhoodId) throw new Error('Bairro inválido.')
+
+  const { count: storeCount, error: storeError } = await client
+    .from('stores')
+    .select('id', { count: 'exact', head: true })
+    .eq('neighborhood_id', neighborhoodId)
+  if (storeError) throw storeError
+  if ((storeCount ?? 0) > 0) {
+    throw new Error(
+      `Não é possível excluir: ${storeCount} loja${storeCount === 1 ? '' : 's'} vinculada${storeCount === 1 ? '' : 's'}. Mova as lojas para outro bairro antes.`
+    )
+  }
+
+  const { count: moderatorCount, error: moderatorError } = await client
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'moderator')
+    .eq('neighborhood_id', neighborhoodId)
+  if (moderatorError) throw moderatorError
+  if ((moderatorCount ?? 0) > 0) {
+    throw new Error(
+      `Não é possível excluir: ${moderatorCount} moderador${moderatorCount === 1 ? '' : 'es'} vinculado${moderatorCount === 1 ? '' : 's'}. Reatribua-os em Moderadores antes.`
+    )
+  }
+
+  const { error } = await client.from('neighborhoods').delete().eq('id', neighborhoodId)
+  if (error) throw error
 }
 
 export async function setModeratorNeighborhood(moderatorId, neighborhoodId) {
