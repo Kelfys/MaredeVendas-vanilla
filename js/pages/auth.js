@@ -76,11 +76,13 @@ function parseQuery() {
   return new URLSearchParams(q)
 }
 
-function authLayout(title, description, body, { infoPanelHtml = '' } = {}) {
-  const pageClass = infoPanelHtml ? 'auth-page auth-page--with-info' : 'auth-page'
+function authLayout(title, description, body, { infoPanelHtml = '', infoPanelCollapsed = false } = {}) {
+  const hasInfo = Boolean(infoPanelHtml)
+  const startCollapsed = hasInfo && infoPanelCollapsed
+  const pageClass = hasInfo && !startCollapsed ? 'auth-page auth-page--with-info' : 'auth-page'
 
   return `
-    <div class="${pageClass}">
+    <div class="${pageClass}" id="auth-page-root">
       <div class="auth-page__login">
         <div class="auth-card">
           <h1>${escapeHtml(title)}</h1>
@@ -89,9 +91,28 @@ function authLayout(title, description, body, { infoPanelHtml = '' } = {}) {
           ${body}
         </div>
       </div>
-      ${infoPanelHtml ? `<aside class="auth-page__info">${infoPanelHtml}</aside>` : ''}
+      ${infoPanelHtml ? `<aside class="auth-page__info" id="auth-page-info"${startCollapsed ? ' hidden' : ''}>${infoPanelHtml}</aside>` : ''}
     </div>
   `
+}
+
+function bindRulesPanelToggle(main, { open = false } = {}) {
+  const root = main.querySelector('#auth-page-root')
+  const panel = main.querySelector('#auth-page-info')
+  const btn = main.querySelector('#toggle-rules-panel')
+  if (!root || !panel || !btn) return
+
+  const setOpen = (isOpen) => {
+    panel.hidden = !isOpen
+    root.classList.toggle('auth-page--with-info', isOpen)
+    btn.setAttribute('aria-expanded', String(isOpen))
+    btn.textContent = isOpen
+      ? 'Ocultar regras e planos'
+      : 'Ver regras e planos da plataforma'
+  }
+
+  setOpen(open)
+  btn.addEventListener('click', () => setOpen(panel.hidden))
 }
 
 function scrollToAuthSection(main, sectionId) {
@@ -148,11 +169,18 @@ export async function renderLogin(main) {
         <a href="${routeHref('/lojista/cadastro')}">Cadastrar minha loja</a>
         <a href="${routeHref('/admin/entrar')}">Acesso admin</a>
       </div>
+      <p class="auth-rules-toggle">
+        <button type="button" class="btn btn-outline btn-sm btn-block" id="toggle-rules-panel" aria-expanded="false" aria-controls="auth-page-info">
+          Ver regras e planos da plataforma
+        </button>
+      </p>
     `,
-    { infoPanelHtml: renderRulesAndPlansContent() },
+    { infoPanelHtml: renderRulesAndPlansContent(), infoPanelCollapsed: true },
   )
 
   const oauthNext = redirect?.startsWith('/') ? redirect : '/favoritos'
+  const rulesSection = getHashSection()
+  bindRulesPanelToggle(main, { open: Boolean(rulesSection) })
   bindGoogleAuth(main, { nextPath: oauthNext, redirect })
   bindPasswordReset(main, 'login-reset-password')
 
@@ -174,7 +202,7 @@ export async function renderLogin(main) {
     }
   })
 
-  scrollToAuthSection(main, getHashSection())
+  scrollToAuthSection(main, rulesSection)
 }
 
 export const renderCustomerLogin = renderLogin

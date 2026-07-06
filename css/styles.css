@@ -1596,6 +1596,10 @@ img { max-width: 100%; display: block; }
   text-align: center;
 }
 
+.auth-rules-toggle {
+  margin-top: 1rem;
+}
+
 .auth-links {
   display: flex;
   flex-direction: column;

@@ -38,11 +38,17 @@ describe('login page rules and plans', () => {
 
     const formStub = { addEventListener: vi.fn() }
     const googleBtn = { addEventListener: vi.fn(), disabled: false }
+    const toggleBtn = { addEventListener: vi.fn(), setAttribute: vi.fn(), textContent: '' }
+    const panel = { hidden: true }
+    const root = { classList: { toggle: vi.fn() } }
     const main = {
       innerHTML: '',
       querySelector: (sel) => {
         if (sel === '#login-form') return formStub
         if (sel === '#google-auth-btn') return googleBtn
+        if (sel === '#toggle-rules-panel') return toggleBtn
+        if (sel === '#auth-page-info') return panel
+        if (sel === '#auth-page-root') return root
         if (sel === '#auth-error') return { innerHTML: '' }
         return null
       },
@@ -55,8 +61,11 @@ describe('login page rules and plans', () => {
     expect(main.innerHTML).toContain('btn-google')
     expect(main.innerHTML).toContain('ou use email e senha')
     expect(googleBtn.addEventListener).toHaveBeenCalled()
-    expect(main.innerHTML).toContain('auth-page--with-info')
+    expect(main.innerHTML).toContain('toggle-rules-panel')
+    expect(main.innerHTML).toContain('Ver regras e planos da plataforma')
     expect(main.innerHTML).toContain('auth-page__info')
+    expect(main.innerHTML).toContain('hidden')
+    expect(main.innerHTML).not.toContain('auth-page--with-info')
     expect(main.innerHTML).toContain('id="regras"')
     expect(main.innerHTML).toContain('id="planos"')
     expect(main.innerHTML).not.toContain('Enviar comprovante')
