@@ -73,6 +73,13 @@ export const STRINGS = {
     "merchantOverview": "Visão Geral"
   },
   "home": {
+    "heroEyebrow": "Marketplace local",
+    "heroTitle": "Compre perto de você",
+    "heroStats": "{stores} lojas · {products} produtos neste bairro",
+    "heroStatsStoresOnly": "{stores} lojas neste bairro",
+    "clearFilters": "Limpar busca",
+    "neighborhoodsLabel": "Bairro",
+    "categoriesLabel": "Categoria",
     "searchStoresProducts": "Buscar loja ou produto...",
     "searchAds": "Buscar anúncio...",
     "allCategories": "Todas",
