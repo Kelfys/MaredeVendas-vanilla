@@ -612,6 +612,16 @@ function renderOrderRows(orders) {
   `).join('')
 }
 
+function renderMerchantPendingAdIdBlock(ad) {
+  if (ad.status !== 'pending') return ''
+  return `
+    <div class="merchant-ad-id" style="margin:0.5rem 0 0.75rem;padding:0.625rem 0.75rem;border:1px solid rgb(245 158 11 / 0.45);border-radius:0.5rem;background:rgb(255 251 235 / 0.6)">
+      <div style="font-size:0.75rem;font-weight:600;color:var(--amber-600,#d97706);margin-bottom:0.25rem">${escapeHtml(t('merchant.adIdPendingTitle'))}</div>
+      <code style="display:block;font-size:0.8125rem;line-height:1.4;word-break:break-all;user-select:all">${escapeHtml(ad.id)}</code>
+      ${ad.is_extra ? `<p class="form-hint" style="margin:0.375rem 0 0">${escapeHtml(t('merchant.adIdPendingHint'))}</p>` : ''}
+    </div>`
+}
+
 function renderStoreAdRows(ads) {
   return ads.map((ad) => {
     const needsPayment = ad.is_extra && ad.status === 'pending'
@@ -623,10 +633,10 @@ function renderStoreAdRows(ads) {
           ${adStatusBadge(ad.status)}
           ${ad.is_extra ? `<span class="admin-stat-chip admin-stat-chip--pending">${escapeHtml(t('merchant.adExtraBadge', { fee: formatCurrency(ad.fee_amount || STORE_AD_EXTRA_FEE) }))}</span>` : ''}
         </div>
+        ${renderMerchantPendingAdIdBlock(ad)}
         <p>${escapeHtml(ad.message)}</p>
         <p class="admin-list-card__meta">
-          ${escapeHtml(t('merchant.adIdLabel', { id: ad.id }))}
-          · ${t('merchant.adCreatedAt', { date: formatDate(ad.created_at) })}
+          ${t('merchant.adCreatedAt', { date: formatDate(ad.created_at) })}
           ${ad.expires_at ? ` · ${t('merchant.adExpiresAt', { date: formatDate(ad.expires_at) })}` : ''}
         </p>
         ${needsPayment ? `

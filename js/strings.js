@@ -463,6 +463,8 @@ export const STRINGS = {
     "extraAdPaymentBanner": "Anúncio extra criado! Envie o comprovante de {fee} pelo WhatsApp informando o ID:",
     "extraAdSendReceipt": "Enviar comprovante (R$ {fee})",
     "adIdLabel": "ID: {id}",
+    "adIdPendingTitle": "ID do anúncio",
+    "adIdPendingHint": "Informe este ID ao enviar o comprovante pelo WhatsApp (anúncios extras).",
     "adExtraBadge": "Extra · {fee}",
     "createAd": "Criar anúncio",
     "passwordsMismatch": "As senhas não coincidem.",
