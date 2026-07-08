@@ -12,8 +12,12 @@ import {
   fetchAllStoresAdmin,
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteProduct, fetchCategories,
+  adjustProductLikes, fetchProductComments, addProductComment, deleteProductComment,
+  fetchPendingContentReports, reviewContentReport,
+  fetchPendingStoreAds, approveStoreAd, rejectStoreAd,
   fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood,
 } from '../api.js'
+import { REPORT_REASONS } from '../reporting.js'
 import { getStaffNeighborhoodScope, formatNeighborhoodLabel } from '../neighborhood.js'
 import { getUser, loadUser, setAdminPendingCount } from '../state.js'
 import { navigate } from '../router.js'
@@ -24,7 +28,7 @@ import {
 import { STORE_THEME_COLORS, stringsEditorHref } from '../config.js'
 import { STAFF_PANELS, staffHref, getStaffMenuItem } from '../staff-nav.js'
 import {
-  canAccessPanel, isReadOnlyStaffTab, canApprovePlanChanges,
+  canAccessPanel, isAdmin, isReadOnlyStaffTab, canApprovePlanChanges,
   MODERATOR_PERMISSIONS, getModeratorPermissionValue,
 } from '../roles.js'
 import {
@@ -32,7 +36,7 @@ import {
   countProductsWithImages, canAddProductImage, canCreateProduct,
   planProductImageLimitMessage, planProductLimitMessage,
   formatProductLimitHint, formatProductImageLimitHint,
-  getPlanById, SUBSCRIPTION_PLANS,
+  getPlanById, SUBSCRIPTION_PLANS, STORE_AD_DURATION_HOURS,
 } from '../plans.js'
 import {
   PRODUCT_IMAGE_UPLOAD_HINT, STORE_LOGO_UPLOAD_HINT, STORE_BANNER_UPLOAD_HINT,
@@ -101,15 +105,106 @@ function renderModeratorPermissionFields(moderator = null, { idPrefix = '' } = {
 
 async function loadStaffApprovalQueue(user, panel = 'admin') {
   const scopeId = getStaffNeighborhoodScope(user, panel)
-  const pendingStores = await fetchPendingStoreApprovals(scopeId)
-  const planRequests = canApprovePlanChanges(user)
-    ? await fetchPendingPlanChangeRequests(scopeId)
-    : []
+  const [pendingStores, planRequests, pendingReports, pendingAds] = await Promise.all([
+    fetchPendingStoreApprovals(scopeId),
+    canApprovePlanChanges(user) ? fetchPendingPlanChangeRequests(scopeId) : Promise.resolve([]),
+    fetchPendingContentReports(scopeId),
+    fetchPendingStoreAds(scopeId),
+  ])
   return {
     pendingStores,
     planRequests,
-    pendingTotal: pendingStores.length + planRequests.length,
+    pendingReports,
+    pendingAds,
+    pendingTotal: pendingStores.length + planRequests.length + pendingReports.length + pendingAds.length,
   }
+}
+
+function getReportReasonLabel(reason) {
+  const match = REPORT_REASONS.find((item) => item.id === reason)
+  return match ? match.label() : reason
+}
+
+function renderContentReportCards(reports) {
+  if (reports.length === 0) return ''
+
+  return `
+    <section class="admin-section">
+      <div class="admin-section__head">
+        <h2>${t('admin.reportsTitle')}</h2>
+        <span class="admin-stat-chip admin-stat-chip--pending">${reports.length} ${reports.length === 1 ? t('common.pendingSingular') : t('common.pendingPlural')}</span>
+      </div>
+      <div class="admin-cards-list">
+        ${reports.map((report) => {
+          const isProduct = report.target_type === 'product'
+          const targetName = isProduct
+            ? (report.product?.name ?? t('common.product'))
+            : (report.store?.name ?? t('common.store'))
+          return `
+            <article class="admin-approval-card" data-report-card="${report.id}">
+              <div class="admin-approval-card__head">
+                <div>
+                  <h3>${escapeHtml(targetName)}</h3>
+                  <p>${isProduct ? t('admin.reportTypeProduct') : t('admin.reportTypeStore')} · ${escapeHtml(report.store?.neighborhood?.name ?? '—')} · ${formatDate(report.created_at)}</p>
+                </div>
+                <span class="badge badge-pending">🚩</span>
+              </div>
+              <dl class="admin-approval-card__details">
+                <div><dt>${t('admin.reportedBy')}</dt><dd>${escapeHtml(report.reporter?.name ?? '—')} · ${escapeHtml(report.reporter?.email ?? '—')}</dd></div>
+                <div><dt>${t('admin.reportReason')}</dt><dd>${escapeHtml(getReportReasonLabel(report.reason))}</dd></div>
+                ${report.details ? `<div><dt>${t('admin.reportDetails')}</dt><dd>${escapeHtml(report.details)}</dd></div>` : ''}
+              </dl>
+              <div class="admin-report-review">
+                <label class="form-label" for="report-note-${report.id}">${t('admin.reportReviewNote')}</label>
+                <textarea class="form-input" id="report-note-${report.id}" rows="2" maxlength="500"></textarea>
+              </div>
+              <div class="admin-approval-card__actions">
+                ${report.store?.slug ? `<a href="#/loja/${escapeHtml(report.store.slug)}" class="btn btn-outline btn-sm">${t('admin.viewReportedStore')}</a>` : ''}
+                <button type="button" class="btn btn-primary btn-sm" data-resolve-report="${report.id}">${t('admin.reportResolve')}</button>
+                <button type="button" class="btn btn-outline btn-sm" data-dismiss-report="${report.id}">${t('admin.reportDismiss')}</button>
+              </div>
+            </article>
+          `
+        }).join('')}
+      </div>
+    </section>`
+}
+
+function renderStoreAdApprovalCards(ads) {
+  if (ads.length === 0) return ''
+
+  return `
+    <section class="admin-section">
+      <div class="admin-section__head">
+        <h2>${t('admin.storeAdsApprovalsTitle')}</h2>
+        <span class="admin-stat-chip admin-stat-chip--pending">${ads.length} ${ads.length === 1 ? t('common.pendingSingular') : t('common.pendingPlural')}</span>
+      </div>
+      <div class="admin-cards-list">
+        ${ads.map((ad) => `
+          <article class="admin-approval-card" data-ad-card="${ad.id}">
+            <div class="admin-approval-card__head">
+              <div>
+                <h3>${escapeHtml(ad.title)}</h3>
+                <p>${escapeHtml(ad.store?.name ?? t('common.store'))} · ${escapeHtml(ad.store?.neighborhood?.name ?? '—')} · ${formatDate(ad.created_at)}</p>
+              </div>
+              <span class="badge badge-pending">📣</span>
+            </div>
+            <dl class="admin-approval-card__details">
+              <div><dt>${t('admin.adId')}</dt><dd><code>${escapeHtml(ad.id)}</code></dd></div>
+              <div><dt>${t('admin.merchant')}</dt><dd>${escapeHtml(ad.store?.owner?.name ?? '—')} · ${escapeHtml(ad.store?.owner?.email ?? '—')}</dd></div>
+              <div><dt>${t('common.message')}</dt><dd>${escapeHtml(ad.message)}</dd></div>
+              ${ad.is_extra ? `<div><dt>${t('admin.adExtraFee')}</dt><dd>${formatCurrency(ad.fee_amount)} · ${t('admin.adDurationHours', { hours: STORE_AD_DURATION_HOURS })}</dd></div>` : `<div><dt>${t('labels.plan')}</dt><dd>${t('admin.adDurationHours', { hours: STORE_AD_DURATION_HOURS })}</dd></div>`}
+            </dl>
+            ${ad.image_url ? `<div class="admin-table-thumb" style="width:6rem;height:4rem;margin-bottom:0.75rem"><img src="${escapeHtml(ad.image_url)}" alt="" /></div>` : ''}
+            <div class="admin-approval-card__actions">
+              ${ad.store?.slug ? `<a href="#/loja/${escapeHtml(ad.store.slug)}" class="btn btn-outline btn-sm">${t('admin.viewReportedStore')}</a>` : ''}
+              <button type="button" class="btn btn-primary btn-sm" data-approve-ad="${ad.id}">${t('admin.approveAd')}</button>
+              <button type="button" class="btn btn-outline btn-sm" data-reject-ad="${ad.id}">${t('labels.reject')}</button>
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    </section>`
 }
 
 function renderPlanChangeApprovalCards(requests) {
@@ -873,9 +968,53 @@ function productImageLimitHintHtml(store, products, product = null) {
   return `<p class="form-hint">${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}</p>`
 }
 
-function renderProductTableRows(products, categories, store = null, { readOnly = false } = {}) {
+function renderAdminCommentList(comments) {
+  if (!comments.length) {
+    return `<p class="product-comments__status">${t('store.noCommentsYet')}</p>`
+  }
+  return comments.map((comment) => `
+    <div class="product-comment" data-comment-id="${comment.id}">
+      <div class="product-comment__meta">
+        <strong>${escapeHtml(comment.user?.name ?? t('common.defaultUser'))}</strong>
+        <div class="product-comment__meta-end">
+          <span>${new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(comment.created_at))}</span>
+          <button
+            type="button"
+            class="product-comment__delete"
+            data-admin-delete-comment="${comment.id}"
+            aria-label="${t('store.deleteComment')}"
+          >${t('common.delete')}</button>
+        </div>
+      </div>
+      <p>${escapeHtml(comment.content)}</p>
+    </div>
+  `).join('')
+}
+
+function renderProductEngagementControls(product) {
+  const likesCount = product.likes_count ?? 0
+  const commentsCount = product.comments_count ?? 0
+  return `
+    <div class="admin-product-engagement">
+      <div class="admin-product-engagement__likes">
+        <span class="admin-product-engagement__label">❤️ <span data-admin-likes-count="${product.id}">${likesCount}</span></span>
+        <button type="button" class="btn btn-outline btn-sm" data-admin-like-dec="${product.id}" aria-label="${t('admin.decreaseLikes')}">−</button>
+        <button type="button" class="btn btn-outline btn-sm" data-admin-like-inc="${product.id}" aria-label="${t('admin.increaseLikes')}">+</button>
+      </div>
+      <button
+        type="button"
+        class="btn btn-outline btn-sm"
+        data-admin-toggle-comments="${product.id}"
+        data-admin-comments-count="${commentsCount}"
+      >💬 ${commentsCount}</button>
+    </div>
+  `
+}
+
+function renderProductTableRows(products, categories, store = null, { readOnly = false, showEngagementControls = false } = {}) {
+  const colSpan = showEngagementControls ? 6 : 5
   if (products.length === 0) {
-    return `<tr><td colspan="5">${t('admin.noProductsInStore')}</td></tr>`
+    return `<tr><td colspan="${colSpan}">${t('admin.noProductsInStore')}</td></tr>`
   }
 
   const withImages = countProductsWithImages(products)
@@ -895,14 +1034,28 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
       <td>${formatCurrency(p.price)}</td>
       <td>${isService(p) ? '—' : (p.stock ?? 0)}</td>
       <td>${p.active ? '✓' : '✗'}</td>
+      ${showEngagementControls ? `<td>${renderProductEngagementControls(p)}</td>` : ''}
       <td style="white-space:nowrap">
         ${readOnly ? '—' : `
         <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">${t('labels.edit')}</button>
         <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">${t('labels.delete')}</button>`}
       </td>
     </tr>
+    ${showEngagementControls ? `
+    <tr class="admin-edit-row" id="admin-comments-row-${p.id}" hidden>
+      <td colspan="${colSpan}">
+        <div class="admin-product-comments" data-admin-comments-panel="${p.id}">
+          <p class="product-comments__status" data-admin-comments-status="${p.id}">${t('common.loadingComments')}</p>
+          <div data-admin-comments-list="${p.id}"></div>
+          <form class="product-comment-form" data-admin-comment-form="${p.id}">
+            <textarea class="form-input" name="content" rows="2" maxlength="500" placeholder="${t('store.commentPlaceholder')}" required></textarea>
+            <button type="submit" class="btn btn-primary btn-sm">${t('store.submitComment')}</button>
+          </form>
+        </div>
+      </td>
+    </tr>` : ''}
     ${readOnly ? '' : `<tr class="admin-edit-row" id="edit-product-row-${p.id}" hidden>
-      <td colspan="5">
+      <td colspan="${colSpan}">
         <form class="admin-edit-panel admin-form-grid" data-product-edit="${p.id}">
           ${catalogItemTypeFieldHtml(p.item_type)}
           <div class="form-group">
@@ -990,7 +1143,7 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'ad
     </aside>`
 }
 
-function renderStoreProductsPanel({ store, products, categories, readOnly = false }) {
+function renderStoreProductsPanel({ store, products, categories, readOnly = false, showEngagementControls = false }) {
   const withImages = store ? countProductsWithImages(products) : 0
   const canAddImageOnCreate = store
     ? canAddProductImage(store.plan_id, withImages)
@@ -1083,9 +1236,9 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
         </div>` : ''}
       <div class="table-wrap admin-store-products-table">
         <table>
-          <thead><tr><th>${t('common.product')}</th><th>${t('common.price')}</th><th>${t('common.stock')}</th><th>${t('common.active')}</th><th></th></tr></thead>
+          <thead><tr><th>${t('common.product')}</th><th>${t('common.price')}</th><th>${t('common.stock')}</th><th>${t('common.active')}</th>${showEngagementControls ? `<th>${t('admin.engagement')}</th>` : ''}<th></th></tr></thead>
           <tbody id="admin-products-tbody">
-            ${renderProductTableRows(products, categories, store, { readOnly })}
+            ${renderProductTableRows(products, categories, store, { readOnly, showEngagementControls })}
           </tbody>
         </table>
       </div>
@@ -1131,6 +1284,7 @@ function quickActions(panel = 'admin') {
   cards.push(
     { href: staffHref(panel, 'pedidos'), icon: '🛒', title: t('nav.staffOrders'), text: t('admin.ordersMetricsHistory') },
     { href: staffHref(panel, 'aprovacoes'), icon: '✅', title: t('nav.staffApprovals'), text: t('admin.registrationsAndPlans') },
+    { href: staffHref(panel, 'denuncias'), icon: '🚩', title: t('nav.staffReports'), text: t('admin.reportsTitle') },
     { href: '#/', icon: '🌐', title: t('admin.viewSite'), text: t('admin.openMarketplace'), muted: true },
   )
 
@@ -1201,7 +1355,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
     const regionalSummary = panel === 'admin'
       ? summarizeRegionalOverview(neighborhoods, stores, moderators)
       : null
-    const { pendingStores: pending, planRequests, pendingTotal } = queue
+    const { pendingStores: pending, planRequests, pendingAds, pendingTotal } = queue
     const orderMetrics = orderAnalytics.metrics
 
     setAdminPendingCount(pendingTotal)
@@ -1248,9 +1402,10 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             <h2>${t('admin.recentApprovals')}</h2>
             ${pendingTotal > 0 ? `<a href="${staffHref(panel, 'aprovacoes')}" class="btn btn-outline btn-sm">${t('admin.viewAllPending', { count: pendingTotal })}</a>` : ''}
           </div>
-          ${pendingPreview.length === 0 && planRequests.length === 0
+          ${pendingPreview.length === 0 && planRequests.length === 0 && pendingAds.length === 0
             ? adminEmptyState('✅', t('admin.allCaughtUpTitle'), t('admin.allCaughtUpBody'))
-            : `${pendingPreview.length > 0 ? `<div class="admin-cards-list">
+            : `${pendingAds.length > 0 ? renderStoreAdApprovalCards(pendingAds.slice(0, 3)) : ''}
+              ${pendingPreview.length > 0 ? `<div class="admin-cards-list">
                 ${pendingPreview.map((s) => `
                   <article class="admin-list-card admin-list-card--highlight">
                     <div class="admin-list-card__main">
@@ -1274,11 +1429,12 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
 
     bindApprovalActions(main, 'overview')
     bindPlanChangeApprovalActions(main, 'overview')
+    bindStoreAdApprovalActions(main, 'overview')
     return
   }
 
   if (tab === 'approvals') {
-    const { pendingStores: pending, planRequests, pendingTotal } = await loadStaffApprovalQueue(user, panel)
+    const { pendingStores: pending, planRequests, pendingAds, pendingTotal } = await loadStaffApprovalQueue(user, panel)
     setAdminPendingCount(pendingTotal)
     import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 
@@ -1290,6 +1446,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
       pendingTotal === 0
         ? adminEmptyState('✅', t('admin.emptyQueueTitle'), t('admin.emptyQueueBody'))
         : `${renderPlanChangeApprovalCards(planRequests)}
+          ${renderStoreAdApprovalCards(pendingAds)}
           ${pending.length > 0 ? `
             <section class="admin-section">
               <div class="admin-section__head">
@@ -1326,6 +1483,26 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
 
     bindApprovalActions(main, 'approvals')
     bindPlanChangeApprovalActions(main, 'approvals')
+    bindStoreAdApprovalActions(main, 'approvals')
+    return
+  }
+
+  if (tab === 'reports') {
+    const { pendingReports, pendingTotal } = await loadStaffApprovalQueue(user, panel)
+    setAdminPendingCount(pendingTotal)
+    import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
+
+    main.innerHTML = adminPage(
+      menuItem.label,
+      t('admin.reportsSubtitle', { count: pendingReports.length }),
+      pendingReports.length === 0
+        ? adminEmptyState('🚩', t('admin.reportsEmptyTitle'), t('admin.reportsEmptyBody'))
+        : renderContentReportCards(pendingReports),
+      '',
+      panel,
+    )
+
+    bindReportReviewActions(main, panel)
     return
   }
 
@@ -1619,6 +1796,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             products: storeProducts,
             categories,
             readOnly: productsReadOnly,
+            showEngagementControls: panel === 'admin',
           })}
         </div>
       `,
@@ -1629,6 +1807,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
     bindStoreProductsNav(main)
     bindProductSearch(main)
     if (!productsReadOnly) bindProductForm(main, selectedStoreId)
+    if (panel === 'admin') bindProductEngagement(main, selectedStoreId)
     return
   }
 
@@ -2172,6 +2351,162 @@ function bindProductForm(main, selectedStoreId = null) {
   bindProductEdits(main, selectedStoreId)
 }
 
+function bindProductEngagement(main, selectedStoreId = null) {
+  const user = getUser()
+  if (!isAdmin(user)) return
+
+  const commentsCache = new Map()
+
+  async function loadAdminComments(productId) {
+    const statusEl = main.querySelector(`[data-admin-comments-status="${productId}"]`)
+    const listEl = main.querySelector(`[data-admin-comments-list="${productId}"]`)
+    if (statusEl) {
+      statusEl.textContent = t('common.loadingComments')
+      statusEl.hidden = false
+    }
+    if (listEl) listEl.innerHTML = ''
+
+    try {
+      const comments = await fetchProductComments(productId)
+      commentsCache.set(productId, comments)
+      if (listEl) listEl.innerHTML = renderAdminCommentList(comments)
+      if (statusEl) statusEl.hidden = true
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = err.message ?? t('store.commentsLoadError')
+        statusEl.hidden = false
+      }
+    }
+  }
+
+  function updateEngagementCounts(productId, { likesCount, commentsCount }) {
+    if (likesCount != null) {
+      main.querySelectorAll(`[data-admin-likes-count="${productId}"]`).forEach((el) => {
+        el.textContent = String(likesCount)
+      })
+      main.querySelectorAll(`[data-like-count="${productId}"]`).forEach((el) => {
+        el.textContent = String(likesCount)
+      })
+    }
+    if (commentsCount != null) {
+      const label = `💬 ${commentsCount}`
+      main.querySelectorAll(`[data-admin-toggle-comments="${productId}"]`).forEach((btn) => {
+        btn.textContent = label
+        btn.dataset.adminCommentsCount = String(commentsCount)
+      })
+      main.querySelectorAll(`[data-comment-count="${productId}"]`).forEach((el) => {
+        el.textContent = String(commentsCount)
+      })
+    }
+  }
+
+  async function handleLikeAdjust(button, delta) {
+    const productId = button.dataset.adminLikeInc ?? button.dataset.adminLikeDec
+    if (!productId) return
+
+    button.disabled = true
+    try {
+      const result = await adjustProductLikes(productId, delta)
+      updateEngagementCounts(productId, { likesCount: result.likes_count })
+      showToast(t('admin.likesUpdated'))
+    } catch (err) {
+      showToast(err.message ?? t('admin.likesAdjustError'))
+    } finally {
+      button.disabled = false
+    }
+  }
+
+  main.querySelectorAll('[data-admin-like-inc]').forEach((btn) => {
+    btn.addEventListener('click', () => handleLikeAdjust(btn, 1))
+  })
+
+  main.querySelectorAll('[data-admin-like-dec]').forEach((btn) => {
+    btn.addEventListener('click', () => handleLikeAdjust(btn, -1))
+  })
+
+  main.querySelectorAll('[data-admin-toggle-comments]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const productId = btn.dataset.adminToggleComments
+      const row = main.querySelector(`#admin-comments-row-${productId}`)
+      if (!row) return
+
+      const opening = row.hidden
+      main.querySelectorAll('[id^="admin-comments-row-"]').forEach((other) => {
+        other.hidden = true
+      })
+      row.hidden = !opening
+      if (opening && !commentsCache.has(productId)) {
+        await loadAdminComments(productId)
+      }
+    })
+  })
+
+  main.querySelectorAll('[data-admin-comment-form]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const productId = form.dataset.adminCommentForm
+      const content = form.content.value
+      const submitBtn = form.querySelector('button[type="submit"]')
+      if (submitBtn) {
+        submitBtn.disabled = true
+        submitBtn.textContent = t('checkout.submitting')
+      }
+
+      try {
+        const comment = await addProductComment(user.id, productId, content)
+        const existing = commentsCache.get(productId) ?? []
+        const next = [comment, ...existing]
+        commentsCache.set(productId, next)
+        const listEl = main.querySelector(`[data-admin-comments-list="${productId}"]`)
+        if (listEl) listEl.innerHTML = renderAdminCommentList(next)
+        const statusEl = main.querySelector(`[data-admin-comments-status="${productId}"]`)
+        if (statusEl) statusEl.hidden = true
+        const toggleBtn = main.querySelector(`[data-admin-toggle-comments="${productId}"]`)
+        const currentCount = Number(toggleBtn?.dataset.adminCommentsCount ?? 0)
+        updateEngagementCounts(productId, { commentsCount: currentCount + 1 })
+        form.reset()
+        showToast(t('store.commentPublished'))
+      } catch (err) {
+        showToast(err.message ?? t('store.commentError'))
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false
+          submitBtn.textContent = t('store.submitComment')
+        }
+      }
+    })
+  })
+
+  main.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-admin-delete-comment]')
+    if (!btn) return
+
+    if (!confirm(t('store.confirmDeleteComment'))) return
+    const commentId = btn.dataset.adminDeleteComment
+    const panel = btn.closest('[data-admin-comments-panel]')
+    const productId = panel?.dataset.adminCommentsPanel
+    if (!commentId || !productId) return
+
+    btn.disabled = true
+    try {
+      await deleteProductComment(commentId)
+      const existing = commentsCache.get(productId) ?? []
+      const next = existing.filter((comment) => comment.id !== commentId)
+      commentsCache.set(productId, next)
+      const listEl = main.querySelector(`[data-admin-comments-list="${productId}"]`)
+      if (listEl) listEl.innerHTML = renderAdminCommentList(next)
+      const toggleBtn = main.querySelector(`[data-admin-toggle-comments="${productId}"]`)
+      const currentCount = Number(toggleBtn?.dataset.adminCommentsCount ?? 0)
+      updateEngagementCounts(productId, { commentsCount: Math.max(0, currentCount - 1) })
+      showToast(t('store.commentDeleted'))
+    } catch (err) {
+      showToast(err.message ?? t('store.commentDeleteError'))
+    } finally {
+      btn.disabled = false
+    }
+  })
+}
+
 function bindProductEdits(main, selectedStoreId = null) {
   main.querySelectorAll('[data-edit-product]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2710,6 +3045,33 @@ function bindApprovalActions(main, tab) {
   })
 }
 
+function bindStoreAdApprovalActions(main, tab) {
+  main.querySelectorAll('[data-approve-ad]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await approveStoreAd(btn.dataset.approveAd)
+        showToast(t('admin.adApproved'))
+        rerenderStaff(main, tab)
+      } catch (err) {
+        showToast(err.message)
+      }
+    })
+  })
+
+  main.querySelectorAll('[data-reject-ad]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(t('admin.confirmRejectAd'))) return
+      try {
+        await rejectStoreAd(btn.dataset.rejectAd)
+        showToast(t('admin.adRejected'))
+        rerenderStaff(main, tab)
+      } catch (err) {
+        showToast(err.message)
+      }
+    })
+  })
+}
+
 function bindPlanChangeApprovalActions(main, tab) {
   main.querySelectorAll('[data-approve-plan-request]').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -2734,5 +3096,31 @@ function bindPlanChangeApprovalActions(main, tab) {
         showToast(err.message)
       }
     })
+  })
+}
+
+function bindReportReviewActions(main, tab = 'reports') {
+  async function review(btn, status) {
+    const reportId = btn.dataset.resolveReport ?? btn.dataset.dismissReport
+    if (!reportId) return
+
+    const note = main.querySelector(`#report-note-${reportId}`)?.value ?? ''
+    btn.disabled = true
+    try {
+      await reviewContentReport(reportId, status, note)
+      showToast(status === 'resolved' ? t('admin.reportResolved') : t('admin.reportDismissed'))
+      rerenderStaff(main, tab)
+    } catch (err) {
+      showToast(err.message ?? t('admin.reportReviewError'))
+      btn.disabled = false
+    }
+  }
+
+  main.querySelectorAll('[data-resolve-report]').forEach((btn) => {
+    btn.addEventListener('click', () => review(btn, 'resolved'))
+  })
+
+  main.querySelectorAll('[data-dismiss-report]').forEach((btn) => {
+    btn.addEventListener('click', () => review(btn, 'dismissed'))
   })
 }

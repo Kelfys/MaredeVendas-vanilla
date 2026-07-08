@@ -28,6 +28,7 @@ export const ADMIN_MENU = [
   { id: 'products', label: t('nav.staffProducts'), icon: '📦', href: '#/admin/produtos' },
   { id: 'pedidos', label: t('nav.staffOrders'), icon: '🛒', href: '#/admin/pedidos' },
   { id: 'approvals', label: t('nav.staffApprovals'), icon: '✅', href: '#/admin/aprovacoes' },
+  { id: 'reports', label: t('nav.staffReports'), icon: '🚩', href: '#/admin/denuncias' },
   { id: 'neighborhoods', label: t('nav.staffNeighborhoods'), icon: '📍', href: '#/admin/bairros' },
   { id: 'moderators', label: t('nav.staffModerators'), icon: '🛡️', href: '#/admin/moderadores' },
   // external: true → ui.js abre strings-editor.html em nova aba (fora do hash router)
@@ -38,6 +39,7 @@ export const ADMIN_MENU = [
 export const MODERATOR_MENU = [
   { id: 'overview', label: t('nav.staffOverview'), icon: '📊', href: '#/moderador' },
   { id: 'approvals', label: t('nav.staffApprovals'), icon: '✅', href: '#/moderador/aprovacoes' },
+  { id: 'reports', label: t('nav.staffReports'), icon: '🚩', href: '#/moderador/denuncias' },
   { id: 'stores', label: t('nav.staffStores'), icon: '🏪', href: '#/moderador/lojas', readOnly: true },
   { id: 'products', label: t('nav.staffProducts'), icon: '📦', href: '#/moderador/produtos', readOnly: true },
   { id: 'pedidos', label: t('nav.staffOrders'), icon: '🛒', href: '#/moderador/pedidos' },

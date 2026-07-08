@@ -20,6 +20,7 @@ function setupAuthMocks({ hash = '#/conta/entrar' } = {}) {
     fetchNeighborhoods: vi.fn().mockResolvedValue([]),
     createStore: vi.fn(),
     fetchStoreByOwner: vi.fn(),
+    promoteCustomerToMerchant: vi.fn(),
   }))
   vi.doMock('../js/state.js', () => ({
     setUser: vi.fn(),

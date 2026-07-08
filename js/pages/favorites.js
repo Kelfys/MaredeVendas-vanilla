@@ -4,14 +4,16 @@
 import {
   fetchFavorites,
   fetchLikedProductsByUser,
+  fetchUserEngagementStats,
   fetchOrdersByCustomer,
   updateCustomerProfile,
   updatePassword,
 } from '../api.js'
 import { getUser, setUser, getCart, getCartItemCount, setStore, addItem, openCart } from '../state.js'
-import { renderStoreCard, renderFeedProductCard } from '../ui.js'
+import { renderStoreCard, renderFeedProductCard, renderEngagementStats } from '../ui.js'
 import { escapeHtml, formatCurrency, formatDate, showToast } from '../utils.js'
-import { routeHref } from '../router.js'
+import { routeHref, navigate } from '../router.js'
+import { getCustomerTab } from '../customer-nav.js'
 import { normalizeStorePaymentMethods, getPaymentMethodLabel } from '../payment.js'
 import { t, deliveryPeriodLabel, orderStatusLabel } from '../strings.js'
 import { bindPasswordToggles } from '../password-field.js'
@@ -30,6 +32,20 @@ const TABS = [
   { id: 'orders', label: t('nav.customerOrders'), icon: '📦' },
   { id: 'profile', label: t('nav.customerProfile'), icon: '👤' },
 ]
+
+function renderRegisterStoreCallout() {
+  return `
+    <section class="customer-register-store" aria-label="${escapeHtml(t('auth.registerMyStore'))}">
+      <div class="customer-register-store__content">
+        <span class="customer-register-store__icon" aria-hidden="true">🏪</span>
+        <div class="customer-register-store__text">
+          <h2 class="customer-register-store__title">${escapeHtml(t('customer.registerStoreTitle'))}</h2>
+          <p class="customer-register-store__desc">${escapeHtml(t('customer.registerStoreDesc'))}</p>
+        </div>
+      </div>
+      <a href="${routeHref('/lojista/cadastro')}" class="btn btn-primary">${escapeHtml(t('auth.registerMyStore'))}</a>
+    </section>`
+}
 
 function customerPage(title, subtitle, content) {
   return `
@@ -117,15 +133,15 @@ function renderMetrics({ favorites, liked, orders, cartCount }) {
   `
 }
 
-function renderOverview({ user, favorites, likedProducts, orders, cart }) {
+function renderOverview({ user, favorites, likedProducts, orders, cart, engagementStats }) {
   const cartCount = getCartItemCount()
   const previewStores = favorites.slice(0, 2)
   const previewLiked = likedProducts.slice(0, 2)
 
   return `
     ${renderMetrics({
-      favorites: favorites.length,
-      liked: likedProducts.length,
+      favorites: engagementStats?.favoritesCount ?? favorites.length,
+      liked: engagementStats?.likesCount ?? likedProducts.length,
       orders: orders.length,
       cartCount,
     })}
@@ -211,11 +227,15 @@ function renderOrdersTab(orders) {
   return `<div class="customer-orders-list">${orders.map(renderOrderCard).join('')}</div>`
 }
 
-function renderProfileTab(user) {
+function renderProfileTab(user, engagementStats) {
   const birthLabel = user.birth_date ? formatDate(user.birth_date) : '—'
 
   return `
     <div class="customer-profile">
+      <section class="customer-profile__activity">
+        <h2>${t('engagement.profileActivity')}</h2>
+        ${renderEngagementStats({ ...engagementStats, mode: 'customer' })}
+      </section>
       <form class="admin-form customer-profile__form" id="customer-profile-form">
         <div class="admin-form-grid">
           <label class="form-group">
@@ -284,10 +304,11 @@ export async function renderFavorites(main) {
     return
   }
 
-  let activeTab = 'overview'
+  let activeTab = getCustomerTab()
   let favorites = []
   let likedProducts = []
   let orders = []
+  let engagementStats = { favoritesCount: 0, likesCount: 0 }
   let productMap = new Map()
   let loading = true
   let profileSaving = false
@@ -298,10 +319,11 @@ export async function renderFavorites(main) {
     paint()
 
     try {
-      ;[favorites, likedProducts, orders] = await Promise.all([
+      ;[favorites, likedProducts, orders, engagementStats] = await Promise.all([
         fetchFavorites(user.id),
         fetchLikedProductsByUser(user.id),
         fetchOrdersByCustomer(user.id),
+        fetchUserEngagementStats(user.id),
       ])
       productMap = new Map(likedProducts.map((product) => [product.id, product]))
     } catch (err) {
@@ -332,8 +354,7 @@ export async function renderFavorites(main) {
 
   function switchTab(tab) {
     if (tab === activeTab) return
-    activeTab = tab
-    paint()
+    navigate(tab === 'overview' ? '/favoritos' : `/favoritos?tab=${tab}`)
   }
 
   function renderTabContent() {
@@ -349,7 +370,7 @@ export async function renderFavorites(main) {
       case 'orders':
         return renderOrdersTab(orders)
       case 'profile':
-        return renderProfileTab(user)
+        return renderProfileTab(user, engagementStats)
       default:
         return renderOverview({
           user,
@@ -357,6 +378,7 @@ export async function renderFavorites(main) {
           likedProducts,
           orders,
           cart: getCart(),
+          engagementStats,
         })
     }
   }
@@ -372,8 +394,13 @@ export async function renderFavorites(main) {
 
     main.innerHTML = customerPage(
       tabLabels[activeTab] ?? t('customer.myAccountTitle'),
-      activeTab === 'overview' ? t('customer.greeting', { name: user.name?.split(' ')[0] ?? t('customer.defaultName') }) : '',
+      activeTab === 'overview'
+        ? t('customer.greeting', { name: user.name?.split(' ')[0] ?? t('customer.defaultName') })
+        : activeTab === 'profile'
+          ? t('engagement.profileActivity')
+          : '',
       `
+        ${renderRegisterStoreCallout()}
         <nav class="customer-tabs tabs" aria-label="${t('customer.accountSectionsAria')}">
           ${TABS.map((tab) => `
             <button

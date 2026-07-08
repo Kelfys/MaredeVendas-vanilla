@@ -125,9 +125,17 @@ Acesse: http://localhost:8080
 
 ```bash
 npx supabase login
-npx supabase link --project-ref ulpjsxmilumqedkkfuqw
-npx supabase db push
+npm run db:link
+npm run db:push
 ```
+
+**Sem login CLI:** copie `.env.example` → `.env.local`, preencha `DATABASE_URL` (senha do Postgres em Settings → Database) e rode:
+
+```bash
+npm run db:push:url
+```
+
+> Este projeto é **SPA vanilla** (`js/db.js` via CDN). Guias do dashboard para Next.js (`@supabase/ssr`), Prisma e `@supabase/server` **não se aplicam** aqui.
 
 Ou execute cada arquivo em `supabase/migrations/` no **SQL Editor** (ordem numérica).
 
@@ -161,10 +169,12 @@ npm test
 
 ## Contas demo (produção / migrations 012, 021, 023, 024)
 
-| Papel | Email | Senha |
-|-------|-------|-------|
-| Cliente | `cliente@maredevendas.com` | `DemoCliente2026!` |
-| Lojista | `demo-pet-2@maredevendas.com` | `DemoLojista2026!` |
+| Papel | Email | Senha | Plano |
+|-------|-------|-------|-------|
+| Cliente | `cliente@maredevendas.com` | `DemoCliente2026!` | — |
+| Lojista (Gratuito) | `demo-gratuito@maredevendas.com` | `DemoLojista2026!` | Gratuito |
+| Lojista (Plus) | `demo-plus@maredevendas.com` | `DemoLojista2026!` | Plus |
+| Lojista | `demo-pet-2@maredevendas.com` | `DemoLojista2026!` | Gratuito |
 | Admin | `brunopdaraujo@gmail.com` | `MarecAdmin2026!` |
 | Moderador | `moderador@maredevendas.com` | `DemoModerador2026!` |
 

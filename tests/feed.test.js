@@ -37,6 +37,24 @@ describe('feed algorithm', () => {
     expect(ranked[0].plan_id).toBe('premium')
   })
 
+  it('boosts stores with more favorites and catalog likes', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z')
+    const quiet = { ...stores[0], favorites_count: 0, likes_count: 0 }
+    const popular = { ...stores[0], favorites_count: 40, likes_count: 80 }
+    expect(getStoreFeedScore(popular, { now })).toBeGreaterThan(getStoreFeedScore(quiet, { now }))
+  })
+
+  it('does not let extreme store engagement dominate linearly', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z')
+    const base = { ...stores[0], favorites_count: 0, likes_count: 0 }
+    const moderate = { ...stores[0], favorites_count: 10, likes_count: 20 }
+    const extreme = { ...stores[0], favorites_count: 500, likes_count: 2000 }
+    const diff = getStoreFeedScore(extreme, { now }) - getStoreFeedScore(moderate, { now })
+    expect(diff).toBeGreaterThan(0)
+    expect(diff).toBeLessThan(4)
+    expect(getStoreFeedScore(moderate, { now })).toBeGreaterThan(getStoreFeedScore(base, { now }))
+  })
+
   it('boosts search matches', () => {
     const score = getStoreFeedScore(stores[0], { search: 'Loja Free' })
     const base = getStoreFeedScore(stores[0])
@@ -48,12 +66,30 @@ describe('feed algorithm', () => {
     expect(ranked[0].id).toBe('p2')
   })
 
+  it('does not let extreme like counts dominate linearly', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z')
+    const base = { created_at: '2025-06-01T00:00:00Z', store_id: 'a' }
+    const moderate = { id: 'm', ...base, likes_count: 8 }
+    const extreme = { id: 'e', ...base, likes_count: 500 }
+    const diff = getProductFeedScore(extreme, { now }) - getProductFeedScore(moderate, { now })
+    expect(diff).toBeGreaterThan(0)
+    expect(diff).toBeLessThan(5)
+  })
+
   it('boosts products from higher plan stores', () => {
     const now = Date.parse('2026-01-01T00:00:00Z')
     const base = { created_at: '2025-06-01T00:00:00Z', likes_count: 5 }
     const low = { id: 'x', store_id: 'a', ...base, store: { plan_id: 'free' } }
     const high = { id: 'y', store_id: 'b', ...base, store: { plan_id: 'premium' } }
     expect(getProductFeedScore(high, { now })).toBeGreaterThan(getProductFeedScore(low, { now }))
+  })
+
+  it('boosts products from stores with higher engagement', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z')
+    const base = { created_at: '2025-06-01T00:00:00Z', likes_count: 3, store: { plan_id: 'free' } }
+    const quiet = { id: 'q', store_id: 'a', ...base, store: { ...base.store, favorites_count: 0, likes_count: 0 } }
+    const popular = { id: 'p', store_id: 'a', ...base, store: { ...base.store, favorites_count: 30, likes_count: 60 } }
+    expect(getProductFeedScore(popular, { now })).toBeGreaterThan(getProductFeedScore(quiet, { now }))
   })
 
   it('resolves store id from nested store', () => {

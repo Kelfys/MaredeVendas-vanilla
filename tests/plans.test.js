@@ -23,6 +23,9 @@ import {
   getPlanMonthlyAdLimit,
   countStoreAdsThisMonth,
   canCreateStoreAd,
+  canCreateIncludedStoreAd,
+  canCreateExtraStoreAd,
+  isExtraStoreAdSlot,
   formatStoreAdLimitHint,
   renderSubscriptionPlanCards,
 } from '../js/plans.js'
@@ -79,8 +82,8 @@ describe('plan store images', () => {
 })
 
 describe('free plan limits', () => {
-  it('exposes PLAN_LIMITS.free as 2 products and 0 images', () => {
-    expect(PLAN_LIMITS.free).toEqual({ products: 2, productImages: 0 })
+  it('exposes PLAN_LIMITS.free as 2 products and 1 image', () => {
+    expect(PLAN_LIMITS.free).toEqual({ products: 2, productImages: 1 })
   })
 
   it('resolves free plan metadata', () => {
@@ -91,17 +94,17 @@ describe('free plan limits', () => {
     expect(plan.priceCooldownHours).toBe(24)
   })
 
-  it('lists free plan features without product images', () => {
+  it('lists free plan features with one catalog image', () => {
     const plan = getPlanById('free')
     expect(plan.features).toContain('Até 2 itens (produtos ou serviços)')
-    expect(plan.features).toContain('Sem imagens nos produtos (planos pagos liberam fotos)')
+    expect(plan.features).toContain('1 foto no catálogo (planos pagos liberam mais)')
     expect(plan.features.some((f) => /Alteração de preços/i.test(f))).toBe(true)
   })
 
-  it('allows logo but not banner or product images', () => {
+  it('allows logo and one product image but not banner', () => {
     expect(planAllowsStoreLogo('free')).toBe(true)
     expect(planAllowsStoreBanner('free')).toBe(false)
-    expect(planAllowsProductImages('free')).toBe(false)
+    expect(planAllowsProductImages('free')).toBe(true)
     expect(planAllowsProductImages('plus')).toBe(true)
   })
 
@@ -114,18 +117,20 @@ describe('free plan limits', () => {
     expect(planProductsRemaining('free', 2)).toBe(0)
   })
 
-  it('never allows product image upload on free', () => {
-    expect(canAddProductImage('free', 0)).toBe(false)
-    expect(canAddProductImage('free', 0, true)).toBe(false)
-    expect(canAddProductImage('free', 5, true)).toBe(false)
-    expect(planProductImagesRemaining('free', 0)).toBe(0)
+  it('allows one product image on free', () => {
+    expect(canAddProductImage('free', 0)).toBe(true)
+    expect(canAddProductImage('free', 0, true)).toBe(true)
+    expect(canAddProductImage('free', 1)).toBe(false)
+    expect(canAddProductImage('free', 1, true)).toBe(true)
+    expect(planProductImagesRemaining('free', 0)).toBe(1)
+    expect(planProductImagesRemaining('free', 1)).toBe(0)
   })
 
   it('returns free-specific limit messages', () => {
     expect(planProductLimitMessage('free')).toContain('2')
     expect(planProductLimitMessage('free')).toContain('Gratuito')
     expect(planProductImageLimitMessage('free')).toBe(
-      'O plano Gratuito não permite imagens nos produtos. Assine um plano pago para enviar fotos no catálogo.',
+      'O plano Gratuito permite imagens em até 1 produto(s). Assine um plano superior para liberar mais.',
     )
     expect(FREE_PLAN_BANNER_MESSAGE).toContain('banner personalizado')
   })
@@ -151,7 +156,7 @@ describe('free plan limits', () => {
     const html = renderSubscriptionPlanCards({ infoOnly: true })
     expect(html).toContain('Gratuito')
     expect(html).toContain('Até 2 itens (produtos ou serviços)')
-    expect(html).toContain('Sem imagens nos produtos')
+    expect(html).toContain('1 foto no catálogo')
     expect(html).toContain('Incluso na aprovação do cadastro')
     expect(html).not.toMatch(/Enviar comprovante — Gratuito/)
   })
@@ -160,7 +165,7 @@ describe('free plan limits', () => {
 describe('plan catalog limits', () => {
   it('defines product and image limits per plan', () => {
     expect(getPlanProductLimit('free')).toBe(2)
-    expect(getPlanProductImageLimit('free')).toBe(0)
+    expect(getPlanProductImageLimit('free')).toBe(1)
     expect(getPlanProductLimit('plus')).toBe(6)
     expect(getPlanProductImageLimit('plus')).toBe(6)
     expect(getPlanProductLimit('premium')).toBe(30)
@@ -175,8 +180,9 @@ describe('plan catalog limits', () => {
   })
 
   it('blocks new product images at plan cap', () => {
-    expect(canAddProductImage('free', 0)).toBe(false)
-    expect(canAddProductImage('free', 0, true)).toBe(false)
+    expect(canAddProductImage('free', 0)).toBe(true)
+    expect(canAddProductImage('free', 1)).toBe(false)
+    expect(canAddProductImage('free', 1, true)).toBe(true)
     expect(canAddProductImage('plus', 5)).toBe(true)
     expect(canAddProductImage('plus', 6)).toBe(false)
     expect(canAddProductImage('plus', 6, true)).toBe(true)
@@ -202,11 +208,14 @@ describe('premium store ads limits', () => {
     expect(countStoreAdsThisMonth(ads, now)).toBe(2)
   })
 
-  it('blocks creation after monthly limit', () => {
-    expect(canCreateStoreAd('premium', 0)).toBe(true)
-    expect(canCreateStoreAd('premium', 1)).toBe(true)
-    expect(canCreateStoreAd('premium', 2)).toBe(false)
-    expect(canCreateStoreAd('plus', 0)).toBe(false)
+  it('allows included ads under limit and extra ads beyond it', () => {
+    expect(canCreateIncludedStoreAd('premium', 0)).toBe(true)
+    expect(canCreateIncludedStoreAd('premium', 1)).toBe(true)
+    expect(canCreateIncludedStoreAd('premium', 2)).toBe(false)
+    expect(isExtraStoreAdSlot('premium', 2)).toBe(true)
+    expect(canCreateExtraStoreAd('premium')).toBe(true)
+    expect(canCreateExtraStoreAd('plus')).toBe(false)
+    expect(canCreateStoreAd('premium', 2)).toBe(true)
   })
 
   it('lists premium ads feature on premium only', () => {

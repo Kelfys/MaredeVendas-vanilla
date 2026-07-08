@@ -12,12 +12,13 @@
  */
 import {
   fetchStoreBySlug, fetchProductsByStore, fetchReviewsByStore,
-  recordStoreView, toggleFavorite, isFavorite,
-  toggleProductLike, fetchProductComments, addProductComment,
+  recordStoreView, toggleFavorite, isFavorite, fetchStoreEngagementStats,
+  toggleProductLike, fetchProductComments, addProductComment, deleteProductComment, adjustProductLikes,
 } from '../api.js'
+import { isStaff, isAdmin } from '../roles.js'
 import { getStoreThemeColor } from '../config.js'
 import {
-  renderProductCard, openCart, formatPhone,
+  renderProductCard, renderEngagementStats, openCart, formatPhone,
 } from '../ui.js'
 import {
   escapeHtml, rankProductsByEngagement, instagramProfileUrl, formatInstagramDisplay,
@@ -27,6 +28,7 @@ import { normalizeStorePaymentMethods } from '../payment.js'
 import { navigate } from '../router.js'
 import { showToast } from '../utils.js'
 import { t } from '../strings.js'
+import { bindReportTriggers, renderReportButton, getReportLoginPath } from '../reporting.js'
 
 export async function renderStorePage(main, { slug }) {
   const store = await fetchStoreBySlug(slug)
@@ -46,9 +48,10 @@ export async function renderStorePage(main, { slug }) {
   recordStoreView(store.id)
 
   const user = getUser()
-  const [rawProducts, reviews] = await Promise.all([
+  const [rawProducts, reviews, engagementStats] = await Promise.all([
     fetchProductsByStore(store.id, user?.id),
     fetchReviewsByStore(store.id),
+    fetchStoreEngagementStats(store.id),
   ])
 
   let products = rankProductsByEngagement(rawProducts)
@@ -106,14 +109,18 @@ export async function renderStorePage(main, { slug }) {
               <h1 style="font-size:1.75rem;font-weight:700">${escapeHtml(store.name)}</h1>
               ${store.category ? `<span class="store-card__category" style="background:${theme.hex}">${escapeHtml(store.category.name)}</span>` : ''}
               ${avgRating > 0 ? `<div class="stars" style="margin-top:0.25rem">★ ${avgRating.toFixed(1)} (${reviews.length})</div>` : ''}
+              ${renderEngagementStats({ ...engagementStats, mode: 'store' })}
             </div>
           </div>
           <div class="store-profile__actions">
             <button type="button" class="btn btn-primary" id="open-cart">
               ${t('store.cart')} ${cartCount > 0 ? `<span class="badge-count">${cartCount > 9 ? '9+' : cartCount}</span>` : ''}
             </button>
-            <button type="button" class="btn btn-outline" id="favorite-btn">${favorited ? t('store.favorited') : t('store.favorite')}</button>
+            ${store.owner_id !== currentUser?.id
+              ? `<button type="button" class="btn btn-outline" id="favorite-btn">${favorited ? t('store.favorited') : t('store.favorite')}</button>`
+              : ''}
             <button type="button" class="btn btn-outline" id="share-btn">${t('store.share')}</button>
+            ${renderReportButton({ type: 'store', id: store.id, name: store.name, user: currentUser, store })}
           </div>
         </div>
 
@@ -136,6 +143,9 @@ export async function renderStorePage(main, { slug }) {
               commentsOpen: openComments.has(product.id),
               comments: commentsByProduct.get(product.id) ?? [],
               commentsLoading: commentsLoading.has(product.id),
+              canDeleteComments: isStaff(currentUser),
+              canAdjustLikes: isAdmin(currentUser),
+              storeOwnerId: store.owner_id,
             })).join('')}</div>`}
 
         ${reviews.length > 0 ? `
@@ -155,6 +165,16 @@ export async function renderStorePage(main, { slug }) {
       </div>
     `
 
+    bindReportTriggers(main, {
+      user: currentUser,
+      storeOwnerId: store.owner_id,
+      redirectPath: `/loja/${slug}`,
+      onRequireAuth: () => {
+        navigate(getReportLoginPath(currentUser, `/loja/${slug}`))
+        showToast(t('report.loginRequired'))
+      },
+    })
+
     document.getElementById('open-cart')?.addEventListener('click', openCart)
     document.getElementById('share-btn')?.addEventListener('click', async () => {
       const url = window.location.href
@@ -171,12 +191,16 @@ export async function renderStorePage(main, { slug }) {
         navigate(`/conta/entrar?redirect=${encodeURIComponent(`/loja/${slug}`)}`)
         return
       }
-      if (currentUser.role !== 'customer') {
-        showToast(t('store.customersOnlyFavorite'))
-        return
+      try {
+        favorited = await toggleFavorite(currentUser.id, store.id)
+        engagementStats.favoritesCount = Math.max(
+          0,
+          engagementStats.favoritesCount + (favorited ? 1 : -1),
+        )
+        paint()
+      } catch (err) {
+        showToast(err.message ?? t('store.favoriteError'))
       }
-      favorited = await toggleFavorite(currentUser.id, store.id)
-      paint()
     })
 
     main.querySelectorAll('[data-add-product]').forEach((btn) => {
@@ -201,10 +225,19 @@ export async function renderStorePage(main, { slug }) {
         const product = productMap.get(productId)
         if (!product) return
 
+        if (store.owner_id === currentUser.id) {
+          showToast(t('store.cannotLikeOwnCatalog'))
+          return
+        }
+
         try {
           const liked = await toggleProductLike(currentUser.id, productId)
           product.liked_by_user = liked
           product.likes_count = Math.max(0, (product.likes_count ?? 0) + (liked ? 1 : -1))
+          engagementStats.likesCount = Math.max(
+            0,
+            engagementStats.likesCount + (liked ? 1 : -1),
+          )
           paint()
         } catch (err) {
           showToast(err.message ?? t('store.likeError'))
@@ -227,6 +260,64 @@ export async function renderStorePage(main, { slug }) {
           return
         }
         paint()
+      })
+    })
+
+    async function handleAdminLikeAdjust(button, delta) {
+      if (!isAdmin(currentUser)) return
+      const productId = button.dataset.adminLikeInc ?? button.dataset.adminLikeDec
+      const product = productMap.get(productId)
+      if (!product) return
+
+      button.disabled = true
+      try {
+        const result = await adjustProductLikes(productId, delta)
+        product.likes_count = result.likes_count
+        product.likes_adjustment = result.likes_adjustment
+        product.organic_likes_count = result.organic_likes_count
+        engagementStats.likesCount = [...productMap.values()].reduce(
+          (sum, item) => sum + (item.likes_count ?? 0),
+          0,
+        )
+        paint()
+        showToast(t('admin.likesUpdated'))
+      } catch (err) {
+        showToast(err.message ?? t('admin.likesAdjustError'))
+        paint()
+      }
+    }
+
+    main.querySelectorAll('[data-admin-like-inc]').forEach((btn) => {
+      btn.addEventListener('click', () => handleAdminLikeAdjust(btn, 1))
+    })
+
+    main.querySelectorAll('[data-admin-like-dec]').forEach((btn) => {
+      btn.addEventListener('click', () => handleAdminLikeAdjust(btn, -1))
+    })
+
+    main.querySelectorAll('[data-delete-comment]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!isStaff(currentUser)) return
+        if (!confirm(t('store.confirmDeleteComment'))) return
+
+        const commentId = btn.dataset.deleteComment
+        const panel = btn.closest('[data-comments-panel]')
+        const productId = panel?.dataset.commentsPanel
+        if (!commentId || !productId) return
+
+        btn.disabled = true
+        try {
+          await deleteProductComment(commentId)
+          const existing = commentsByProduct.get(productId) ?? []
+          commentsByProduct.set(productId, existing.filter((c) => c.id !== commentId))
+          const product = productMap.get(productId)
+          if (product) product.comments_count = Math.max(0, (product.comments_count ?? 0) - 1)
+          paint()
+          showToast(t('store.commentDeleted'))
+        } catch (err) {
+          showToast(err.message ?? t('store.commentDeleteError'))
+          paint()
+        }
       })
     })
 

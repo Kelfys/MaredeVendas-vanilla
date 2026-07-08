@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const FREE_IMAGE_ERROR =
-  'O plano Gratuito não permite imagens nos produtos. Assine um plano pago para enviar fotos no catálogo.'
+const FREE_IMAGE_LIMIT_ERROR =
+  'O plano Gratuito permite imagens em até 1 produto(s). Assine um plano superior para liberar mais.'
 
 const uploadImage = vi.fn().mockResolvedValue('https://cdn.example.com/product.jpg')
 
@@ -93,7 +93,7 @@ function productForm({ withImage = false } = {}) {
   }
 }
 
-describe('api free plan product image blocking', () => {
+describe('api free plan product images', () => {
   beforeEach(() => {
     uploadImage.mockClear()
     vi.stubGlobal('window', {
@@ -108,11 +108,24 @@ describe('api free plan product image blocking', () => {
     vi.doUnmock('../js/uploads.js')
   })
 
-  it('createProduct rejects image upload on free plan', async () => {
-    const api = await loadApi(createMockSupabase({ planId: 'free', productCount: 0 }))
+  it('createProduct allows first image upload on free plan', async () => {
+    const api = await loadApi(createMockSupabase({ planId: 'free', productCount: 0, catalogProducts: [] }))
+
+    const created = await api.createProduct('store-1', productForm({ withImage: true }))
+
+    expect(created).toMatchObject({ id: 'prod-new' })
+    expect(uploadImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('createProduct rejects second image when free plan image slot is used', async () => {
+    const api = await loadApi(createMockSupabase({
+      planId: 'free',
+      productCount: 1,
+      catalogProducts: [{ id: 'prod-1', image: 'https://legacy.example/old.jpg' }],
+    }))
 
     await expect(api.createProduct('store-1', productForm({ withImage: true })))
-      .rejects.toThrow(FREE_IMAGE_ERROR)
+      .rejects.toThrow(FREE_IMAGE_LIMIT_ERROR)
 
     expect(uploadImage).not.toHaveBeenCalled()
   })
@@ -126,27 +139,41 @@ describe('api free plan product image blocking', () => {
     expect(uploadImage).not.toHaveBeenCalled()
   })
 
-  it('updateProduct rejects new image on free plan', async () => {
+  it('updateProduct allows first image on free plan', async () => {
     const api = await loadApi(createMockSupabase({
       planId: 'free',
+      catalogProducts: [],
       productRow: { store_id: 'store-1', image: null },
     }))
 
-    await expect(api.updateProduct('prod-1', { image: new File(['x'], 'nova.jpg', { type: 'image/jpeg' }) }))
-      .rejects.toThrow(FREE_IMAGE_ERROR)
+    const updated = await api.updateProduct('prod-1', { image: new File(['x'], 'nova.jpg', { type: 'image/jpeg' }) })
 
-    expect(uploadImage).not.toHaveBeenCalled()
+    expect(updated).toMatchObject({ id: 'prod-1' })
+    expect(uploadImage).toHaveBeenCalledTimes(1)
   })
 
-  it('updateProduct rejects image replacement on free plan even if product already had image', async () => {
+  it('updateProduct allows image replacement on free when product already had image', async () => {
     const api = await loadApi(createMockSupabase({
       planId: 'free',
       catalogProducts: [{ id: 'prod-1', image: 'https://legacy.example/old.jpg' }],
       productRow: { store_id: 'store-1', image: 'https://legacy.example/old.jpg' },
     }))
 
-    await expect(api.updateProduct('prod-1', { image: new File(['x'], 'troca.jpg', { type: 'image/jpeg' }) }))
-      .rejects.toThrow(FREE_IMAGE_ERROR)
+    const updated = await api.updateProduct('prod-1', { image: new File(['x'], 'troca.jpg', { type: 'image/jpeg' }) })
+
+    expect(updated).toMatchObject({ id: 'prod-1' })
+    expect(uploadImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('updateProduct rejects new image on another product when free limit is reached', async () => {
+    const api = await loadApi(createMockSupabase({
+      planId: 'free',
+      catalogProducts: [{ id: 'prod-other', image: 'https://legacy.example/other.jpg' }],
+      productRow: { store_id: 'store-1', image: null },
+    }))
+
+    await expect(api.updateProduct('prod-1', { image: new File(['x'], 'nova.jpg', { type: 'image/jpeg' }) }))
+      .rejects.toThrow(FREE_IMAGE_LIMIT_ERROR)
 
     expect(uploadImage).not.toHaveBeenCalled()
   })

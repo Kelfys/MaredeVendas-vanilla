@@ -66,18 +66,28 @@ export function getCurrentPath() {
   return hashPath || '/'
 }
 
+export function getHashQueryParam(name) {
+  if (USE_HISTORY_ROUTER) {
+    return new URLSearchParams(window.location.search).get(name)
+  }
+
+  const raw = window.location.hash.replace(/^#/, '') || '/'
+  const query = raw.split('?')[1] ?? ''
+  return new URLSearchParams(query.split('#')[0]).get(name)
+}
+
 export function getHashSection() {
   if (USE_HISTORY_ROUTER) {
     return new URLSearchParams(window.location.search).get('sec')
   }
 
-  const raw = window.location.hash.replace(/^#/, '') || '/'
-  const query = raw.split('?')[1] ?? ''
-  const fromQuery = new URLSearchParams(query.split('#')[0]).get('sec')
-  if (fromQuery) return fromQuery
-  const pathPart = raw.split('?')[0]
-  const anchorIdx = pathPart.indexOf('#', 1)
-  return anchorIdx !== -1 ? pathPart.slice(anchorIdx + 1) : null
+  return getHashQueryParam('sec')
+    ?? (() => {
+      const raw = window.location.hash.replace(/^#/, '') || '/'
+      const pathPart = raw.split('?')[0]
+      const anchorIdx = pathPart.indexOf('#', 1)
+      return anchorIdx !== -1 ? pathPart.slice(anchorIdx + 1) : null
+    })()
 }
 
 function matchRoute(path) {

@@ -1,8 +1,8 @@
 /**
  * Componentes de UI reutilizáveis (renderização imperativa).
  *
- * Header: logo, nav-desktop (Criar loja, Entrar), ações (tema, painel, sair)
- * e nav-mobile (hambúrguer). Entrar fica no menu — não nas ações do header.
+ * Header: logo, nav-desktop (Criar loja, Entrar, Minha conta), ações (tema, painel, sair)
+ * e nav-mobile (hambúrguer).
  *
  * Também: store-card, feed-product-card, cart-drawer e checkout com pagamentos por loja.
  */
@@ -26,10 +26,77 @@ import { createOrder } from './api.js'
 import { navigate, render as rerenderRoute, getCurrentPath, routeHref } from './router.js'
 import { showToast } from './utils.js'
 import { STAFF_PANELS, getStaffMenu, isStaffPath, getStaffPanel, getStaffTab } from './staff-nav.js'
+import { renderReportButton } from './reporting.js'
 import { MERCHANT_PANEL, MERCHANT_MENU, isMerchantPath, getMerchantTab, merchantMenuHref } from './merchant-nav.js'
+import { CUSTOMER_MENU, isCustomerAccountPath, getCustomerTab, customerMenuHref } from './customer-nav.js'
 
 let menuOpen = false
 let staffMenuOpen = false
+let headerCartBound = false
+
+function renderMenuToggleButton() {
+  const label = menuOpen ? t('nav.closeMenu') : t('nav.openMenu')
+  return `
+    <button
+      type="button"
+      class="icon-btn menu-toggle${menuOpen ? ' menu-toggle--open' : ''}"
+      id="menu-toggle"
+      aria-expanded="${menuOpen}"
+      aria-controls="nav-mobile"
+      aria-label="${label}"
+      title="${label}"
+    >
+      <span class="menu-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span>
+    </button>`
+}
+
+function renderCartHeaderButton(cartCount) {
+  const title = cartCount > 0
+    ? t('nav.cartWithCount', { count: cartCount > 9 ? '9+' : cartCount })
+    : t('nav.cart')
+  return `
+    <button
+      type="button"
+      class="icon-btn icon-btn--cart"
+      id="header-cart-btn"
+      title="${title}"
+      aria-label="${title}"
+    >
+      <span class="icon-btn__glyph" aria-hidden="true">🛒</span>
+      ${cartCount > 0 ? `<span class="icon-btn__badge">${cartCount > 9 ? '9+' : cartCount}</span>` : ''}
+    </button>`
+}
+
+function renderCustomerMobileNav(user, customerTab) {
+  const firstName = escapeHtml(user.name?.split(' ')[0] ?? t('customer.defaultName'))
+  return `
+    <div class="nav-mobile__user">
+      <span class="nav-mobile__avatar" aria-hidden="true">👤</span>
+      <div class="nav-mobile__user-text">
+        <strong>${firstName}</strong>
+        <span>${escapeHtml(t('nav.customerMenuTitle'))}</span>
+      </div>
+    </div>
+    ${CUSTOMER_MENU.map((item) => `
+      <a
+        href="${customerMenuHref(item)}"
+        class="nav-mobile__link${customerTab === item.id ? ' active' : ''}"
+      >
+        <span class="nav-mobile__link-icon" aria-hidden="true">${item.icon}</span>
+        <span>${item.label}</span>
+      </a>
+    `).join('')}
+    <div class="nav-mobile__divider"></div>`
+}
+
+function bindHeaderNavClose(header) {
+  header.querySelectorAll('.nav-mobile a, .nav-mobile button, .admin-toolbar__tab').forEach((el) => {
+    el.addEventListener('click', () => {
+      staffMenuOpen = false
+      menuOpen = false
+    })
+  })
+}
 
 /** Links fora do SPA (ex.: strings-editor.html) abrem em nova aba. */
 function staffMenuLinkAttrs(item) {
@@ -75,12 +142,18 @@ export function renderHeader() {
   const onLogin = currentPath === '/conta/entrar'
   const onRegisterStore = currentPath === '/lojista/cadastro'
   const showCreateStore = !user || user?.role === 'customer'
+  const onCustomerAccount = user?.role === 'customer' && isCustomerAccountPath(currentPath)
+  const customerTab = onCustomerAccount ? getCustomerTab(currentPath) : null
+  const isCustomerPublic = user?.role === 'customer' && !onStaff && !onMerchant
+  const cartCount = getCartItemCount()
+  const themeIcon = getTheme() === 'dark' ? '☀️' : '🌙'
 
   header.innerHTML = `
+    ${menuOpen ? `<button type="button" class="header__backdrop" id="header-backdrop" aria-label="${escapeHtml(t('nav.closeMenu'))}"></button>` : ''}
     <div class="header__inner">
       <a href="${routeHref('/')}" class="logo">
         <div class="logo__icon">🏪</div>
-        <span>${APP_NAME.replace('Vendas', '')}<span class="accent">Vendas</span></span>
+        <span class="logo__text">${APP_NAME.replace('Vendas', '')}<span class="accent">Vendas</span></span>
       </a>
 
       <nav class="nav-desktop">
@@ -92,12 +165,17 @@ export function renderHeader() {
           <span class="nav-btn__icon" aria-hidden="true">🔑</span>
           <span>${t('nav.login')}</span>
         </a>` : ''}
+        ${user?.role === 'customer' ? `<a href="${customerMenuHref(CUSTOMER_MENU[0])}" class="nav-btn${onCustomerAccount ? ' active' : ''}">
+          <span class="nav-btn__icon" aria-hidden="true">👤</span>
+          <span>${t('nav.customerMenuTitle')}</span>
+        </a>` : ''}
       </nav>
 
       <div class="header__actions">
-        <button type="button" class="icon-btn" id="theme-toggle" title="${t('nav.toggleTheme')}">${getTheme() === 'dark' ? '☀️' : '🌙'}</button>
+        ${isCustomerPublic ? renderCartHeaderButton(cartCount) : ''}
+        <button type="button" class="icon-btn header__action--desktop" id="theme-toggle" title="${t('nav.toggleTheme')}" aria-label="${t('nav.toggleTheme')}">${themeIcon}</button>
 
-        ${user?.role === 'customer' ? `<a href="#/favoritos" class="icon-btn" title="${t('nav.myAccount')}">👤</a>` : ''}
+        ${user?.role === 'customer' ? `<a href="${customerMenuHref(CUSTOMER_MENU[0])}" class="icon-btn header__action--desktop" title="${t('nav.myAccount')}" aria-label="${t('nav.myAccount')}">👤</a>` : ''}
         ${user?.role === 'merchant' ? `
           <div class="header-dropdown ${staffMenuOpen ? 'open' : ''}" id="staff-dropdown-merchant">
             <button type="button" class="icon-btn ${onMerchant ? 'icon-btn--active' : ''}" id="staff-menu-toggle-merchant" title="${MERCHANT_PANEL.label}" aria-expanded="${staffMenuOpen}" aria-haspopup="true">${MERCHANT_PANEL.icon}</button>
@@ -115,9 +193,9 @@ export function renderHeader() {
           </div>` : ''}
         ${user?.role === 'admin' ? renderStaffPanelDropdown(user, 'admin', staffTab) : ''}
         ${user?.role === 'moderator' ? renderStaffPanelDropdown(user, 'moderator', staffTab) : ''}
-        ${user ? `<button type="button" class="icon-btn" id="logout-btn" title="${t('nav.logout')}">🚪</button>` : ''}
+        ${user ? `<button type="button" class="icon-btn header__action--desktop" id="logout-btn" title="${t('nav.logout')}" aria-label="${t('nav.logout')}">🚪</button>` : ''}
 
-        <button type="button" class="icon-btn menu-toggle" id="menu-toggle" aria-expanded="${menuOpen}">${menuOpen ? t('nav.closeMenu') : t('nav.openMenu')}</button>
+        ${renderMenuToggleButton()}
       </div>
     </div>
 
@@ -134,7 +212,7 @@ export function renderHeader() {
           </a>` : ''}
         </div>
       ` : ''}
-      ${user?.role === 'customer' ? `<a href="#/favoritos">${t('nav.myAccount')}</a>` : ''}
+      ${user?.role === 'customer' ? renderCustomerMobileNav(user, customerTab ?? 'overview') : ''}
       ${user?.role === 'merchant' ? `
         <p class="nav-mobile__section">${t('nav.merchantPanel')}</p>
         ${MERCHANT_MENU.map((item) => {
@@ -154,7 +232,16 @@ export function renderHeader() {
         ${renderStaffMenuItems('moderator', staffTab, { compact: true })}
         <a href="${routeHref('/')}">${t('nav.backToSite')}</a>
       ` : ''}
-      ${user ? `<button type="button" id="logout-mobile">🚪 ${t('nav.logout')}</button>` : ''}
+      <div class="nav-mobile__footer">
+        <button type="button" class="nav-mobile__utility" id="theme-toggle-mobile">
+          <span class="nav-mobile__link-icon" aria-hidden="true">${themeIcon}</span>
+          <span>${t('nav.toggleTheme')}</span>
+        </button>
+        ${user ? `<button type="button" class="nav-mobile__utility nav-mobile__utility--danger" id="logout-mobile">
+          <span class="nav-mobile__link-icon" aria-hidden="true">🚪</span>
+          <span>${t('nav.logout')}</span>
+        </button>` : ''}
+      </div>
     </nav>
 
     ${onStaff ? `
@@ -174,6 +261,24 @@ export function renderHeader() {
         </div>
       </div>
     ` : ''}
+    ${onCustomerAccount ? `
+      <div class="admin-toolbar customer-toolbar">
+        <div class="admin-toolbar__inner">
+          <div class="admin-toolbar__tabs">
+            ${CUSTOMER_MENU.map((item) => `
+              <a
+                href="${customerMenuHref(item)}"
+                class="admin-toolbar__tab ${customerTab === item.id ? 'active' : ''}"
+                title="${escapeHtml(item.label)}"
+              >
+                <span class="admin-toolbar__tab-icon" aria-hidden="true">${item.icon}</span>
+                <span class="admin-toolbar__tab-label">${item.label}</span>
+              </a>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    ` : ''}
     ${onMerchant ? `
       <div class="admin-toolbar merchant-toolbar">
         <div class="admin-toolbar__inner">
@@ -181,20 +286,27 @@ export function renderHeader() {
             ${MERCHANT_MENU.map((item) => {
               const pending = item.id === 'orders' ? getMerchantNewOrdersCount() : 0
               return `
-              <a href="${merchantMenuHref(item)}" class="admin-toolbar__tab ${merchantTab === item.id ? 'active' : ''}">
-                <span>${item.icon}</span> ${item.label}
+              <a href="${merchantMenuHref(item)}" class="admin-toolbar__tab ${merchantTab === item.id ? 'active' : ''}" title="${escapeHtml(item.label)}">
+                <span class="admin-toolbar__tab-icon" aria-hidden="true">${item.icon}</span>
+                <span class="admin-toolbar__tab-label">${item.label}</span>
                 ${pending > 0 ? `<span class="admin-toolbar__badge">${pending}</span>` : ''}
               </a>`
             }).join('')}
           </div>
-          <button type="button" class="btn btn-outline btn-sm" id="merchant-refresh" title="${t('common.refreshDataTitle')}">${t('nav.refresh')}</button>
+          <button type="button" class="btn btn-outline btn-sm admin-toolbar__refresh" id="merchant-refresh" title="${t('common.refreshDataTitle')}" aria-label="${t('common.refreshDataTitle')}">
+            <span class="admin-toolbar__refresh-icon" aria-hidden="true">↻</span>
+            <span class="admin-toolbar__refresh-label">${t('nav.refresh').replace(/^↻\s*/, '')}</span>
+          </button>
         </div>
       </div>
     ` : ''}
   `
 
-  header.classList.toggle('header--admin', onStaff || onMerchant)
-
+  header.classList.toggle('header--admin', onStaff || onMerchant || onCustomerAccount)
+  header.classList.toggle('header--customer', isCustomerPublic)
+  header.classList.toggle('header--customer-account', onCustomerAccount)
+  header.classList.toggle('header--menu-open', menuOpen)
+  document.body.classList.toggle('body--menu-open', menuOpen)
   ;['admin', 'moderator', 'merchant'].forEach((panel) => {
     document.getElementById(`staff-menu-toggle-${panel}`)?.addEventListener('click', (e) => {
       e.stopPropagation()
@@ -214,7 +326,8 @@ export function renderHeader() {
     showToast(t('toasts.panelUpdated'))
   })
 
-  header.querySelectorAll('.admin-menu__item, .admin-toolbar__tab').forEach((link) => {
+  bindHeaderNavClose(header)
+  header.querySelectorAll('.admin-menu__item').forEach((link) => {
     link.addEventListener('click', () => {
       staffMenuOpen = false
       menuOpen = false
@@ -236,12 +349,27 @@ export function renderHeader() {
     }, 0)
   }
 
-  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const handleThemeToggle = () => {
     toggleTheme()
+    renderHeader()
+  }
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleThemeToggle)
+  document.getElementById('theme-toggle-mobile')?.addEventListener('click', handleThemeToggle)
+
+  document.getElementById('header-cart-btn')?.addEventListener('click', () => {
+    menuOpen = false
+    openCart()
+    renderHeader()
+  })
+
+  document.getElementById('header-backdrop')?.addEventListener('click', () => {
+    menuOpen = false
     renderHeader()
   })
 
   document.getElementById('menu-toggle')?.addEventListener('click', () => {
+    staffMenuOpen = false
     menuOpen = !menuOpen
     renderHeader()
   })
@@ -267,10 +395,34 @@ export function closeMobileMenu() {
 export function initHeader() {
   renderHeader()
   onAuthChange(() => renderHeader())
+  if (!headerCartBound) {
+    onCartChange(() => renderHeader())
+    headerCartBound = true
+  }
+}
+
+/** Favoritos + curtidas em produtos (perfil da loja ou do cliente). */
+export function renderEngagementStats({ favoritesCount = 0, likesCount = 0, mode = 'store' } = {}) {
+  const favLabel = mode === 'store' ? t('engagement.storeFavorites') : t('engagement.customerFavorites')
+  const likesLabel = mode === 'store' ? t('engagement.storeLikes') : t('engagement.customerLikes')
+
+  return `
+    <div class="profile-stats" aria-label="${escapeHtml(t('engagement.statsAria'))}">
+      <div class="profile-stats__item">
+        <span class="profile-stats__icon" aria-hidden="true">❤️</span>
+        <span class="profile-stats__value">${favoritesCount}</span>
+        <span class="profile-stats__label">${escapeHtml(favLabel)}</span>
+      </div>
+      <div class="profile-stats__item">
+        <span class="profile-stats__icon" aria-hidden="true">👍</span>
+        <span class="profile-stats__value">${likesCount}</span>
+        <span class="profile-stats__label">${escapeHtml(likesLabel)}</span>
+      </div>
+    </div>`
 }
 
 export function renderStoreCard(store, options = {}) {
-  const { showPlanBadge = false } = options
+  const { showPlanBadge = false, user = null } = options
   const theme = getStoreThemeColor(store.theme_color)
   const bannerStyle = `background: linear-gradient(135deg, ${theme.gradientFrom}, ${theme.gradientTo})`
   const plan = getPlanById(store.plan_id)
@@ -296,9 +448,12 @@ export function renderStoreCard(store, options = {}) {
           <span>📍 ${escapeHtml(store.city)}, ${escapeHtml(store.state)}</span>
           ${store.opening_hours ? `<span>🕐 ${escapeHtml(store.opening_hours)}</span>` : ''}
         </div>
-        <a href="#/loja/${escapeHtml(store.slug)}" class="btn btn-block" style="margin-top:1rem;background:${theme.hex};color:white">
-          ${t('home.viewStoreCta')}
-        </a>
+        <div class="store-card__actions">
+          <a href="#/loja/${escapeHtml(store.slug)}" class="btn btn-block" style="background:${theme.hex};color:white">
+            ${t('home.viewStoreCta')}
+          </a>
+          ${renderReportButton({ type: 'store', id: store.id, name: store.name, user, store })}
+        </div>
       </div>
     </article>
   `
@@ -339,7 +494,7 @@ function renderUsedProductTag(product, className = 'product-tag product-tag--use
 
 /** Card horizontal de produto no feed da home. */
 export function renderFeedProductCard(product, options = {}) {
-  const { badge = 'new' } = options
+  const { badge = 'new', user = null, storeOwnerId = null } = options
   const oos = !isCatalogItemAvailable(product)
   const likesCount = product.likes_count ?? 0
   const badgeLabels = {
@@ -375,9 +530,19 @@ export function renderFeedProductCard(product, options = {}) {
               <span class="feed-product-card__price">${formatCurrency(product.price)}</span>
               ${likesCount > 0 ? `<span class="feed-product-card__likes">❤️ ${likesCount}</span>` : ''}
             </div>
-            <button type="button" class="btn btn-primary btn-sm" data-feed-add-product="${product.id}" ${oos ? 'disabled' : ''}>
-              ${t('home.addToCartShort')}
-            </button>
+            <div class="feed-product-card__actions">
+              <button type="button" class="btn btn-primary btn-sm" data-feed-add-product="${product.id}" ${oos ? 'disabled' : ''}>
+                ${t('home.addToCartShort')}
+              </button>
+              ${renderReportButton({
+                type: 'product',
+                id: product.id,
+                name: product.name,
+                user,
+                storeOwnerId,
+                product,
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -391,6 +556,9 @@ export function renderProductCard(product, options = {}) {
     commentsOpen = false,
     comments = [],
     commentsLoading = false,
+    canDeleteComments = false,
+    canAdjustLikes = false,
+    storeOwnerId = null,
   } = options
   const oos = !isCatalogItemAvailable(product)
   const likesCount = product.likes_count ?? 0
@@ -426,6 +594,12 @@ export function renderProductCard(product, options = {}) {
               💬 ${commentsCount}
             </button>
           `}
+          ${canAdjustLikes ? `
+            <div class="product-card__engagement-admin" title="${t('admin.adjustLikesHint')}">
+              <button type="button" class="engagement-btn engagement-btn--ghost" data-admin-like-dec="${product.id}" aria-label="${t('admin.decreaseLikes')}">−</button>
+              <button type="button" class="engagement-btn engagement-btn--ghost" data-admin-like-inc="${product.id}" aria-label="${t('admin.increaseLikes')}">+</button>
+            </div>
+          ` : ''}
         </div>
         ${commentsOpen ? `
           <div class="product-comments" data-comments-panel="${product.id}">
@@ -434,10 +608,20 @@ export function renderProductCard(product, options = {}) {
               : comments.length === 0
                 ? `<p class="product-comments__status">${t('store.noCommentsYet')}</p>`
                 : comments.map((comment) => `
-                    <div class="product-comment">
+                    <div class="product-comment" data-comment-id="${comment.id}">
                       <div class="product-comment__meta">
                         <strong>${escapeHtml(comment.user?.name ?? t('common.defaultUser'))}</strong>
-                        <span>${new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(comment.created_at))}</span>
+                        <div class="product-comment__meta-end">
+                          <span>${new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(comment.created_at))}</span>
+                          ${canDeleteComments ? `
+                            <button
+                              type="button"
+                              class="product-comment__delete"
+                              data-delete-comment="${comment.id}"
+                              aria-label="${t('store.deleteComment')}"
+                            >${t('common.delete')}</button>
+                          ` : ''}
+                        </div>
                       </div>
                       <p>${escapeHtml(comment.content)}</p>
                     </div>
@@ -456,7 +640,17 @@ export function renderProductCard(product, options = {}) {
         ` : ''}
         <div class="product-card__footer">
           <span class="product-card__price">${formatCurrency(product.price)}</span>
-          <button type="button" class="btn btn-primary btn-sm" data-add-product="${product.id}" ${oos ? 'disabled' : ''}>${t('store.addProduct')}</button>
+          <div class="product-card__footer-actions">
+            <button type="button" class="btn btn-primary btn-sm" data-add-product="${product.id}" ${oos ? 'disabled' : ''}>${t('store.addProduct')}</button>
+            ${renderReportButton({
+              type: 'product',
+              id: product.id,
+              name: product.name,
+              user,
+              storeOwnerId,
+              product,
+            })}
+          </div>
         </div>
       </div>
     </article>

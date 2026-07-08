@@ -171,6 +171,7 @@ function setupCustomerMocks() {
   vi.doMock('../js/api.js', () => ({
     fetchFavorites: noop(),
     fetchLikedProductsByUser: noop(),
+    fetchUserEngagementStats: () => Promise.resolve({ favoritesCount: 0, likesCount: 0 }),
     fetchOrdersByCustomer: noop(),
     updateCustomerProfile: vi.fn(),
     updatePassword: vi.fn(),
@@ -178,10 +179,13 @@ function setupCustomerMocks() {
   vi.doMock('../js/router.js', () => ({
     routeHref: (path) => `#${path}`,
     navigate: vi.fn(),
+    getCurrentPath: () => '/favoritos',
+    getHashQueryParam: (name) => (name === 'tab' ? 'profile' : null),
   }))
   vi.doMock('../js/ui.js', () => ({
     renderStoreCard: () => '',
     renderFeedProductCard: () => '',
+    renderEngagementStats: () => '',
   }))
 }
 
@@ -239,13 +243,12 @@ describe('password toggle on change-password pages', () => {
     const { renderFavorites } = await import('../js/pages/favorites.js')
     const renderPromise = renderFavorites(main)
     await vi.waitFor(() => {
-      expect(main.querySelector('[data-customer-tab="profile"]')).toBeTruthy()
+      expect(main.querySelector('#customer-password-form')).toBeTruthy()
       expect(main.querySelector('.loading')).toBeFalsy()
     })
-    main.querySelector('[data-customer-tab="profile"]').click()
     await renderPromise
 
-    expect(main.querySelector('#customer-password-form')).toBeTruthy()
+    expect(main.querySelector('[data-customer-tab="profile"]')?.classList.contains('active')).toBe(true)
     expectPasswordToggleWorks(main, { route: '/favoritos (perfil)', expectedCount: 2 })
   })
 })

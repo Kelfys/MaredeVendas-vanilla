@@ -21,7 +21,7 @@ describe('router path helpers', () => {
       APP_BASE_PATH: '',
       USE_HISTORY_ROUTER: false,
     }))
-    const { getCurrentPath, routeHref, getHashSection } = await import('../js/router.js')
+    const { getCurrentPath, routeHref, getHashSection, getHashQueryParam } = await import('../js/router.js')
     expect(getCurrentPath()).toBe('/dashboard/pedidos')
     expect(routeHref('/dashboard')).toBe('#/dashboard')
 
@@ -29,6 +29,12 @@ describe('router path helpers', () => {
     window.location.href = 'https://example.github.io/MaredeVendas-vanilla/#/conta/entrar?sec=planos'
     expect(getCurrentPath()).toBe('/conta/entrar')
     expect(getHashSection()).toBe('planos')
+    expect(getHashQueryParam('sec')).toBe('planos')
+
+    window.location.hash = '#/favoritos?tab=orders'
+    window.location.href = 'https://example.github.io/MaredeVendas-vanilla/#/favoritos?tab=orders'
+    expect(getCurrentPath()).toBe('/favoritos')
+    expect(getHashQueryParam('tab')).toBe('orders')
 
     window.location.href = 'https://example.github.io/MaredeVendas-vanilla/#/admin/entrar'
     window.location.hash = '#/admin/entrar'

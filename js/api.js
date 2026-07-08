@@ -20,7 +20,7 @@
  * Erros não mapeados repassam error.message original do backend.
  */
 import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
-import { generateSlug, sanitizeSearch } from './utils.js'
+import { generateSlug, sanitizeSearch, getProductEngagementWeight, computeProductLikesCount } from './utils.js'
 import { t } from './strings.js'
 import { DEFAULT_THEME_COLOR, getProductionSiteUrl, isProductionSiteHost } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
@@ -30,7 +30,8 @@ import {
   getPlanProductLimit, getPlanProductImageLimit,
   planProductLimitMessage, planProductImageLimitMessage, canAddProductImage,
   getPriceCooldownRemaining, formatPriceCooldownRemaining, getPlanById,
-  planAllowsStoreAds, canCreateStoreAd, getPlanMonthlyAdLimit,
+  planAllowsStoreAds, getPlanMonthlyAdLimit, STORE_AD_DURATION_HOURS, STORE_AD_EXTRA_FEE,
+  canCreateIncludedStoreAd, canCreateExtraStoreAd, isExtraStoreAdSlot,
 } from './plans.js'
 
 async function countStoreProductsWithImages(client, storeId) {
@@ -256,6 +257,33 @@ export async function signInWithGoogle({ nextPath = '/favoritos', role } = {}) {
   return data
 }
 
+/** Promove cliente logado a lojista. Idempotente se o perfil já for merchant. */
+export async function promoteCustomerToMerchant() {
+  const client = await requireClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) throw new Error(t('auth.accountLoadError'))
+
+  const { data: profile, error } = await client.from('users').select('role').eq('id', user.id).single()
+  if (error || !profile) throw new Error(t('auth.accountLoadError'))
+  if (profile.role === 'merchant') return profile
+  if (profile.role !== 'customer') throw new Error(t('auth.notMerchantAccount'))
+
+  const { error: metaError } = await client.auth.updateUser({
+    data: { ...user.user_metadata, role: 'merchant' },
+  })
+  if (metaError) throw metaError
+
+  const { data, error: roleError } = await client
+    .from('users')
+    .update({ role: 'merchant' })
+    .eq('id', user.id)
+    .eq('role', 'customer')
+    .select('role')
+    .single()
+  if (roleError) throw roleError
+  return data
+}
+
 /** Após OAuth: aplica papel lojista se veio de /lojista/cadastro (oauth-role em sessionStorage). */
 export async function completeOAuthSignup() {
   let intendedRole = null
@@ -267,25 +295,11 @@ export async function completeOAuthSignup() {
   }
   if (intendedRole !== 'merchant') return
 
-  const client = await requireClient()
-  const { data: { user } } = await client.auth.getUser()
-  if (!user) return
-
-  const { data: profile, error } = await client.from('users').select('role').eq('id', user.id).single()
-  if (error || !profile) return
-  if (profile.role === 'merchant' || profile.role === 'admin' || profile.role === 'moderator') return
-
-  const { error: metaError } = await client.auth.updateUser({
-    data: { ...user.user_metadata, role: 'merchant' },
-  })
-  if (metaError) throw metaError
-
-  const { error: roleError } = await client
-    .from('users')
-    .update({ role: 'merchant' })
-    .eq('id', user.id)
-    .eq('role', 'customer')
-  if (roleError) throw roleError
+  try {
+    await promoteCustomerToMerchant()
+  } catch {
+    // OAuth concluído; promoção pode falhar se o perfil não for customer
+  }
 }
 
 export async function requestPasswordReset(email) {
@@ -670,7 +684,8 @@ async function attachProductEngagement(products, userId = null) {
 
   return products.map((product) => ({
     ...product,
-    likes_count: likeCounts[product.id] ?? 0,
+    organic_likes_count: likeCounts[product.id] ?? 0,
+    likes_count: computeProductLikesCount(likeCounts[product.id], product.likes_adjustment),
     comments_count: commentCounts[product.id] ?? 0,
     liked_by_user: userLikes.has(product.id),
   }))
@@ -691,6 +706,7 @@ function normalizeMarketplaceProduct(row) {
       plan_id: store.plan_id,
       category_id: store.category_id,
       neighborhood_id: store.neighborhood_id,
+      owner_id: store.owner_id,
       category: store.category ?? null,
     },
   }
@@ -734,7 +750,7 @@ export async function fetchMarketplaceProducts(filters = {}) {
 
   let query = client
     .from('products')
-    .select('*, category:categories(*), store:stores!inner(id, name, slug, whatsapp, theme_color, city, state, plan_id, status, subscription_status, category_id, neighborhood_id, payment_methods, category:categories(id, name))')
+    .select('*, category:categories(*), store:stores!inner(id, name, slug, whatsapp, theme_color, city, state, plan_id, status, subscription_status, category_id, neighborhood_id, owner_id, payment_methods, category:categories(id, name))')
     .eq('active', true)
     .eq('stores.status', 'approved')
     .order('created_at', { ascending: false })
@@ -760,17 +776,19 @@ export async function fetchTopLikedProducts(filters = {}) {
   const limit = filters.limit ?? 12
   const products = await fetchMarketplaceProducts({ ...filters, fetchLimit: 80 })
   const withEngagement = await attachProductEngagement(products, filters.userId ?? null)
+  const now = filters.now ?? Date.now()
+  const byScore = (a, b) => getProductEngagementWeight(b, now) - getProductEngagementWeight(a, now)
 
   const liked = withEngagement
     .filter((p) => (p.likes_count ?? 0) > 0)
-    .sort((a, b) => (b.likes_count ?? 0) - (a.likes_count ?? 0))
+    .sort(byScore)
 
   if (liked.length >= limit) return liked.slice(0, limit)
 
   const seen = new Set(liked.map((p) => p.id))
   const fallback = withEngagement
     .filter((p) => !seen.has(p.id))
-    .sort((a, b) => (b.likes_count ?? 0) - (a.likes_count ?? 0))
+    .sort(byScore)
 
   return [...liked, ...fallback].slice(0, limit)
 }
@@ -889,6 +907,18 @@ export async function deleteProduct(productId) {
 
 export async function toggleProductLike(userId, productId) {
   const client = await requireClient()
+
+  const { data: product, error: productError } = await client
+    .from('products')
+    .select('id, store:stores(owner_id)')
+    .eq('id', productId)
+    .maybeSingle()
+  if (productError) throw productError
+  if (!product) throw new Error(t('errors.productNotFound'))
+  if (product.store?.owner_id === userId) {
+    throw new Error(t('errors.cannotLikeOwnProduct'))
+  }
+
   const { data: existing, error: readError } = await client
     .from('product_likes')
     .select('id')
@@ -941,6 +971,195 @@ export async function addProductComment(userId, productId, content) {
     .single()
   if (error) {
     if (isMissingEngagementTableError(error)) throw new Error(ENGAGEMENT_UNAVAILABLE)
+    throw error
+  }
+  return data
+}
+
+export async function deleteProductComment(commentId) {
+  const client = await requireClient()
+  const { error } = await client
+    .from('product_comments')
+    .delete()
+    .eq('id', commentId)
+  if (error) {
+    if (isMissingEngagementTableError(error)) throw new Error(ENGAGEMENT_UNAVAILABLE)
+    throw error
+  }
+}
+
+/** Admin: incrementa ou reduz o total exibido de curtidas (ajuste sobre as curtidas reais). */
+export async function adjustProductLikes(productId, delta) {
+  if (!delta) return { likes_count: 0, likes_adjustment: 0, organic_likes_count: 0 }
+
+  const client = await requireClient()
+  const { data: product, error: productError } = await client
+    .from('products')
+    .select('id, likes_adjustment')
+    .eq('id', productId)
+    .single()
+  if (productError) throw productError
+
+  const { count: organicCount, error: countError } = await client
+    .from('product_likes')
+    .select('id', { count: 'exact', head: true })
+    .eq('product_id', productId)
+  if (countError && !isMissingEngagementTableError(countError)) throw countError
+
+  const organic = organicCount ?? 0
+  const adjustment = product.likes_adjustment ?? 0
+  const nextTotal = computeProductLikesCount(organic, adjustment + delta)
+  const nextAdjustment = nextTotal - organic
+
+  const { error: updateError } = await client
+    .from('products')
+    .update({ likes_adjustment: nextAdjustment })
+    .eq('id', productId)
+  if (updateError) throw updateError
+
+  return {
+    likes_count: nextTotal,
+    likes_adjustment: nextAdjustment,
+    organic_likes_count: organic,
+  }
+}
+
+// --- Content reports ---
+
+const REPORT_REASON_IDS = new Set(['inappropriate', 'misleading', 'spam', 'offensive', 'other'])
+
+function isMissingReportTableError(error) {
+  const msg = error?.message ?? ''
+  const code = error?.code ?? ''
+  return code === 'PGRST205' || /could not find the table/i.test(msg)
+}
+
+function isDuplicateReportError(error) {
+  return error?.code === '23505'
+}
+
+function normalizeReportReason(reason) {
+  const normalized = String(reason ?? '').trim()
+  if (!REPORT_REASON_IDS.has(normalized)) throw new Error(t('errors.reportReasonRequired'))
+  return normalized
+}
+
+function normalizeReportDetails(details) {
+  const trimmed = String(details ?? '').trim()
+  if (trimmed.length > 500) throw new Error(t('errors.reportDetailsTooLong'))
+  return trimmed || null
+}
+
+function mapReportError(error) {
+  if (isMissingReportTableError(error)) throw new Error(t('errors.reportsUnavailable'))
+  if (isDuplicateReportError(error)) throw new Error(t('errors.reportAlreadyPending'))
+  throw error
+}
+
+const CONTENT_REPORT_SELECT = `
+  *,
+  reporter:users!reporter_id(id, name, email),
+  store:stores(id, name, slug, city, state, neighborhood_id, neighborhood:neighborhoods(id, name)),
+  product:products(id, name, image)
+`
+
+export async function submitStoreReport(userId, storeId, reason, details = '') {
+  const client = await requireClient()
+
+  const { data: store, error: storeError } = await client
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .single()
+  if (storeError) throw storeError
+  if (!store) throw new Error(t('errors.storeNotFound'))
+  if (store.owner_id === userId) throw new Error(t('errors.cannotReportOwnStore'))
+
+  const { data, error } = await client
+    .from('content_reports')
+    .insert({
+      reporter_id: userId,
+      target_type: 'store',
+      store_id: storeId,
+      reason: normalizeReportReason(reason),
+      details: normalizeReportDetails(details),
+    })
+    .select(CONTENT_REPORT_SELECT)
+    .single()
+  if (error) mapReportError(error)
+  return data
+}
+
+export async function submitProductReport(userId, productId, reason, details = '') {
+  const client = await requireClient()
+
+  const { data: product, error: productError } = await client
+    .from('products')
+    .select('id, store_id, store:stores(owner_id)')
+    .eq('id', productId)
+    .single()
+  if (productError) throw productError
+  if (!product) throw new Error(t('errors.productNotFound'))
+  if (product.store?.owner_id === userId) throw new Error(t('errors.cannotReportOwnProduct'))
+
+  const { data, error } = await client
+    .from('content_reports')
+    .insert({
+      reporter_id: userId,
+      target_type: 'product',
+      store_id: product.store_id,
+      product_id: productId,
+      reason: normalizeReportReason(reason),
+      details: normalizeReportDetails(details),
+    })
+    .select(CONTENT_REPORT_SELECT)
+    .single()
+  if (error) mapReportError(error)
+  return data
+}
+
+export async function fetchPendingContentReports(neighborhoodId = null) {
+  const client = await requireClient()
+  let query = client
+    .from('content_reports')
+    .select(CONTENT_REPORT_SELECT)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+
+  const { data, error } = await query
+  if (error) {
+    if (isMissingReportTableError(error)) return []
+    throw error
+  }
+
+  let reports = data ?? []
+  if (neighborhoodId) {
+    reports = reports.filter((report) => report.store?.neighborhood_id === neighborhoodId)
+  }
+  return reports
+}
+
+export async function reviewContentReport(reportId, status, reviewNote = '') {
+  if (!['resolved', 'dismissed'].includes(status)) {
+    throw new Error(t('errors.invalidReportStatus'))
+  }
+
+  const client = await requireClient()
+  const note = String(reviewNote ?? '').trim() || null
+  const { data, error } = await client
+    .from('content_reports')
+    .update({
+      status,
+      review_note: note,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: (await client.auth.getUser()).data.user?.id ?? null,
+    })
+    .eq('id', reportId)
+    .eq('status', 'pending')
+    .select(CONTENT_REPORT_SELECT)
+    .single()
+  if (error) {
+    if (isMissingReportTableError(error)) throw new Error(t('errors.reportsUnavailable'))
     throw error
   }
   return data
@@ -1038,6 +1257,18 @@ export async function fetchFavorites(userId) {
 
 export async function toggleFavorite(userId, storeId) {
   const client = await requireClient()
+
+  const { data: store, error: storeError } = await client
+    .from('stores')
+    .select('owner_id')
+    .eq('id', storeId)
+    .maybeSingle()
+  if (storeError) throw storeError
+  if (!store) throw new Error(t('errors.storeNotFound'))
+  if (store.owner_id === userId) {
+    throw new Error(t('errors.cannotFavoriteOwnStore'))
+  }
+
   const { data: existing } = await client
     .from('favorites')
     .select('id')
@@ -1062,6 +1293,139 @@ export async function isFavorite(userId, storeId) {
     .eq('store_id', storeId)
     .maybeSingle()
   return Boolean(data)
+}
+
+/** Anexa favoritos recebidos e curtidas totais do catálogo em cada loja (batch). */
+export async function attachStoreEngagementStats(stores) {
+  if (!stores?.length) return stores ?? []
+
+  const client = await requireClient()
+  const storeIds = stores.map((store) => store.id)
+
+  const [
+    { data: favorites, error: favError },
+    { data: products, error: productsError },
+  ] = await Promise.all([
+    client.from('favorites').select('store_id').in('store_id', storeIds),
+    client.from('products').select('id, store_id, likes_adjustment').in('store_id', storeIds),
+  ])
+
+  if (favError && !isMissingEngagementTableError(favError)) throw favError
+  if (productsError) throw productsError
+
+  const favoritesCount = {}
+  for (const row of favorites ?? []) {
+    favoritesCount[row.store_id] = (favoritesCount[row.store_id] ?? 0) + 1
+  }
+
+  const productIds = (products ?? []).map((product) => product.id)
+  const organicByProduct = {}
+
+  if (productIds.length > 0) {
+    const { data: likes, error: likesError } = await client
+      .from('product_likes')
+      .select('product_id')
+      .in('product_id', productIds)
+
+    if (likesError && !isMissingEngagementTableError(likesError)) throw likesError
+    if (!likesError) {
+      for (const row of likes ?? []) {
+        organicByProduct[row.product_id] = (organicByProduct[row.product_id] ?? 0) + 1
+      }
+    }
+  }
+
+  const likesCount = {}
+  for (const product of products ?? []) {
+    const storeId = product.store_id
+    if (!storeId) continue
+    const productTotal = computeProductLikesCount(organicByProduct[product.id], product.likes_adjustment)
+    likesCount[storeId] = (likesCount[storeId] ?? 0) + productTotal
+  }
+
+  return stores.map((store) => ({
+    ...store,
+    favorites_count: favoritesCount[store.id] ?? 0,
+    likes_count: likesCount[store.id] ?? 0,
+  }))
+}
+
+/** Totais públicos da loja: favoritos recebidos e curtidas nos produtos do catálogo. */
+export async function fetchStoreEngagementStats(storeId) {
+  const client = await requireClient()
+
+  const { count: favoritesCount, error: favError } = await client
+    .from('favorites')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', storeId)
+  if (favError) throw favError
+
+  const { data: products, error: productsError } = await client
+    .from('products')
+    .select('id, likes_adjustment')
+    .eq('store_id', storeId)
+  if (productsError) throw productsError
+
+  const productIds = (products ?? []).map((p) => p.id)
+  if (productIds.length === 0) {
+    return { favoritesCount: favoritesCount ?? 0, likesCount: 0 }
+  }
+
+  const organicByProduct = {}
+  const { data: likes, error: likesError } = await client
+    .from('product_likes')
+    .select('product_id')
+    .in('product_id', productIds)
+  if (likesError) {
+    if (isMissingEngagementTableError(likesError)) {
+      const adjustmentOnly = (products ?? []).reduce(
+        (sum, product) => sum + Math.max(0, product.likes_adjustment ?? 0),
+        0,
+      )
+      return { favoritesCount: favoritesCount ?? 0, likesCount: adjustmentOnly }
+    }
+    throw likesError
+  }
+
+  for (const row of likes ?? []) {
+    organicByProduct[row.product_id] = (organicByProduct[row.product_id] ?? 0) + 1
+  }
+
+  const likesCount = (products ?? []).reduce((sum, product) => (
+    sum + computeProductLikesCount(organicByProduct[product.id], product.likes_adjustment)
+  ), 0)
+
+  return {
+    favoritesCount: favoritesCount ?? 0,
+    likesCount,
+  }
+}
+
+/** Totais do usuário: lojas favoritas e produtos curtidos. */
+export async function fetchUserEngagementStats(userId) {
+  const client = await requireClient()
+
+  const { count: favoritesCount, error: favError } = await client
+    .from('favorites')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  if (favError) throw favError
+
+  const { count: likesCount, error: likesError } = await client
+    .from('product_likes')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+  if (likesError) {
+    if (isMissingEngagementTableError(likesError)) {
+      return { favoritesCount: favoritesCount ?? 0, likesCount: 0 }
+    }
+    throw likesError
+  }
+
+  return {
+    favoritesCount: favoritesCount ?? 0,
+    likesCount: likesCount ?? 0,
+  }
 }
 
 export async function fetchLikedProductsByUser(userId, limit = 24) {
@@ -1397,7 +1761,7 @@ export async function fetchAdminProducts(storeId = null) {
   if (storeId) query = query.eq('store_id', storeId)
   const { data, error } = await query
   if (error) throw error
-  return data ?? []
+  return attachProductEngagement(data ?? [])
 }
 
 export async function createStoreAsAdmin(form) {
@@ -1685,20 +2049,20 @@ export async function fetchStoreAds(storeId) {
   return data ?? []
 }
 
-async function countStoreAdsCreatedThisMonth(client, storeId) {
+async function countIncludedStoreAdsCreatedThisMonth(client, storeId) {
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const { count, error } = await client
     .from('store_ads')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', storeId)
+    .eq('is_extra', false)
     .gte('created_at', monthStart)
   if (error) throw error
   return count ?? 0
 }
 
-/** Premium + loja aprovada/ativa + limite mensal (PLAN_MONTHLY_AD_LIMIT em plans.js). */
-async function assertStoreAdAllowed(client, storeId) {
+async function loadStoreAdContext(client, storeId) {
   const { data: store, error: storeError } = await client
     .from('stores')
     .select('plan_id, status, subscription_status')
@@ -1714,15 +2078,86 @@ async function assertStoreAdAllowed(client, storeId) {
     throw new Error(t('merchant.adsApprovalRequired'))
   }
 
-  const adsThisMonth = await countStoreAdsCreatedThisMonth(client, storeId)
-  if (!canCreateStoreAd(planId, adsThisMonth)) {
-    throw new Error(t('errors.storeAdsMonthlyLimit', { limit: getPlanMonthlyAdLimit(planId) }))
-  }
+  const includedThisMonth = await countIncludedStoreAdsCreatedThisMonth(client, storeId)
+  return { planId, includedThisMonth }
 }
 
-export async function createStoreAd(storeId, { title, message, image }) {
+export async function fetchPendingStoreAds(neighborhoodId = null) {
   const client = await requireClient()
-  await assertStoreAdAllowed(client, storeId)
+  let query = client
+    .from('store_ads')
+    .select('*, store:stores(id, name, slug, plan_id, city, state, neighborhood_id, neighborhood:neighborhoods(id, name, slug), owner:users(id, name, email))')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+  const { data, error } = await query
+  if (error) {
+    if (error.code === '42P01') return []
+    throw error
+  }
+  let ads = data ?? []
+  if (neighborhoodId) {
+    ads = ads.filter((ad) => ad.store?.neighborhood_id === neighborhoodId)
+  }
+  return ads
+}
+
+function storeAdExpiryFromNow(now = Date.now()) {
+  return new Date(now + STORE_AD_DURATION_HOURS * 60 * 60 * 1000).toISOString()
+}
+
+export async function approveStoreAd(adId) {
+  const client = await requireClient()
+  const approvedAt = new Date().toISOString()
+  const { data, error } = await client
+    .from('store_ads')
+    .update({
+      status: 'approved',
+      approved_at: approvedAt,
+      expires_at: storeAdExpiryFromNow(),
+      rejected_at: null,
+    })
+    .eq('id', adId)
+    .eq('status', 'pending')
+    .select('*, store:stores(id, name)')
+    .single()
+  if (error) throw error
+  if (!data) throw new Error(t('errors.storeAdNotPending'))
+  return data
+}
+
+export async function rejectStoreAd(adId) {
+  const client = await requireClient()
+  const { data, error } = await client
+    .from('store_ads')
+    .update({
+      status: 'rejected',
+      rejected_at: new Date().toISOString(),
+    })
+    .eq('id', adId)
+    .eq('status', 'pending')
+    .select('*, store:stores(id, name)')
+    .single()
+  if (error) throw error
+  if (!data) throw new Error(t('errors.storeAdNotPending'))
+  return data
+}
+
+export async function createStoreAd(storeId, { title, message, image, feeAcknowledged = false }) {
+  const client = await requireClient()
+  const { planId, includedThisMonth } = await loadStoreAdContext(client, storeId)
+  const extra = isExtraStoreAdSlot(planId, includedThisMonth)
+
+  if (extra) {
+    if (!canCreateExtraStoreAd(planId)) {
+      throw new Error(t('errors.storeAdsPremiumOnly'))
+    }
+    if (!feeAcknowledged) {
+      throw new Error(t('errors.storeAdFeeAckRequired', { fee: STORE_AD_EXTRA_FEE }))
+    }
+  } else if (!canCreateIncludedStoreAd(planId, includedThisMonth)) {
+    throw new Error(t('errors.storeAdsMonthlyLimit', { limit: getPlanMonthlyAdLimit(planId) }))
+  }
+
   let image_url = null
   if (image instanceof File) {
     image_url = await uploadImage(STORAGE_BUCKETS.products, `ads/${storeId}/${Date.now()}`, image)
@@ -1735,6 +2170,9 @@ export async function createStoreAd(storeId, { title, message, image }) {
       title: title.trim(),
       message: message.trim(),
       image_url,
+      is_extra: extra,
+      fee_amount: extra ? STORE_AD_EXTRA_FEE : 0,
+      fee_acknowledged: extra ? Boolean(feeAcknowledged) : false,
     })
     .select()
     .single()

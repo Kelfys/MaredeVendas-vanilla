@@ -103,6 +103,7 @@ describe('google auth', () => {
       fetchNeighborhoods: vi.fn().mockResolvedValue([]),
       createStore: vi.fn(),
       fetchStoreByOwner: vi.fn(),
+      promoteCustomerToMerchant: vi.fn(),
     }))
     vi.doMock('../js/state.js', () => ({
       getUser: () => null,

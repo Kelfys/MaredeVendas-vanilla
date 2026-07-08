@@ -1,17 +1,19 @@
 /**
  * Algoritmo do feed da home — ranking de lojas, produtos e anúncios patrocinados.
  *
- * Score por plano da loja, curtidas, novidade, busca e rotação diária.
+ * Score por plano, engajamento da loja (favoritos + curtidas no catálogo, escala log),
+ * curtidas do produto, novidade, busca e rotação diária.
  * Anúncios aprovados entram a cada N slots; diversidade entre lojas no mix.
  */
 import { getPlanFeedWeight } from './plans.js'
-import { getProductEngagementWeight } from './utils.js'
+import { getProductEngagementWeight, getStoreEngagementBoost } from './utils.js'
 
 const STORE_NEW_DAYS = 30
 const STORE_NEW_BOOST = 0.35
 const SEARCH_MATCH_BOOST = 2
 const CATEGORY_MATCH_BOOST = 1.5
 const PLAN_PRODUCT_BOOST = 0.15
+const STORE_PRODUCT_ENGAGEMENT_BOOST = 0.12
 const AD_INTERVAL = 5
 
 export function getProductStoreId(product) {
@@ -41,6 +43,7 @@ export function getStoreFeedScore(store, { search = '', categoryId = null, now =
     if (haystack.includes(term)) score += SEARCH_MATCH_BOOST
   }
 
+  score += getStoreEngagementBoost(store)
   score += rotationJitter(store.id, dayBucket(now))
   return score
 }
@@ -49,6 +52,7 @@ export function getProductFeedScore(product, { search = '', now = Date.now() } =
   let score = getProductEngagementWeight(product, now)
   const planWeight = getPlanFeedWeight(product.store?.plan_id)
   if (planWeight > 1) score += (planWeight - 1) * PLAN_PRODUCT_BOOST
+  score += getStoreEngagementBoost(product.store) * STORE_PRODUCT_ENGAGEMENT_BOOST
 
   const term = search.trim().toLowerCase()
   if (term) {

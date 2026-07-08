@@ -4,10 +4,10 @@
  *
  * Plano Gratuito (free) — ver PLAN_LIMITS e README § Planos de assinatura:
  *   • até 2 itens no catálogo (produto ou serviço)
- *   • 0 imagens de produto (productImages: 0 → canAddProductImage sempre false)
+ *   • 1 foto no catálogo (productImages: 1 — total entre os produtos)
  *   • logo da loja sim; banner personalizado não (planAllowsStoreBanner)
  *   • alteração de preço a cada 24 h (PLAN_COOLDOWN_HOURS.free)
- * Anúncios no feed (store_ads): exclusivo Premium — até 2 por mês (PLAN_MONTHLY_AD_LIMIT).
+ * Anúncios no feed (store_ads): exclusivo Premium — até 2 inclusos/mês; extras R$ 5 (STORE_AD_EXTRA_FEE), 24h após aprovação.
  * Validação na API: js/api.js (assertProductCountAllowed, assertProductImageAllowed, assertStoreAdAllowed).
  */
 import { formatCurrency, escapeHtml } from './utils.js'
@@ -46,12 +46,18 @@ export function planAllowsStoreBanner(planId) {
   return Boolean(planId && planId !== 'free')
 }
 
-/** Anúncios no feed (store_ads): Premium = 2/mês calendário; demais = 0. */
+/** Anúncios no feed (store_ads): Premium = 2 inclusos/mês calendário; demais = 0. */
 export const PLAN_MONTHLY_AD_LIMIT = {
   free: 0,
   plus: 0,
   premium: 2,
 }
+
+/** Duração de exibição após aprovação (horas). */
+export const STORE_AD_DURATION_HOURS = 24
+
+/** Taxa por anúncio extra (acima do limite incluso do plano). */
+export const STORE_AD_EXTRA_FEE = 5
 
 export function planAllowsStoreAds(planId) {
   return planId === 'premium'
@@ -71,9 +77,34 @@ export function countStoreAdsThisMonth(ads, now = new Date()) {
   }).length
 }
 
-export function canCreateStoreAd(planId, adsThisMonth) {
+/** Conta apenas slots inclusos (não extras) criados no mês. */
+export function countIncludedStoreAdsThisMonth(ads, now = new Date()) {
+  const month = now.getMonth()
+  const year = now.getFullYear()
+  return (ads ?? []).filter((ad) => {
+    if (ad.is_extra) return false
+    const created = new Date(ad.created_at)
+    return created.getMonth() === month && created.getFullYear() === year
+  }).length
+}
+
+export function isExtraStoreAdSlot(planId, includedAdsThisMonth) {
   if (!planAllowsStoreAds(planId)) return false
-  return adsThisMonth < getPlanMonthlyAdLimit(planId)
+  return includedAdsThisMonth >= getPlanMonthlyAdLimit(planId)
+}
+
+export function canCreateIncludedStoreAd(planId, includedAdsThisMonth) {
+  if (!planAllowsStoreAds(planId)) return false
+  return includedAdsThisMonth < getPlanMonthlyAdLimit(planId)
+}
+
+export function canCreateExtraStoreAd(planId) {
+  return planAllowsStoreAds(planId)
+}
+
+/** @deprecated Use canCreateIncludedStoreAd ou canCreateExtraStoreAd */
+export function canCreateStoreAd(planId, adsThisMonth) {
+  return canCreateIncludedStoreAd(planId, adsThisMonth) || canCreateExtraStoreAd(planId)
 }
 
 export function planStoreAdLimitMessage(planId) {
@@ -82,10 +113,14 @@ export function planStoreAdLimitMessage(planId) {
   return t('plans.monthlyAdLimitMessage', { limit })
 }
 
-export function formatStoreAdLimitHint(planId, adsThisMonth) {
+export function formatStoreAdLimitHint(planId, includedAdsThisMonth) {
   const limit = getPlanMonthlyAdLimit(planId)
-  const remaining = Math.max(0, limit - adsThisMonth)
-  return t('plans.monthlyAdLimitHint', { count: adsThisMonth, limit, remaining })
+  const remaining = Math.max(0, limit - includedAdsThisMonth)
+  return t('plans.monthlyAdLimitHint', { count: includedAdsThisMonth, limit, remaining })
+}
+
+export function formatStoreAdExtraFeeHint() {
+  return t('plans.extraAdFeeHint', { fee: formatCurrency(STORE_AD_EXTRA_FEE), hours: STORE_AD_DURATION_HOURS })
 }
 
 /** @deprecated Use planAllowsStoreBanner — banner exige plano pago; logo é liberado em todos os planos */
@@ -95,11 +130,11 @@ export function planAllowsStoreBranding(planId) {
 
 /**
  * Limites de catálogo por plano (itens totais e quantos podem ter foto).
- * products: teto de cadastro; productImages: 0 no free bloqueia qualquer upload.
+ * products: teto de cadastro; productImages: teto de produtos com foto no catálogo.
  */
 export const PLAN_LIMITS = {
-  // Gratuito: 2 itens publicáveis, sem foto no catálogo
-  free: { products: 2, productImages: 0 },
+  // Gratuito: 2 itens publicáveis, 1 produto com foto
+  free: { products: 2, productImages: 1 },
   plus: { products: 6, productImages: 6 },
   premium: { products: 30, productImages: 30 },
 }
@@ -118,7 +153,7 @@ export function planProductLimitMessage(planId) {
   return t('plans.productLimitMessage', { plan: plan.name, limit })
 }
 
-/** Planos pagos permitem foto nos produtos; Gratuito não. */
+/** Planos com productImages > 0 permitem foto nos produtos (Gratuito: 1 no total). */
 export function planAllowsProductImages(planId) {
   return getPlanProductImageLimit(planId) > 0
 }
@@ -146,7 +181,7 @@ export function canCreateProduct(planId, productCount) {
   return productCount < getPlanProductLimit(planId)
 }
 
-/** productImages === 0 (free) nega upload novo e troca de imagem existente. */
+/** productImages === 0 nega upload; no limite, só troca em produto que já tem foto. */
 export function canAddProductImage(planId, productsWithImages, productAlreadyHasImage = false) {
   const limit = getPlanProductImageLimit(planId)
   if (limit === 0) return false
@@ -187,7 +222,7 @@ const PLAN_CONFIGS = [
     priceCooldownHours: PLAN_COOLDOWN_HOURS.free,
     featureKeys: [
       'plans.featureFreeItems2',
-      'plans.featureFreeNoImages',
+      'plans.featureFreeOneImage',
       'plans.featureStoreLogo',
       'plans.featureDefaultBanner',
       'plans.featureToggleProducts',
@@ -401,4 +436,22 @@ export function buildGenericPaymentUrl() {
     PAYMENT_WHATSAPP,
     buildPaymentMessage(t('plans.paymentWhatsappPlanPlaceholder'), ''),
   )
+}
+
+function buildExtraAdPaymentMessage(adTitle = '') {
+  return [
+    t('plans.paymentWhatsappGreeting'),
+    '',
+    t('plans.extraAdPaymentBody', { fee: formatCurrency(STORE_AD_EXTRA_FEE), hours: STORE_AD_DURATION_HOURS }),
+    adTitle ? t('plans.extraAdPaymentTitle', { title: adTitle }) : '',
+    '',
+    t('plans.paymentWhatsappReceipt'),
+    '',
+    t('plans.paymentWhatsappStoreName'),
+    t('plans.paymentWhatsappEmail'),
+  ].filter(Boolean).join('\n')
+}
+
+export function buildExtraAdPaymentUrl(adTitle = '') {
+  return buildWhatsAppUrl(PAYMENT_WHATSAPP, buildExtraAdPaymentMessage(adTitle))
 }

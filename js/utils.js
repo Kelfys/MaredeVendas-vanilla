@@ -145,19 +145,48 @@ export function matchesStoreSearch(haystack, term) {
   return normalizePhoneDigits(haystack).includes(termDigits)
 }
 
-const ENGAGEMENT_LIKE_WEIGHT = 5
+/** Curtidas com retorno decrescente — evita que um item viral domine o feed. */
+const ENGAGEMENT_LIKE_WEIGHT = 2.5
+const ENGAGEMENT_LIKE_MAX_BOOST = 10
 const ENGAGEMENT_NEW_DAYS = 14
 const ENGAGEMENT_NEW_MAX_BOOST = 1.5
+const STORE_FAVORITE_WEIGHT = 1.2
+const STORE_FAVORITE_MAX_BOOST = 3
+const STORE_LIKES_WEIGHT = 1.2
+const STORE_LIKES_MAX_BOOST = 3
 
-/** Peso de exibição: curtidas valem mais que o bônus de produto novo. */
+function logEngagementBoost(count, weight, maxBoost) {
+  return Math.min(maxBoost, Math.log1p(Math.max(0, count)) * weight)
+}
+
+/** Total exibido de curtidas: orgânicas + ajuste manual do admin. */
+export function computeProductLikesCount(organicCount, likesAdjustment = 0) {
+  return Math.max(0, (organicCount ?? 0) + (likesAdjustment ?? 0))
+}
+
+/** Bônus de ranking para lojas com favoritos recebidos e curtidas no catálogo. */
+export function getStoreEngagementBoost(store = {}) {
+  const favorites = Math.max(0, store.favorites_count ?? store.favoritesCount ?? 0)
+  const likes = Math.max(0, store.likes_count ?? store.likesCount ?? 0)
+  return (
+    logEngagementBoost(favorites, STORE_FAVORITE_WEIGHT, STORE_FAVORITE_MAX_BOOST)
+    + logEngagementBoost(likes, STORE_LIKES_WEIGHT, STORE_LIKES_MAX_BOOST)
+  )
+}
+
+/** Peso de exibição: curtidas (log) + bônus de produto novo. */
 export function getProductEngagementWeight(product, now = Date.now()) {
-  const likes = product.likes_count ?? 0
+  const likes = Math.max(0, product.likes_count ?? 0)
+  const likeBoost = Math.min(
+    ENGAGEMENT_LIKE_MAX_BOOST,
+    Math.log1p(likes) * ENGAGEMENT_LIKE_WEIGHT,
+  )
   const ageDays = (now - new Date(product.created_at).getTime()) / (1000 * 60 * 60 * 24)
   let newBoost = 0
   if (ageDays < ENGAGEMENT_NEW_DAYS) {
     newBoost = ENGAGEMENT_NEW_MAX_BOOST * (1 - ageDays / ENGAGEMENT_NEW_DAYS)
   }
-  return 1 + likes * ENGAGEMENT_LIKE_WEIGHT + newBoost
+  return 1 + likeBoost + newBoost
 }
 
 /** Sorteio ponderado — produtos mais curtidos têm maior chance de aparecer primeiro. */

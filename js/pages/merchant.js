@@ -20,8 +20,10 @@ import {
   countProductsWithImages, canAddProductImage, canCreateProduct,
   planProductImageLimitMessage, planProductLimitMessage,
   formatProductLimitHint, formatProductImageLimitHint,
-  planAllowsStoreAds, canCreateStoreAd, countStoreAdsThisMonth,
-  formatStoreAdLimitHint, getPlanMonthlyAdLimit,
+  planAllowsStoreAds, canCreateIncludedStoreAd, canCreateExtraStoreAd,
+  countIncludedStoreAdsThisMonth, isExtraStoreAdSlot,
+  formatStoreAdLimitHint, formatStoreAdExtraFeeHint, getPlanMonthlyAdLimit,
+  STORE_AD_EXTRA_FEE, STORE_AD_DURATION_HOURS, buildExtraAdPaymentUrl,
   getPlanById, formatPlanPrice,
   getPriceCooldownRemaining, formatPriceCooldownRemaining,
   getPlanPriceCooldownHours,
@@ -283,17 +285,17 @@ function renderRecentOrders(orders) {
   }
 
   return `
-    <div class="table-wrap admin-orders-table">
+    <div class="table-wrap admin-orders-table admin-table--stack">
       <table>
         <thead><tr><th>${t('common.date')}</th><th>${t('common.customer')}</th><th>${t('common.payment')}</th><th>${t('common.total')}</th><th>${t('labels.status')}</th></tr></thead>
         <tbody>
           ${orders.slice(0, 5).map((o) => `
             <tr>
-              <td>${formatDate(o.created_at)}</td>
-              <td>${escapeHtml(o.customer_name)}</td>
-              <td>${escapeHtml(o.payment_method ? getPaymentMethodLabel(o.payment_method) : t('app.dashPlaceholder'))}</td>
-              <td>${formatCurrency(o.total)}</td>
-              <td>${orderStatusBadge(o.status)}</td>
+              <td data-label="${escapeHtml(t('common.date'))}">${formatDate(o.created_at)}</td>
+              <td class="admin-table__primary" data-label="">${escapeHtml(o.customer_name)}</td>
+              <td data-label="${escapeHtml(t('common.payment'))}">${escapeHtml(o.payment_method ? getPaymentMethodLabel(o.payment_method) : t('app.dashPlaceholder'))}</td>
+              <td data-label="${escapeHtml(t('common.total'))}">${formatCurrency(o.total)}</td>
+              <td data-label="${escapeHtml(t('labels.status'))}">${orderStatusBadge(o.status)}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -360,7 +362,7 @@ function renderAdsSummary(ads, store) {
   const pending = ads.filter((a) => a.status === 'pending').length
   const planId = store?.plan_id ?? 'free'
   const premiumHint = planAllowsStoreAds(planId)
-    ? `<p class="form-hint">${escapeHtml(formatStoreAdLimitHint(planId, countStoreAdsThisMonth(ads)))}</p>`
+    ? `<p class="form-hint">${escapeHtml(formatStoreAdLimitHint(planId, countIncludedStoreAdsThisMonth(ads)))}</p>`
     : `<p class="form-hint form-hint--info">${escapeHtml(t('merchant.adsPremiumRequired'))}</p>`
 
   return `
@@ -381,11 +383,13 @@ function renderAdsSummary(ads, store) {
     </section>`
 }
 
-/** Formulário de novo anúncio ou bloqueios (aprovação, plano, limite 2/mês). */
+/** Formulário de novo anúncio ou bloqueios (aprovação, plano, limite incluso / extra). */
 function merchantAdsCreatePanel(store, ads) {
   const planId = store.plan_id ?? 'free'
   const approved = store.status === 'approved' && ['active', 'trialing'].includes(store.subscription_status)
-  const adsThisMonth = countStoreAdsThisMonth(ads)
+  const includedThisMonth = countIncludedStoreAdsThisMonth(ads)
+  const extraSlot = isExtraStoreAdSlot(planId, includedThisMonth)
+  const canCreate = canCreateIncludedStoreAd(planId, includedThisMonth) || (extraSlot && canCreateExtraStoreAd(planId))
 
   if (!approved) {
     return `<div class="alert alert-error" style="margin-bottom:1rem">${t('merchant.adsApprovalRequired')}</div>`
@@ -395,9 +399,28 @@ function merchantAdsCreatePanel(store, ads) {
       <div class="alert alert-info" style="margin-bottom:1rem">${t('merchant.adsPremiumRequired')}</div>
       <p style="margin-bottom:1rem"><a href="${merchantHref('planos')}" class="btn btn-outline btn-sm">${t('merchant.viewPlansUpgrade')}</a></p>`
   }
-  if (!canCreateStoreAd(planId, adsThisMonth)) {
+  if (!canCreate) {
     return `<div class="alert alert-info" style="margin-bottom:1rem">${escapeHtml(t('errors.storeAdsMonthlyLimit', { limit: getPlanMonthlyAdLimit(planId) }))}</div>`
   }
+
+  const extraFeeBlock = extraSlot ? `
+    <div class="alert alert-info admin-form-grid__full" style="margin:0">
+      <p>${escapeHtml(t('merchant.extraAdFeeNote', {
+        limit: getPlanMonthlyAdLimit(planId),
+        fee: formatCurrency(STORE_AD_EXTRA_FEE),
+        hours: STORE_AD_DURATION_HOURS,
+      }))}</p>
+      <p class="form-hint" style="margin-top:0.5rem">${escapeHtml(formatStoreAdExtraFeeHint())}</p>
+    </div>
+    <label class="admin-check admin-form-grid__full">
+      <input type="checkbox" name="fee_acknowledged" required />
+      <span>${escapeHtml(t('merchant.extraAdFeeAck', { fee: formatCurrency(STORE_AD_EXTRA_FEE) }))}</span>
+    </label>
+    <div class="admin-form-grid__full">
+      <a href="${buildExtraAdPaymentUrl()}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" data-extra-ad-receipt>
+        ${escapeHtml(t('merchant.extraAdSendReceipt', { fee: formatCurrency(STORE_AD_EXTRA_FEE) }))}
+      </a>
+    </div>` : ''
 
   return `
     <details class="admin-form-panel" open>
@@ -419,12 +442,14 @@ function merchantAdsCreatePanel(store, ads) {
             <small class="form-hint">${PRODUCT_IMAGE_UPLOAD_HINT}</small>
           </div>
         </div>
+        ${extraFeeBlock}
         <div class="admin-form-grid__full">
           <button type="submit" class="btn btn-primary btn-sm">${t('merchant.createAd')}</button>
         </div>
       </form>
       <p class="form-hint" style="margin-top:0.75rem">${t('merchant.adsApprovalNote')}</p>
-      <p class="form-hint">${escapeHtml(formatStoreAdLimitHint(planId, adsThisMonth))}</p>
+      <p class="form-hint">${escapeHtml(formatStoreAdLimitHint(planId, includedThisMonth))}</p>
+      ${extraSlot ? `<p class="form-hint">${escapeHtml(formatStoreAdExtraFeeHint())}</p>` : ''}
     </details>`
 }
 
@@ -491,17 +516,17 @@ function renderProductTableRows(products, categories, store) {
         data-product-stock="${isService(p) ? '' : (p.stock ?? 0)}"
         data-product-active="${p.active ? '1' : '0'}"
       >
-        <td>
+        <td class="admin-table__primary" data-label="">
           <div class="admin-table-thumb">
             ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : `<span>${getCatalogItemIcon(p)}</span>`}
           </div>
           <strong>${escapeHtml(p.name)}</strong>
           <br><small class="form-hint">${escapeHtml(getCatalogItemLabel(p))}${isUsedProduct(p) ? ` · ${t('catalog.used')}` : ''}</small>
         </td>
-        <td>${formatCurrency(p.price)}</td>
-        <td>${isService(p) ? t('app.dashPlaceholder') : ((p.stock ?? 0) <= LOW_STOCK_THRESHOLD ? `<span class="badge badge-pending">${p.stock}</span>` : p.stock)}</td>
-        <td>${p.active ? `<span class="badge badge-approved">${t('common.active')}</span>` : `<span class="badge badge-blocked">${t('common.inactive')}</span>`}</td>
-        <td style="white-space:nowrap">
+        <td data-label="${escapeHtml(t('common.price'))}">${formatCurrency(p.price)}</td>
+        <td data-label="${escapeHtml(t('common.stock'))}">${isService(p) ? t('app.dashPlaceholder') : ((p.stock ?? 0) <= LOW_STOCK_THRESHOLD ? `<span class="badge badge-pending">${p.stock}</span>` : p.stock)}</td>
+        <td data-label="${escapeHtml(t('labels.status'))}">${p.active ? `<span class="badge badge-approved">${t('common.active')}</span>` : `<span class="badge badge-blocked">${t('common.inactive')}</span>`}</td>
+        <td class="admin-table__actions" data-label="">
           <button type="button" class="btn btn-outline btn-sm" data-edit-product="${p.id}">${t('labels.edit')}</button>
           <button type="button" class="btn btn-outline btn-sm" data-del-product="${p.id}">${t('labels.delete')}</button>
         </td>
@@ -571,13 +596,13 @@ function renderOrderRows(orders) {
       data-order-created="${escapeHtml(o.created_at)}"
       data-order-search="${escapeHtml(`${o.customer_name} ${o.customer_phone}`.toLowerCase())}"
     >
-      <td>${formatDate(o.created_at)}</td>
-      <td><strong>${escapeHtml(o.customer_name)}</strong></td>
-      <td>${escapeHtml(o.customer_phone)}</td>
-      <td>${escapeHtml(o.payment_method ? getPaymentMethodLabel(o.payment_method) : t('app.dashPlaceholder'))}</td>
-      <td>${formatCurrency(o.total)}</td>
-      <td>${orderStatusBadge(o.status)}</td>
-      <td style="white-space:nowrap">
+      <td data-label="${escapeHtml(t('common.date'))}">${formatDate(o.created_at)}</td>
+      <td class="admin-table__primary" data-label=""><strong>${escapeHtml(o.customer_name)}</strong></td>
+      <td data-label="${escapeHtml(t('labels.phone'))}">${escapeHtml(o.customer_phone)}</td>
+      <td data-label="${escapeHtml(t('common.payment'))}">${escapeHtml(o.payment_method ? getPaymentMethodLabel(o.payment_method) : t('app.dashPlaceholder'))}</td>
+      <td data-label="${escapeHtml(t('common.total'))}">${formatCurrency(o.total)}</td>
+      <td data-label="${escapeHtml(t('labels.status'))}">${orderStatusBadge(o.status)}</td>
+      <td class="admin-table__actions" data-label="">
         ${o.status === 'sent'
           ? `<button type="button" class="btn btn-outline btn-sm" data-mark-viewed="${escapeHtml(o.id)}">${t('merchant.markAsViewed')}</button>`
           : t('app.dashPlaceholder')}
@@ -593,6 +618,7 @@ function renderStoreAdRows(ads) {
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.375rem">
           <strong>${escapeHtml(ad.title)}</strong>
           ${adStatusBadge(ad.status)}
+          ${ad.is_extra ? `<span class="admin-stat-chip admin-stat-chip--pending">${escapeHtml(t('merchant.adExtraBadge', { fee: formatCurrency(ad.fee_amount || STORE_AD_EXTRA_FEE) }))}</span>` : ''}
         </div>
         <p>${escapeHtml(ad.message)}</p>
         <p class="admin-list-card__meta">
@@ -1043,6 +1069,13 @@ function bindAdForm(main, store) {
   const form = main.querySelector('#ad-form')
   bindImagePreview(form?.querySelector('input[name="image"]'), main.querySelector('[data-preview-ad-create]'))
 
+  const titleInput = form?.querySelector('input[name="title"]')
+  const receiptLink = form?.querySelector('[data-extra-ad-receipt]')
+  titleInput?.addEventListener('input', () => {
+    if (!receiptLink) return
+    receiptLink.href = buildExtraAdPaymentUrl(titleInput.value.trim())
+  })
+
   form?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const f = e.target
@@ -1055,12 +1088,13 @@ function bindAdForm(main, store) {
         const err = validateImageFile(imageFile, STORAGE_BUCKETS.products)
         if (err) throw new Error(err)
       }
-      await createStoreAd(store.id, {
+      const ad = await createStoreAd(store.id, {
         title: f.title.value,
         message: f.message.value,
         image: imageFile,
+        feeAcknowledged: Boolean(f.fee_acknowledged?.checked),
       })
-      showToast(t('merchant.adSentForApproval'))
+      showToast(t('merchant.adCreatedWithId', { id: ad.id }))
       renderMerchantDashboard(main, 'ads')
     } catch (err) {
       msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
@@ -1276,7 +1310,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
                   <button type="button" class="admin-filter-chip" data-filter="0">${t('common.inactivePlural')}</button>
                 </div>
               </div>
-              <div class="table-wrap" id="merchant-products-table">
+              <div class="table-wrap admin-table--stack" id="merchant-products-table">
                 <table>
                   <thead><tr>
                     <th class="admin-table-sortable">
@@ -1375,7 +1409,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
               </div>
               <button type="button" class="btn btn-outline btn-sm" id="merchant-orders-export">${t('common.exportCsv')}</button>
             </div>
-            <div class="table-wrap admin-orders-table" style="margin-top:1rem" id="merchant-orders-table">
+            <div class="table-wrap admin-orders-table admin-table--stack" style="margin-top:1rem" id="merchant-orders-table">
               <table>
                 <thead><tr>
                   <th class="admin-table-sortable">
@@ -1433,9 +1467,12 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
 
   if (tab === 'ads') {
     const ads = await fetchStoreAds(store.id)
-    const canCreate = store.status === 'approved'
+    const includedThisMonth = countIncludedStoreAdsThisMonth(ads)
+    const approved = store.status === 'approved' && ['active', 'trialing'].includes(store.subscription_status)
+    const canCreate = approved
       && planAllowsStoreAds(store.plan_id)
-      && canCreateStoreAd(store.plan_id, countStoreAdsThisMonth(ads))
+      && (canCreateIncludedStoreAd(store.plan_id, includedThisMonth)
+        || (isExtraStoreAdSlot(store.plan_id, includedThisMonth) && canCreateExtraStoreAd(store.plan_id)))
 
     main.innerHTML = merchantPage(
       menuItem.label,

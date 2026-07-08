@@ -5,7 +5,11 @@
   "scripts": {
     "start": "npx --yes serve -l 8080 .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:link": "npx supabase link --project-ref ulpjsxmilumqedkkfuqw",
+    "db:push": "npx supabase db push",
+    "db:push:url": "node tools/db-push.mjs",
+    "db:setup": "powershell -ExecutionPolicy Bypass -File tools/supabase-setup.ps1"
   },
   "devDependencies": {
     "happy-dom": "^20.10.6",
