@@ -218,6 +218,7 @@ img { max-width: 100%; display: block; }
   font-size: 0.875rem;
 }
 
+/* Auto-hide do header no mobile — controlado por js/header-scroll.js */
 @media (max-width: 767px) {
   .header {
     transition: transform 0.25s ease;
@@ -935,6 +936,7 @@ img { max-width: 100%; display: block; }
   transition: max-height 0.25s ease, opacity 0.2s ease;
 }
 
+/* Filtros recolhidos na home — controlado por js/home-filters-scroll.js */
 .home-toolbar__filters--hidden {
   max-height: 0;
   opacity: 0;

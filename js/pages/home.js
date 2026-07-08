@@ -316,7 +316,7 @@ export async function renderHome(main) {
     })
 
     bindFeedEvents()
-    bindHomeFiltersScroll()
+    bindHomeFiltersScroll() // auto-hide bairros/categorias ao rolar — ver home-filters-scroll.js
   }
 
   async function load() {

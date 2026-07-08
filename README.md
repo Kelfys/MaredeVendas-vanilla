@@ -46,6 +46,9 @@ maredevendas-vanilla/
 │   ├── db.js               # Cliente Supabase (CDN ESM)
 │   ├── api.js              # Camada de acesso a dados (erros em errors.*)
 │   ├── feed.js             # Algoritmo do feed da home
+│   ├── home-filters-scroll.js  # Esconde bairros/categorias da home ao rolar
+│   ├── header-scroll.js    # Esconde o cabeçalho no mobile ao rolar
+│   ├── scroll-to-top.js    # Botão flutuante ↑ (topo + atualizar página)
 │   ├── payment.js          # Formas de pagamento no checkout
 │   ├── ui.js               # Header, carrinho, cards e checkout
 │   ├── utils.js            # Formatação, escape HTML, validação de idade
@@ -53,7 +56,7 @@ maredevendas-vanilla/
 │   ├── merchant-nav.js     # Menu do painel do lojista
 │   ├── staff-nav.js        # Menu dos painéis admin e moderador
 │   └── pages/              # Uma página por rota
-├── supabase/migrations/    # Migrations SQL (001 → 033)
+├── supabase/migrations/    # Migrations SQL (001 → 043)
 ├── tests/                  # Testes unitários (Vitest)
 └── .github/workflows/
     └── deploy.yml          # Pipeline de deploy para GitHub Pages
@@ -206,10 +209,24 @@ Botões na UI em `/conta/entrar`, `/conta/criar` e `/lojista/cadastro`. **Requer
 
 ### Navegação (header)
 
-- **Desktop:** `Início · Entrar` (pills no menu; Entrar só para visitantes)
-- **Mobile:** `Início` e `Entrar` no topo do menu hambúrguer (☰)
+- **Desktop:** `Criar loja` e `Entrar` (pills; Entrar só para visitantes)
+- **Mobile:** `Criar loja` e `Entrar` no topo do menu hambúrguer (☰); carrinho 🛒 para clientes logados
 - Logado: **👤 Minha conta** (cliente), painel do lojista/admin/moderador ou sair conforme o papel
 - Painéis admin/moderador/lojista: link **← Voltar ao site** (feed)
+
+### Scroll na interface
+
+Comportamento ao rolar a página (listener `passive` em `window`):
+
+| Recurso | Arquivo | Onde vale | Comportamento |
+|---------|---------|-----------|---------------|
+| **Header mobile** | `js/header-scroll.js` | Telas ≤767px | Cabeçalho some ao rolar para baixo e volta ao rolar para cima; não esconde com menu ☰ aberto |
+| **Filtros da home** | `js/home-filters-scroll.js` | `#/` (bairros + categorias) | Chips somem ao rolar para baixo; a busca permanece fixa |
+| **Botão ↑** | `js/scroll-to-top.js` | Global | Aparece após ~280px; clique sobe ao topo e chama `render()` (atualiza a rota) |
+
+Classes CSS: `.header--scroll-hidden`, `.home-toolbar__filters--hidden`, `.scroll-to-top--visible`.
+
+Inicialização no boot (`app.js`); estados resetados a cada troca de rota (`router.js`).
 
 ---
 
@@ -287,9 +304,11 @@ Bairros demo no Rio (seed na migration): **Copacabana**, **Ipanema**, **Leblon**
 
 ### Marketplace (visitante / cliente)
 
-- Na **home**, chips de bairro filtram lojas, produtos e anúncios
+- Na **home**, chips de bairro filtram lojas, produtos e anúncios (chip **Todos** lista todas as regiões)
 - A escolha fica salva no navegador (`js/neighborhood.js`)
 - Sem bairro selecionado, o primeiro bairro ativo é usado automaticamente
+- Ao rolar o feed, bairros e categorias se recolhem (`home-filters-scroll.js`); no mobile o header também some (`header-scroll.js`)
+- Produtos podem ser marcados como **Usado** no catálogo (`is_used`, migration `043`)
 
 ### Admin
 

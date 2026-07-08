@@ -1,8 +1,15 @@
 /**
- * Botão flutuante para voltar ao topo da página.
+ * Botão flutuante ↑ para voltar ao topo e atualizar a rota atual.
+ *
+ * Visível após `SHOW_AFTER` px de scroll. No clique: `scrollTo(0)` + `render()`
+ * do router (mesmo efeito do botão ↻ nos painéis staff).
+ *
+ * Inicialização: `initScrollToTop()` em `app.js`. Reset em troca de rota:
+ * `resetScrollToTop()` em `router.js`.
  */
 import { t } from './strings.js'
 
+/** Distância mínima de scroll antes de exibir o botão. */
 const SHOW_AFTER = 280
 let button = null
 let bound = false

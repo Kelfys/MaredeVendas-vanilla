@@ -256,6 +256,7 @@ export function renderHeader() {
   document.getElementById('logout-mobile')?.addEventListener('click', doLogout)
 }
 
+/** Fecha menu hambúrguer e dropdowns staff; usado ao rolar (`header-scroll.js`). */
 export function closeMobileMenu() {
   if (!menuOpen && !staffMenuOpen) return
   menuOpen = false

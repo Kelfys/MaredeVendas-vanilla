@@ -129,6 +129,7 @@ export async function render() {
     if (epoch !== renderEpoch) return
     if (typeof cleanup === 'function') currentCleanup = cleanup
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Reseta estados de scroll (filtros da home, botão ↑, header mobile)
     import('./home-filters-scroll.js').then(({ resetHomeFiltersScroll }) => resetHomeFiltersScroll()).catch(() => {})
     import('./scroll-to-top.js').then(({ resetScrollToTop }) => resetScrollToTop()).catch(() => {})
     import('./header-scroll.js').then(({ resetHeaderScroll }) => resetHeaderScroll()).catch(() => {})

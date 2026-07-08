@@ -196,8 +196,8 @@ function boot() {
 
   initHeader()
   initCart()
-  initScrollToTop()
-  initHeaderScroll()
+  initScrollToTop() // botão ↑ — ver js/scroll-to-top.js
+  initHeaderScroll() // auto-hide do header no mobile — ver js/header-scroll.js
   setupAuthListeners()
   initRouter()
   delete window.__MV_INITIAL_ROUTE__

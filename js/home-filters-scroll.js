@@ -1,10 +1,17 @@
 /**
- * Esconde bairros e categorias da home ao rolar o feed para baixo; reaparecem ao rolar para cima.
+ * Auto-hide dos filtros de bairro e categoria na home (`#home-toolbar-filters`).
+ *
+ * Só atua quando a home está montada. A barra de busca permanece fixa; apenas
+ * as chips de bairro/categoria recebem `.home-toolbar__filters--hidden`.
+ *
+ * Ligado em `bindHomeFiltersScroll()` (`home.js` após cada `paint()`).
+ * Reset em troca de rota: `resetHomeFiltersScroll()` em `router.js`.
  */
 let lastScrollY = 0
 let hidden = false
 let bound = false
 
+/** Mesmos limiares de `header-scroll.js` para comportamento consistente. */
 const SCROLL_DELTA = 10
 const TOP_REVEAL = 56
 
