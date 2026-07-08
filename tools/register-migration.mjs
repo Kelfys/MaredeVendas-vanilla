@@ -1,7 +1,4 @@
-/**
- * Executa um arquivo .sql via pg usando DATABASE_URL (.env.local).
- * Uso: node tools/apply-sql.mjs supabase/migrations/044_store_ads_approval_billing.sql
- */
+/** Registra versão aplicada manualmente em supabase_migrations.schema_migrations */
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,34 +26,38 @@ function loadEnvFile(name) {
   return vars
 }
 
-const sqlFile = process.argv[2]
-if (!sqlFile) {
-  console.error('Uso: node tools/apply-sql.mjs <arquivo.sql>')
+const version = process.argv[2]
+const name = process.argv[3]
+if (!version || !name) {
+  console.error('Uso: node tools/register-migration.mjs <versão> <nome>')
   process.exit(1)
 }
 
 const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.local') }
 const dbUrl = env.DATABASE_POOLER_URL || env.DATABASE_URL
-if (!dbUrl || dbUrl.includes('[YOUR-PASSWORD]')) {
+if (!dbUrl) {
   console.error('Defina DATABASE_URL em .env.local')
   process.exit(1)
 }
 
-const sqlPath = resolve(root, sqlFile)
-if (!existsSync(sqlPath)) {
-  console.error(`Arquivo não encontrado: ${sqlPath}`)
-  process.exit(1)
-}
-
-const sql = readFileSync(sqlPath, 'utf8')
 let lastError = null
-
 for (const { label, config } of connectionAttempts(dbUrl)) {
   const client = new pg.Client(config)
   try {
     await client.connect()
-    await client.query(sql)
-    console.log(`Aplicado: ${sqlFile} (${label})`)
+    const existing = await client.query(
+      'SELECT version FROM supabase_migrations.schema_migrations WHERE version = $1',
+      [version],
+    )
+    if (existing.rowCount > 0) {
+      console.log(`Migration ${version} já registrada`)
+      process.exit(0)
+    }
+    await client.query(
+      'INSERT INTO supabase_migrations.schema_migrations(version, name) VALUES ($1, $2)',
+      [version, name],
+    )
+    console.log(`Registrada migration ${version} (${name}) via ${label}`)
     process.exit(0)
   } catch (err) {
     lastError = err
@@ -66,5 +67,6 @@ for (const { label, config } of connectionAttempts(dbUrl)) {
   }
 }
 
-console.error(lastError?.message ?? 'Falha ao aplicar SQL')
+console.error(`Falha ao registrar: ${lastError?.message ?? 'sem conexão'}`)
+console.error('Alternativa: SQL Editor → tools/register-044.sql')
 process.exit(1)
