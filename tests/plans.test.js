@@ -30,6 +30,7 @@ import {
 describe('plan price cooldown', () => {
   it('returns hours per plan', () => {
     expect(getPlanPriceCooldownHours('free')).toBe(24)
+    expect(getPlanPriceCooldownHours('plus')).toBe(12)
     expect(getPlanPriceCooldownHours('premium')).toBeNull()
   })
 
@@ -51,13 +52,13 @@ describe('plan price cooldown', () => {
   })
 
   it('resolves plan by id', () => {
-    expect(getPlanById('starter').name).toBe('Starter')
-    expect(getPlanById('starter').priceMonthly).toBe(2.99)
     expect(getPlanById('plus').name).toBe('Plus')
+    expect(getPlanById('plus').priceMonthly).toBe(2.99)
+    expect(getPlanById('premium').name).toBe('Premium')
   })
 
-  it('lists starter plan features with 6-item catalog', () => {
-    const plan = getPlanById('starter')
+  it('lists plus plan features with 6-item catalog', () => {
+    const plan = getPlanById('plus')
     expect(plan.features).toContain('Até 6 itens (produtos ou serviços)')
     expect(plan.features).toContain('Imagens em até 6 produtos (500 KB cada)')
   })
@@ -71,7 +72,7 @@ describe('plan store images', () => {
 
   it('restricts banner to paid plans', () => {
     expect(planAllowsStoreBanner('free')).toBe(false)
-    expect(planAllowsStoreBanner('starter')).toBe(true)
+    expect(planAllowsStoreBanner('plus')).toBe(true)
     expect(planAllowsStoreBanner('premium')).toBe(true)
   })
 })
@@ -100,7 +101,7 @@ describe('free plan limits', () => {
     expect(planAllowsStoreLogo('free')).toBe(true)
     expect(planAllowsStoreBanner('free')).toBe(false)
     expect(planAllowsProductImages('free')).toBe(false)
-    expect(planAllowsProductImages('starter')).toBe(true)
+    expect(planAllowsProductImages('plus')).toBe(true)
   })
 
   it('allows creating only while under 2 catalog items', () => {
@@ -159,10 +160,8 @@ describe('plan catalog limits', () => {
   it('defines product and image limits per plan', () => {
     expect(getPlanProductLimit('free')).toBe(2)
     expect(getPlanProductImageLimit('free')).toBe(0)
-    expect(getPlanProductLimit('starter')).toBe(6)
-    expect(getPlanProductImageLimit('starter')).toBe(6)
-    expect(getPlanProductLimit('plus')).toBe(30)
-    expect(getPlanProductImageLimit('plus')).toBe(30)
+    expect(getPlanProductLimit('plus')).toBe(6)
+    expect(getPlanProductImageLimit('plus')).toBe(6)
     expect(getPlanProductLimit('premium')).toBe(80)
     expect(getPlanProductImageLimit('premium')).toBe(80)
   })
@@ -177,16 +176,15 @@ describe('plan catalog limits', () => {
   it('blocks new product images at plan cap', () => {
     expect(canAddProductImage('free', 0)).toBe(false)
     expect(canAddProductImage('free', 0, true)).toBe(false)
-    expect(canAddProductImage('starter', 5)).toBe(true)
-    expect(canAddProductImage('starter', 6)).toBe(false)
-    expect(canAddProductImage('starter', 6, true)).toBe(true)
+    expect(canAddProductImage('plus', 5)).toBe(true)
+    expect(canAddProductImage('plus', 6)).toBe(false)
+    expect(canAddProductImage('plus', 6, true)).toBe(true)
   })
 })
 
 describe('premium store ads limits', () => {
   it('allows ads only on premium with monthly cap of 4', () => {
     expect(planAllowsStoreAds('free')).toBe(false)
-    expect(planAllowsStoreAds('starter')).toBe(false)
     expect(planAllowsStoreAds('plus')).toBe(false)
     expect(planAllowsStoreAds('premium')).toBe(true)
     expect(getPlanMonthlyAdLimit('premium')).toBe(4)
@@ -210,8 +208,8 @@ describe('premium store ads limits', () => {
     expect(canCreateStoreAd('plus', 0)).toBe(false)
   })
 
-  it('lists premium ads feature and removes expanded ad from plus', () => {
-    expect(getPlanById('plus').features).not.toContain('Anúncio ampliado na vitrine principal')
+  it('lists premium ads feature on premium only', () => {
+    expect(getPlanById('plus').features).not.toContain('Até 4 anúncios por mês no feed')
     expect(getPlanById('premium').features).toContain('Até 4 anúncios por mês no feed')
   })
 
@@ -224,7 +222,7 @@ describe('premium store ads limits', () => {
 describe('renderSubscriptionPlanCards', () => {
   it('renders public plan buttons', () => {
     const html = renderSubscriptionPlanCards()
-    expect(html).toContain('Enviar comprovante — Starter')
+    expect(html).toContain('Enviar comprovante — Plus')
     expect(html).not.toContain('Seu plano atual')
   })
 
@@ -232,14 +230,14 @@ describe('renderSubscriptionPlanCards', () => {
     const html = renderSubscriptionPlanCards({ infoOnly: true })
     expect(html).not.toContain('Enviar comprovante')
     expect(html).toContain('Incluso na aprovação do cadastro')
-    expect(html).toContain('Starter')
+    expect(html).toContain('Plus')
   })
 
   it('highlights current plan in dashboard mode', () => {
-    const html = renderSubscriptionPlanCards({ currentPlanId: 'starter' })
+    const html = renderSubscriptionPlanCards({ currentPlanId: 'plus' })
     expect(html).toContain('plan-card--current')
     expect(html).toContain('Seu plano atual')
-    expect(html).toContain('Assinar — Plus')
-    expect(html).not.toContain('Assinar — Starter')
+    expect(html).toContain('Assinar — Premium')
+    expect(html).not.toContain('Assinar — Plus')
   })
 })

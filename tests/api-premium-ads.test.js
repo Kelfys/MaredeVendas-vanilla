@@ -63,7 +63,7 @@ describe('createStoreAd plan limits', () => {
 
   it('rejects ads for non-premium plans', async () => {
     vi.doMock('../js/db.js', () => ({
-      requireClient: vi.fn(async () => createMockSupabase({ planId: 'starter' })),
+      requireClient: vi.fn(async () => createMockSupabase({ planId: 'plus' })),
       getSupabase: vi.fn(),
       isSupabaseConfigured: () => true,
     }))

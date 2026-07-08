@@ -1233,7 +1233,7 @@ export async function createPlanChangeRequest(storeId, requestedPlanId, merchant
   if (storeError) throw storeError
   if (store.owner_id !== user.id) throw new Error(t('errors.noPermissionPlanRequest'))
 
-  if (!['free', 'starter', 'plus', 'premium'].includes(requestedPlanId)) {
+  if (!['free', 'plus', 'premium'].includes(requestedPlanId)) {
     throw new Error(t('errors.invalidPlan'))
   }
   if (requestedPlanId === store.plan_id && getPlanById(requestedPlanId).priceMonthly === 0) {

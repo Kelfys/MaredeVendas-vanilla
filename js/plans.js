@@ -41,7 +41,7 @@ export function planAllowsStoreLogo() {
   return true
 }
 
-/** Banner da vitrine — somente planos pagos (starter, plus, premium). */
+/** Banner da vitrine — somente planos pagos (plus, premium). */
 export function planAllowsStoreBanner(planId) {
   return Boolean(planId && planId !== 'free')
 }
@@ -49,7 +49,6 @@ export function planAllowsStoreBanner(planId) {
 /** Anúncios no feed (store_ads): Premium = 4/mês calendário; demais = 0. */
 export const PLAN_MONTHLY_AD_LIMIT = {
   free: 0,
-  starter: 0,
   plus: 0,
   premium: 4,
 }
@@ -101,8 +100,7 @@ export function planAllowsStoreBranding(planId) {
 export const PLAN_LIMITS = {
   // Gratuito: 2 itens publicáveis, sem foto no catálogo
   free: { products: 2, productImages: 0 },
-  starter: { products: 6, productImages: 6 },
-  plus: { products: 30, productImages: 30 },
+  plus: { products: 6, productImages: 6 },
   premium: { products: 80, productImages: 80 },
 }
 
@@ -175,8 +173,7 @@ export function formatProductImageLimitHint(planId, productsWithImages) {
 /** Intervalo mínimo entre mudanças de preço; free = 24 h, premium = sem limite (null). */
 const PLAN_COOLDOWN_HOURS = {
   free: 24,
-  starter: 12,
-  plus: 4,
+  plus: 12,
   premium: null,
 }
 
@@ -199,31 +196,17 @@ const PLAN_CONFIGS = [
     cooldownAfterIndex: 4,
   },
   {
-    id: 'starter',
-    nameKey: 'plans.planStarter',
-    descriptionKey: 'plans.planStarterDesc',
-    priceMonthly: 2.99,
-    priceCooldownHours: PLAN_COOLDOWN_HOURS.starter,
-    featureKeys: [
-      'plans.featureStarterItems6',
-      'plans.featureStarterImages6',
-      'plans.featureCustomBanner',
-      'plans.featureHomeHighlight',
-      'plans.featureToggleProducts',
-    ],
-    cooldownAfterIndex: 3,
-  },
-  {
     id: 'plus',
     nameKey: 'plans.planPlus',
     descriptionKey: 'plans.planPlusDesc',
-    priceMonthly: 15,
+    priceMonthly: 2.99,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.plus,
     featureKeys: [
-      'plans.featurePlusItems30',
-      'plans.featurePlusImagesAll',
+      'plans.featurePlusItems6',
+      'plans.featurePlusImages6',
       'plans.featureCustomBanner',
-      'plans.featureSearchPriority',
+      'plans.featureHomeHighlight',
+      'plans.featureToggleProducts',
     ],
     cooldownAfterIndex: 3,
   },
@@ -268,7 +251,7 @@ export function getPlanById(planId) {
   return SUBSCRIPTION_PLANS.find((p) => p.id === planId) ?? SUBSCRIPTION_PLANS[0]
 }
 
-const PLAN_RANK = { free: 0, starter: 1, plus: 2, premium: 3 }
+const PLAN_RANK = { free: 0, plus: 1, premium: 2 }
 
 function planRank(planId) {
   return PLAN_RANK[planId] ?? 0
@@ -358,8 +341,7 @@ export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode 
 
 const PLAN_FEED_WEIGHT = {
   free: 1,
-  starter: 2,
-  plus: 3,
+  plus: 2,
   premium: 4,
 }
 

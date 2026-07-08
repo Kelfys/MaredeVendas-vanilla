@@ -337,7 +337,7 @@ Em `#/lojista/cadastro`, o lojista escolhe **Bairro / região** antes de enviar.
 
 Limites e regras ficam em **`js/plans.js`** (`PLAN_LIMITS`, `canCreateProduct`, `canAddProductImage`, `planAllowsStoreBanner`). A API (`js/api.js`) e o painel do lojista bloqueiam cadastro/upload além do plano. Textos exibidos ao usuário em `js/strings.js` (seção `plans.*`).
 
-O plano **Gratuito** é ativado após aprovação do cadastro da loja. Planos pagos (Starter, Plus, Premium) são solicitados em **Dashboard → Planos** e confirmados pelo admin após comprovante.
+O plano **Gratuito** é ativado após aprovação do cadastro da loja. Planos pagos (Plus, Premium) são solicitados em **Dashboard → Planos** e confirmados pelo admin após comprovante.
 
 ### Plano Gratuito — limites
 
@@ -359,8 +359,7 @@ Lojistas no Gratuito podem publicar até **dois** produtos ou serviços **sem fo
 | Plano | Itens no catálogo | Produtos com imagem | Banner personalizado | Anúncios no feed | Cooldown de preço |
 |-------|-------------------|---------------------|----------------------|------------------|-------------------|
 | **Gratuito** | 2 | 0 | Não | Não | 24 h |
-| **Starter** | 6 | 6 | Sim | Não | 12 h |
-| **Plus** | 30 | 30 | Sim | Não | 4 h |
+| **Plus** | 6 | 6 | Sim | Não | 12 h |
 | **Premium** | 80 | 80 | Sim | **4/mês** | Sem limite |
 
 Detalhes de preços, destaques no feed e lista completa de benefícios: `#/regras` (seção planos) ou painel **Planos** do lojista.

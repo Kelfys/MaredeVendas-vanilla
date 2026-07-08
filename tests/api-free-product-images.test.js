@@ -160,8 +160,8 @@ describe('api free plan product image blocking', () => {
     expect(uploadImage).not.toHaveBeenCalled()
   })
 
-  it('createProduct allows image upload on starter plan', async () => {
-    const api = await loadApi(createMockSupabase({ planId: 'starter', productCount: 0, catalogProducts: [] }))
+  it('createProduct allows image upload on plus plan', async () => {
+    const api = await loadApi(createMockSupabase({ planId: 'plus', productCount: 0, catalogProducts: [] }))
 
     const created = await api.createProduct('store-1', productForm({ withImage: true }))
 

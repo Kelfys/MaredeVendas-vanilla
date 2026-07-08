@@ -32,7 +32,7 @@ import {
   countProductsWithImages, canAddProductImage, canCreateProduct,
   planProductImageLimitMessage, planProductLimitMessage,
   formatProductLimitHint, formatProductImageLimitHint,
-  getPlanById,
+  getPlanById, SUBSCRIPTION_PLANS,
 } from '../plans.js'
 import {
   PRODUCT_IMAGE_UPLOAD_HINT, STORE_LOGO_UPLOAD_HINT, STORE_BANNER_UPLOAD_HINT,
@@ -1409,10 +1409,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             <div class="form-group">
               <label class="form-label">${t('labels.plan')}</label>
               <select class="form-input" name="plan_id">
-                <option value="free">${t('admin.planFree')}</option>
-                <option value="starter">Starter</option>
-                <option value="plus">Plus</option>
-                <option value="premium">Premium</option>
+                ${SUBSCRIPTION_PLANS.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
               </select>
             </div>
             <div data-branding-wrap class="admin-form-grid__full admin-form-grid">
@@ -1523,7 +1520,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                       <div class="form-group">
                         <label class="form-label">${t('labels.plan')}</label>
                         <select class="form-input" name="plan_id">
-                          ${['free', 'starter', 'plus', 'premium'].map((p) => `<option value="${p}" ${s.plan_id === p ? 'selected' : ''}>${escapeHtml(getPlanById(p).name)}</option>`).join('')}
+                          ${SUBSCRIPTION_PLANS.map((p) => `<option value="${p.id}" ${s.plan_id === p.id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
                         </select>
                       </div>
                       <div class="form-group admin-form-grid__full">
