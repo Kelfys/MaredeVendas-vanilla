@@ -443,12 +443,13 @@ export function buildGenericPaymentUrl() {
   )
 }
 
-function buildExtraAdPaymentMessage(adTitle = '') {
+function buildExtraAdPaymentMessage({ title = '', id = '' } = {}) {
   return [
     t('plans.paymentWhatsappGreeting'),
     '',
     t('plans.extraAdPaymentBody', { fee: formatCurrency(STORE_AD_EXTRA_FEE), hours: STORE_AD_DURATION_HOURS }),
-    adTitle ? t('plans.extraAdPaymentTitle', { title: adTitle }) : '',
+    id ? t('plans.extraAdPaymentId', { id }) : '',
+    title ? t('plans.extraAdPaymentTitle', { title }) : '',
     '',
     t('plans.paymentWhatsappReceipt'),
     '',
@@ -457,6 +458,7 @@ function buildExtraAdPaymentMessage(adTitle = '') {
   ].filter(Boolean).join('\n')
 }
 
-export function buildExtraAdPaymentUrl(adTitle = '') {
-  return buildWhatsAppUrl(PAYMENT_WHATSAPP, buildExtraAdPaymentMessage(adTitle))
+/** URL WhatsApp do comprovante de anúncio extra — id obrigatório para o staff vincular o pagamento. */
+export function buildExtraAdPaymentUrl({ title = '', id = '' } = {}) {
+  return buildWhatsAppUrl(PAYMENT_WHATSAPP, buildExtraAdPaymentMessage({ title, id }))
 }

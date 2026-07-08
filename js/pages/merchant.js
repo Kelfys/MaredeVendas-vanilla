@@ -421,11 +421,7 @@ function merchantAdsCreatePanel(store, ads) {
       <input type="checkbox" name="fee_acknowledged" required />
       <span>${escapeHtml(t('merchant.extraAdFeeAck', { fee: formatCurrency(STORE_AD_EXTRA_FEE) }))}</span>
     </label>
-    <div class="admin-form-grid__full">
-      <a href="${buildExtraAdPaymentUrl()}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" data-extra-ad-receipt>
-        ${escapeHtml(t('merchant.extraAdSendReceipt', { fee: formatCurrency(STORE_AD_EXTRA_FEE) }))}
-      </a>
-    </div>` : ''
+    <p class="form-hint admin-form-grid__full">${escapeHtml(t('merchant.extraAdPayAfterCreate'))}</p>` : ''
 
   return `
     <details class="admin-form-panel" open>
@@ -617,7 +613,9 @@ function renderOrderRows(orders) {
 }
 
 function renderStoreAdRows(ads) {
-  return ads.map((ad) => `
+  return ads.map((ad) => {
+    const needsPayment = ad.is_extra && ad.status === 'pending'
+    return `
     <div class="admin-list-card">
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.375rem">
@@ -627,13 +625,45 @@ function renderStoreAdRows(ads) {
         </div>
         <p>${escapeHtml(ad.message)}</p>
         <p class="admin-list-card__meta">
-          ${t('merchant.adCreatedAt', { date: formatDate(ad.created_at) })}
-          ${ad.expires_at ? t('merchant.adExpiresAt', { date: formatDate(ad.expires_at) }) : ''}
+          ${escapeHtml(t('merchant.adIdLabel', { id: ad.id }))}
+          · ${t('merchant.adCreatedAt', { date: formatDate(ad.created_at) })}
+          ${ad.expires_at ? ` · ${t('merchant.adExpiresAt', { date: formatDate(ad.expires_at) })}` : ''}
         </p>
+        ${needsPayment ? `
+          <div style="margin-top:0.5rem">
+            <a href="${buildExtraAdPaymentUrl({ title: ad.title, id: ad.id })}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+              ${escapeHtml(t('merchant.extraAdSendReceipt', { fee: formatCurrency(ad.fee_amount || STORE_AD_EXTRA_FEE) }))}
+            </a>
+          </div>` : ''}
       </div>
       ${ad.image_url ? `<div class="admin-table-thumb" style="width:3rem;height:3rem;flex-shrink:0"><img src="${escapeHtml(ad.image_url)}" alt="" /></div>` : ''}
-    </div>
-  `).join('')
+    </div>`
+  }).join('')
+}
+
+const EXTRA_AD_PAYMENT_SESSION_KEY = 'merchant-extra-ad-id'
+
+function renderExtraAdPaymentBanner(main, ads) {
+  let adId = null
+  try {
+    adId = sessionStorage.getItem(EXTRA_AD_PAYMENT_SESSION_KEY)
+    sessionStorage.removeItem(EXTRA_AD_PAYMENT_SESSION_KEY)
+  } catch {
+    return
+  }
+  if (!adId) return
+
+  const ad = ads.find((item) => item.id === adId && item.is_extra)
+  const msgEl = main.querySelector('#ad-msg')
+  if (!ad || !msgEl) return
+
+  msgEl.innerHTML = `
+    <div class="alert alert-success" style="margin-bottom:1rem">
+      <p>${escapeHtml(t('merchant.extraAdPaymentBanner', { fee: formatCurrency(ad.fee_amount || STORE_AD_EXTRA_FEE) }))} <code>${escapeHtml(ad.id)}</code></p>
+      <a href="${buildExtraAdPaymentUrl({ title: ad.title, id: ad.id })}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm" style="margin-top:0.5rem">
+        ${escapeHtml(t('merchant.extraAdSendReceipt', { fee: formatCurrency(ad.fee_amount || STORE_AD_EXTRA_FEE) }))}
+      </a>
+    </div>`
 }
 
 /** Configurações → imagem da loja: logo em qualquer plano; banner só se planAllowsStoreBanner. */
@@ -1070,17 +1100,10 @@ function bindSettingsForm(main, store) {
   })
 }
 
-/** Submit do anúncio: envia feeAcknowledged, exibe toast com UUID retornado por createStoreAd. */
+/** Submit do anúncio: extras gravam id em sessionStorage para banner WhatsApp com ID na mensagem. */
 function bindAdForm(main, store) {
   const form = main.querySelector('#ad-form')
   bindImagePreview(form?.querySelector('input[name="image"]'), main.querySelector('[data-preview-ad-create]'))
-
-  const titleInput = form?.querySelector('input[name="title"]')
-  const receiptLink = form?.querySelector('[data-extra-ad-receipt]')
-  titleInput?.addEventListener('input', () => {
-    if (!receiptLink) return
-    receiptLink.href = buildExtraAdPaymentUrl(titleInput.value.trim())
-  })
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault()
@@ -1100,6 +1123,9 @@ function bindAdForm(main, store) {
         image: imageFile,
         feeAcknowledged: Boolean(f.fee_acknowledged?.checked),
       })
+      if (ad.is_extra) {
+        try { sessionStorage.setItem(EXTRA_AD_PAYMENT_SESSION_KEY, ad.id) } catch { /* ignore */ }
+      }
       showToast(t('merchant.adCreatedWithId', { id: ad.id }))
       renderMerchantDashboard(main, 'ads')
     } catch (err) {
@@ -1507,6 +1533,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
     )
 
     if (canCreate) bindAdForm(main, store)
+    renderExtraAdPaymentBanner(main, ads)
     return
   }
 
