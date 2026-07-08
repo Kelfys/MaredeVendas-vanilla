@@ -379,8 +379,11 @@ export async function renderModeratorLogin(main) {
 }
 
 export async function renderMerchantRegister(main) {
-  const { getUser, loadUser } = await import('../state.js')
-  const { signUp, fetchCategories, fetchNeighborhoods, createStore, fetchStoreByOwner } = await import('../api.js')
+  const { getUser, loadUser, setUser } = await import('../state.js')
+  const {
+    signUp, fetchCategories, fetchNeighborhoods, createStore, fetchStoreByOwner,
+    promoteCustomerToMerchant,
+  } = await import('../api.js')
 
   let user = getUser()
   if (!user) {
@@ -415,6 +418,12 @@ export async function renderMerchantRegister(main) {
       }
     })
     return
+  }
+
+  if (user.role === 'customer') {
+    await promoteCustomerToMerchant()
+    user = await loadUser()
+    if (user) setUser(user)
   }
 
   if (user.role !== 'merchant') {

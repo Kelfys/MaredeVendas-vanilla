@@ -23,7 +23,7 @@ function setupMocks() {
   vi.doMock('../js/state.js', () => ({
     getUser: vi.fn(() => customerUser),
     loadUser: vi.fn().mockResolvedValue({ ...customerUser, role: 'merchant' }),
-    setUser: vi.fn(),
+    setUser: vi.fn((user) => { customerUser.role = user.role }),
   }))
   vi.doMock('../js/api.js', () => ({
     promoteCustomerToMerchant,

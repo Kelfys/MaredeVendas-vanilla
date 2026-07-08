@@ -768,7 +768,12 @@ export const STRINGS = {
     "storeAdsPremiumOnly": "Anúncios no feed são exclusivos do plano Premium.",
     "storeAdsMonthlyLimit": "Limite de {limit} anúncios por mês no plano Premium. Aguarde o próximo mês ou entre em contato com o suporte.",
     "storeAdNotPending": "Este anúncio não está mais aguardando aprovação.",
-    "storeAdFeeAckRequired": "Confirme a taxa de {fee} para criar um anúncio extra."
+    "storeAdFeeAckRequired": "Confirme a taxa de {fee} para criar um anúncio extra.",
+    "cannotLikeOwnProduct": "Você não pode curtir produtos da sua própria loja.",
+    "cannotFavoriteOwnStore": "Você não pode favoritar a sua própria loja.",
+    "cannotReportOwnStore": "Você não pode denunciar a sua própria loja.",
+    "cannotReportOwnProduct": "Você não pode denunciar produtos da sua própria loja.",
+    "reportReasonRequired": "Selecione um motivo válido para a denúncia."
   },
   "uploads": {
     "logoHint": "JPG, PNG, WebP ou GIF — máx. 2 MB.",
@@ -914,6 +919,7 @@ export const STRINGS = {
     "paymentWhatsappPlanPlaceholder": "(informar plano)",
     "featureFreeItems2": "Até 2 itens (produtos ou serviços)",
     "featureFreeNoImages": "Sem imagens nos produtos (planos pagos liberam fotos)",
+    "featureFreeOneImage": "1 foto no catálogo (planos pagos liberam mais)",
     "featureStoreLogo": "Logo da loja (foto de perfil)",
     "featureDefaultBanner": "Banner padrão por cor (sem banner personalizado)",
     "featureToggleProducts": "Ativar ou ocultar produtos à venda",
