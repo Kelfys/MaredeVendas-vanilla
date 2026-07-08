@@ -25,6 +25,8 @@ export function getTheme() {
 export function setTheme(theme) {
   localStorage.setItem(THEME_STORAGE_KEY, theme)
   document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light')
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#000000' : '#E1306C')
 }
 
 export function toggleTheme() {
