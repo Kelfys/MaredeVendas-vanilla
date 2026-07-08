@@ -121,6 +121,13 @@ export function normalizeForSearch(value) {
     .trim()
 }
 
+/** Chave de busca para lojas no painel admin (nome, bairro, cidade, lojista). */
+export function buildStoreSearchKey(store) {
+  return normalizeForSearch(
+    `${store.name ?? ''} ${store.neighborhood?.name ?? ''} ${store.city ?? ''} ${store.state ?? ''} ${store.owner?.name ?? ''} ${store.owner?.email ?? ''}`,
+  )
+}
+
 const ENGAGEMENT_LIKE_WEIGHT = 5
 const ENGAGEMENT_NEW_DAYS = 14
 const ENGAGEMENT_NEW_MAX_BOOST = 1.5

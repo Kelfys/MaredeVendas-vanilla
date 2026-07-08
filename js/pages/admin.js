@@ -18,7 +18,7 @@ import { getStaffNeighborhoodScope, formatNeighborhoodLabel } from '../neighborh
 import { getUser, loadUser, setAdminPendingCount } from '../state.js'
 import { navigate } from '../router.js'
 import {
-  escapeHtml, formatDate, formatCurrency, showToast, normalizeForSearch,
+  escapeHtml, formatDate, formatCurrency, showToast, normalizeForSearch, buildStoreSearchKey,
   formatDateTimeCsv, buildCsv, downloadTextFile, validateInstagramHandle,
 } from '../utils.js'
 import { STORE_THEME_COLORS, stringsEditorHref } from '../config.js'
@@ -550,7 +550,7 @@ function bindStoreListFilters(main) {
   let activeNeighborhood = 'all'
 
   const apply = () => {
-    const term = search?.value.trim().toLowerCase() ?? ''
+    const term = normalizeForSearch(search?.value ?? '')
     rows.forEach((row) => {
       const matchesSearch = !term || (row.dataset.storeSearch ?? '').includes(term)
       const matchesStatus = activeFilter === 'all' || row.dataset.storeStatus === activeFilter
@@ -859,12 +859,6 @@ function productCountMap(products) {
   return counts
 }
 
-function buildStoreSearchKey(store) {
-  return normalizeForSearch(
-    `${store.name} ${store.neighborhood?.name ?? ''} ${store.city ?? ''} ${store.state ?? ''} ${store.owner?.name ?? ''}`,
-  )
-}
-
 function productImageLimitHintHtml(store, products, product = null) {
   if (!store) return ''
 
@@ -989,6 +983,7 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'ad
               </span>
             </a>
           `).join('')}
+        <p class="admin-store-products-nav__empty hidden" data-store-search-empty>${t('admin.noStoresSearchMatch')}</p>
       </div>
     </aside>`
 }
@@ -1461,7 +1456,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             <thead><tr><th>${t('common.store')}</th><th>${t('common.neighborhood')}</th><th>${t('admin.merchant')}</th><th>${t('labels.city')}</th><th>${t('labels.status')}</th><th>${t('labels.plan')}</th><th></th></tr></thead>
             <tbody>
               ${stores.length === 0 ? `<tr><td colspan="7">${adminEmptyState('🏪', t('admin.noStoresTitle'), t('admin.noStoresBody'))}</td></tr>` : stores.map((s) => `
-                <tr data-store-row data-store-id="${s.id}" data-store-status="${s.status}" data-store-neighborhood="${s.neighborhood_id ?? ''}" data-store-search="${escapeHtml(`${s.name} ${s.neighborhood?.name ?? ''} ${s.city} ${s.state} ${s.owner?.name ?? ''} ${s.owner?.email ?? ''}`.toLowerCase())}">
+                <tr data-store-row data-store-id="${s.id}" data-store-status="${s.status}" data-store-neighborhood="${s.neighborhood_id ?? ''}" data-store-search="${escapeHtml(buildStoreSearchKey(s))}">
                   <td>
                     <div class="admin-table-thumb">
                       ${s.logo ? `<img src="${escapeHtml(s.logo)}" alt="" />` : '<span>🏪</span>'}
@@ -2112,13 +2107,20 @@ function bindStoreProductsNav(main) {
   const list = main.querySelector('#admin-store-products-list')
   if (!search || !list) return
 
+  const emptyMsg = list.querySelector('[data-store-search-empty]')
+
   const apply = () => {
     const term = normalizeForSearch(search.value)
+    let visibleCount = 0
     list.querySelectorAll('[data-store-nav]').forEach((item) => {
       const haystack = item.dataset.storeSearch ?? ''
       const visible = !term || haystack.includes(term)
       item.classList.toggle('hidden', !visible)
+      if (visible) visibleCount += 1
     })
+    if (emptyMsg) {
+      emptyMsg.classList.toggle('hidden', visibleCount > 0 || !term)
+    }
   }
 
   search.addEventListener('input', apply)

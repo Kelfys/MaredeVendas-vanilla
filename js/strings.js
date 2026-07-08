@@ -554,6 +554,7 @@ export const STRINGS = {
     "saveProduct": "Salvar produto",
     "searchStorePlaceholder": "Buscar loja...",
     "noStoresRegistered": "Nenhuma loja cadastrada",
+    "noStoresSearchMatch": "Nenhuma loja encontrada para esta busca.",
     "productCount": "{count} produto(s)",
     "selectStoreTitle": "Selecione uma loja",
     "selectStoreBody": "Escolha uma loja na lista ao lado para ver os produtos.",
