@@ -379,11 +379,8 @@ export async function renderModeratorLogin(main) {
 }
 
 export async function renderMerchantRegister(main) {
-  const { getUser, loadUser, setUser } = await import('../state.js')
-  const {
-    signUp, fetchCategories, fetchNeighborhoods, createStore, fetchStoreByOwner,
-    promoteCustomerToMerchant,
-  } = await import('../api.js')
+  const { getUser, loadUser } = await import('../state.js')
+  const { signUp, fetchCategories, fetchNeighborhoods, createStore, fetchStoreByOwner } = await import('../api.js')
 
   let user = getUser()
   if (!user) {
@@ -417,24 +414,6 @@ export async function renderMerchantRegister(main) {
         main.querySelector('#auth-error').innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
       }
     })
-    return
-  }
-
-  if (user.role === 'customer') {
-    main.innerHTML = '<div class="loading"><div class="spinner"></div></div>'
-    try {
-      await promoteCustomerToMerchant()
-      const updated = await loadUser()
-      setUser(updated)
-      user = updated ?? getUser()
-    } catch (err) {
-      main.innerHTML = `<div class="empty-state"><h2>${escapeHtml(t('auth.accessDeniedTitle'))}</h2><p>${escapeHtml(err.message ?? t('auth.customerBecomeMerchantError'))}</p></div>`
-      return
-    }
-  }
-
-  if (user.role === 'admin' || user.role === 'moderator') {
-    main.innerHTML = `<div class="empty-state"><h2>${escapeHtml(t('auth.accessDeniedTitle'))}</h2><p>${escapeHtml(t('auth.notMerchantAccount'))}</p></div>`
     return
   }
 
