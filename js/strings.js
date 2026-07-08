@@ -38,7 +38,8 @@ export const STRINGS = {
     "freePlanPrice": "Grátis",
     "perMonth": "/mês",
     "noImage": "Sem imagem",
-    "dashPlaceholder": "—"
+    "dashPlaceholder": "—",
+    "scrollToTop": "Voltar ao topo"
   },
   "nav": {
     "home": "Início",

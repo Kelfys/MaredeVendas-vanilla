@@ -10,6 +10,7 @@ import { registerRoute, initRouter, routeHref, navigate, getCurrentPath, render 
 import { getSupabase } from './db.js'
 import { completeOAuthSignup } from './api.js'
 import { getProductionSiteUrl, isLegacyCustomDomainHost } from './config.js'
+import { initScrollToTop } from './scroll-to-top.js'
 
 const PROTECTED_ROUTE_PREFIXES = ['/dashboard', '/admin', '/moderador']
 
@@ -194,6 +195,7 @@ function boot() {
 
   initHeader()
   initCart()
+  initScrollToTop()
   setupAuthListeners()
   initRouter()
   delete window.__MV_INITIAL_ROUTE__
