@@ -842,7 +842,8 @@ export const STRINGS = {
     "service": "Serviço",
     "type": "Tipo",
     "stock": "Estoque",
-    "onRequest": "Sob consulta"
+    "onRequest": "Sob consulta",
+    "used": "Usado"
   },
   "rules": {
     "title": "Regras da Plataforma",

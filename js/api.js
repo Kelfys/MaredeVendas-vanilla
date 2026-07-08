@@ -817,6 +817,7 @@ export async function createProduct(storeId, form) {
     category_id: form.category_id || null,
     item_type: itemType,
     stock,
+    is_used: itemType === 'service' ? false : Boolean(form.is_used),
     active: form.active ?? true,
     image: imageUrl,
   }).select().single()
@@ -846,7 +847,7 @@ export async function updateProduct(productId, form) {
   }
 
   const updates = {}
-  for (const key of ['name', 'description', 'price', 'category_id', 'active']) {
+  for (const key of ['name', 'description', 'price', 'category_id', 'active', 'is_used']) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
   if (form.category_id === '') updates.category_id = null

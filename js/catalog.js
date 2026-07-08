@@ -54,6 +54,27 @@ export function catalogItemTypeFieldHtml(selected = 'product') {
     </div>`
 }
 
+export function isUsedProduct(item) {
+  return Boolean(item?.is_used)
+}
+
+export function catalogUsedFieldHtml(checked = false) {
+  return `
+    <div class="form-group" data-used-field>
+      <label class="admin-check">
+        <input type="checkbox" name="is_used" ${checked ? 'checked' : ''} />
+        ${t('catalog.used')}
+      </label>
+    </div>`
+}
+
+export function readCatalogUsedFromForm(form) {
+  const checkbox = form.is_used ?? form.querySelector?.('[name="is_used"]')
+  if (!checkbox) return false
+  if (normalizeItemType(form.item_type?.value) === 'service') return false
+  return Boolean(checkbox.checked)
+}
+
 export function catalogStockFieldHtml(value = 0, itemType = 'product') {
   const isSvc = normalizeItemType(itemType) === 'service'
   return `
@@ -68,6 +89,8 @@ export function bindCatalogItemTypeForm(form) {
   const typeSelect = form.querySelector('[name="item_type"]')
   const stockGroup = form.querySelector('[data-stock-field]')
   const stockInput = form.querySelector('[name="stock"]')
+  const usedGroup = form.querySelector('[data-used-field]')
+  const usedInput = form.querySelector('[name="is_used"]')
 
   const toggle = () => {
     const isSvc = normalizeItemType(typeSelect?.value) === 'service'
@@ -76,6 +99,8 @@ export function bindCatalogItemTypeForm(form) {
       stockInput.required = !isSvc
       if (isSvc) stockInput.value = ''
     }
+    if (usedGroup) usedGroup.hidden = isSvc
+    if (usedInput && isSvc) usedInput.checked = false
   }
 
   typeSelect?.addEventListener('change', toggle)

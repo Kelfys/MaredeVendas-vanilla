@@ -40,7 +40,8 @@ import {
 } from '../uploads.js'
 import {
   isService, getCatalogItemIcon, getCatalogItemLabel,
-  catalogItemTypeFieldHtml, catalogStockFieldHtml, bindCatalogItemTypeForm, readCatalogItemForm,
+  catalogItemTypeFieldHtml, catalogStockFieldHtml, catalogUsedFieldHtml,
+  bindCatalogItemTypeForm, readCatalogItemForm, readCatalogUsedFromForm,
 } from '../catalog.js'
 import { t } from '../strings.js'
 import { bindPasswordToggles } from '../password-field.js'
@@ -913,6 +914,7 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
             <input class="form-input" name="price" type="number" step="0.01" min="0" value="${p.price}" required />
           </div>
           ${catalogStockFieldHtml(p.stock ?? 0, p.item_type)}
+          ${catalogUsedFieldHtml(p.is_used)}
           <div class="form-group">
             <label class="form-label">${t('labels.category')}</label>
             <select class="form-input" name="category_id">
@@ -1042,6 +1044,7 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
               <input class="form-input" name="price" type="number" step="0.01" min="0" required />
             </div>
             ${catalogStockFieldHtml(10, 'product')}
+            ${catalogUsedFieldHtml(false)}
             <div class="form-group">
               <label class="form-label">${t('labels.category')}</label>
               <select class="form-input" name="category_id">
@@ -2152,6 +2155,7 @@ function bindProductForm(main, selectedStoreId = null) {
         price: parseFloat(f.price.value),
         item_type: catalogFields.item_type,
         stock: catalogFields.stock,
+        is_used: readCatalogUsedFromForm(f),
         category_id: f.category_id.value,
         active: true,
         image: imageFile,
@@ -2209,6 +2213,7 @@ function bindProductEdits(main, selectedStoreId = null) {
           price: parseFloat(form.price.value),
           item_type: catalogFields.item_type,
           stock: catalogFields.stock,
+          is_used: readCatalogUsedFromForm(form),
           category_id: form.category_id.value,
           active: form.active.value === 'true',
           image: imageFile,

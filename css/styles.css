@@ -1156,6 +1156,28 @@ img { max-width: 100%; display: block; }
   font-size: 1.75rem;
 }
 
+.feed-product-card__used-tag,
+.product-tag--used {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(120 53 15 / 0.92);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+[data-theme='dark'] .feed-product-card__used-tag,
+[data-theme='dark'] .product-tag--used {
+  background: rgb(146 64 14 / 0.95);
+  color: rgb(255 237 213);
+}
+
 .feed-product-card__body {
   flex: 1;
   min-width: 0;

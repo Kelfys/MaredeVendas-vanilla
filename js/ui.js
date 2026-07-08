@@ -10,7 +10,7 @@ import { APP_NAME } from './config.js'
 import { t, deliveryPeriodLabel } from './strings.js'
 import { getStoreThemeColor } from './config.js'
 import { escapeHtml, formatCurrency, formatPhone } from './utils.js'
-import { isCatalogItemAvailable, getCatalogItemIcon, getCatalogItemLabel } from './catalog.js'
+import { isCatalogItemAvailable, getCatalogItemIcon, getCatalogItemLabel, isUsedProduct } from './catalog.js'
 import { getPlanById } from './plans.js'
 import {
   getUser, logout, onAuthChange, toggleTheme, getTheme, getAdminPendingCount,
@@ -324,6 +324,11 @@ export function renderFeedAdCard(ad) {
   `
 }
 
+function renderUsedProductTag(product, className = 'product-tag product-tag--used') {
+  if (!isUsedProduct(product)) return ''
+  return `<span class="${className}">${t('catalog.used')}</span>`
+}
+
 /** Card horizontal de produto no feed da home. */
 export function renderFeedProductCard(product, options = {}) {
   const { badge = 'new' } = options
@@ -350,6 +355,7 @@ export function renderFeedProductCard(product, options = {}) {
           ${product.image
             ? `<img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
             : `<div class="feed-product-card__placeholder">${getCatalogItemIcon(product)}</div>`}
+          ${renderUsedProductTag(product, 'feed-product-card__used-tag')}
           ${oos ? `<span class="product-card__oos">${t('store.unavailable')}</span>` : ''}
         </a>
         <div class="feed-product-card__body">
@@ -393,6 +399,7 @@ export function renderProductCard(product, options = {}) {
           : `<div class="product-card__placeholder">${getCatalogItemIcon(product)}</div>`}
         ${oos ? `<span class="product-card__oos">${t('store.unavailable')}</span>` : ''}
         <span class="product-card__type">${escapeHtml(typeLabel)}</span>
+        ${renderUsedProductTag(product)}
       </div>
       <div class="product-card__body">
         <h3 class="product-card__name">${escapeHtml(product.name)}</h3>

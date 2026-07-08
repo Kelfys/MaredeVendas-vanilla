@@ -36,8 +36,9 @@ import { renderOrdersChart, bindOrdersChart } from '../order-charts.js'
 import { bindPaginatedSortableList } from '../list-utils.js'
 import { routeHref, render } from '../router.js'
 import {
-  isService, getCatalogItemIcon, getCatalogItemLabel,
-  catalogItemTypeFieldHtml, catalogStockFieldHtml, bindCatalogItemTypeForm, readCatalogItemForm,
+  isService, getCatalogItemIcon, getCatalogItemLabel, isUsedProduct,
+  catalogItemTypeFieldHtml, catalogStockFieldHtml, catalogUsedFieldHtml,
+  bindCatalogItemTypeForm, readCatalogItemForm, readCatalogUsedFromForm,
 } from '../catalog.js'
 import {
   getPaymentMethodLabel, PAYMENT_METHODS, normalizeStorePaymentMethods,
@@ -495,7 +496,7 @@ function renderProductTableRows(products, categories, store) {
             ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" />` : `<span>${getCatalogItemIcon(p)}</span>`}
           </div>
           <strong>${escapeHtml(p.name)}</strong>
-          <br><small class="form-hint">${escapeHtml(getCatalogItemLabel(p))}</small>
+          <br><small class="form-hint">${escapeHtml(getCatalogItemLabel(p))}${isUsedProduct(p) ? ` · ${t('catalog.used')}` : ''}</small>
         </td>
         <td>${formatCurrency(p.price)}</td>
         <td>${isService(p) ? t('app.dashPlaceholder') : ((p.stock ?? 0) <= LOW_STOCK_THRESHOLD ? `<span class="badge badge-pending">${p.stock}</span>` : p.stock)}</td>
@@ -519,6 +520,7 @@ function renderProductTableRows(products, categories, store) {
               ${priceCooldownHintHtml(store.plan_id, p)}
             </div>
             ${catalogStockFieldHtml(p.stock ?? 0, p.item_type)}
+            ${catalogUsedFieldHtml(p.is_used)}
             <div class="form-group">
               <label class="form-label">${t('labels.category')}</label>
               <select class="form-input" name="category_id">
@@ -888,6 +890,7 @@ function bindProductEdits(main, store) {
           price: parseFloat(form.price.value),
           item_type: catalogFields.item_type,
           stock: catalogFields.stock,
+          is_used: readCatalogUsedFromForm(form),
           category_id: form.category_id.value,
           active: form.active.value === 'true',
           image: imageFile,
@@ -938,6 +941,7 @@ function bindProductForm(main, store) {
         price: parseFloat(f.price.value),
         item_type: catalogFields.item_type,
         stock: catalogFields.stock,
+        is_used: readCatalogUsedFromForm(f),
         category_id: f.category_id.value,
         active: true,
         image: imageFile,
@@ -1229,6 +1233,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
               <input class="form-input" name="price" type="number" step="0.01" min="0" required />
             </div>
             ${catalogStockFieldHtml(0, 'product')}
+            ${catalogUsedFieldHtml(false)}
             <div class="form-group admin-form-grid__full">
               <label class="form-label">${t('labels.category')}</label>
               <select class="form-input" name="category_id">

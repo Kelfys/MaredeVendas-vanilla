@@ -2,8 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   isService,
   isCatalogItemAvailable,
+  isUsedProduct,
   normalizeItemType,
   readCatalogItemForm,
+  readCatalogUsedFromForm,
 } from '../js/catalog.js'
 
 describe('catalog item types', () => {
@@ -40,5 +42,25 @@ describe('catalog item types', () => {
       stock: { value: '10' },
     }
     expect(readCatalogItemForm(serviceForm)).toEqual({ item_type: 'service', stock: null })
+  })
+
+  it('detects used products', () => {
+    expect(isUsedProduct({ is_used: true })).toBe(true)
+    expect(isUsedProduct({ is_used: false })).toBe(false)
+    expect(isUsedProduct({})).toBe(false)
+  })
+
+  it('reads used flag from form and ignores services', () => {
+    const usedForm = {
+      item_type: { value: 'product' },
+      is_used: { checked: true },
+    }
+    expect(readCatalogUsedFromForm(usedForm)).toBe(true)
+
+    const serviceForm = {
+      item_type: { value: 'service' },
+      is_used: { checked: true },
+    }
+    expect(readCatalogUsedFromForm(serviceForm)).toBe(false)
   })
 })
