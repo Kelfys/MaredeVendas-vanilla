@@ -10,7 +10,6 @@ import { buildHomeFeed } from '../feed.js'
 import { setStore, addItem, getUser } from '../state.js'
 import { normalizeStorePaymentMethods } from '../payment.js'
 import { getSelectedNeighborhoodId, setSelectedNeighborhoodId, formatNeighborhoodLabel } from '../neighborhood.js'
-import { routeHref } from '../router.js'
 import { t } from '../strings.js'
 import { bindHomeFiltersScroll } from '../home-filters-scroll.js'
 
@@ -167,7 +166,6 @@ export async function renderHome(main) {
             ${neighborhoodLabel ? `<p class="home-hero__location">📍 ${escapeHtml(neighborhoodLabel)}</p>` : ''}
             ${neighborhoods.length ? `<p class="home-hero__stats">${escapeHtml(statsText)}</p>` : ''}
           </div>
-          <a href="${routeHref('/lojista/cadastro')}" class="btn btn-outline home-hero__cta">${t('auth.registerMyStore')}</a>
         </div>
       </section>`
   }
