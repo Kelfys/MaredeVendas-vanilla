@@ -30,6 +30,7 @@ export function initScrollToTop() {
 
   button.addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    import('./router.js').then(({ render }) => render()).catch(() => {})
   })
 
   const app = document.getElementById('app')

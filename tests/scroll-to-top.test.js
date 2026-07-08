@@ -61,4 +61,18 @@ describe('scroll to top button', () => {
     resetScrollToTop()
     expect(button.classList.remove).toHaveBeenCalledWith('scroll-to-top--visible')
   })
+
+  it('click scrolls to top and refreshes the current page', async () => {
+    const render = vi.fn()
+    vi.doMock('../js/router.js', () => ({ render }))
+
+    const { initScrollToTop } = await import('../js/scroll-to-top.js')
+    initScrollToTop()
+
+    const clickHandler = button.addEventListener.mock.calls.find(([event]) => event === 'click')?.[1]
+    clickHandler()
+
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+    await vi.waitFor(() => expect(render).toHaveBeenCalled())
+  })
 })
