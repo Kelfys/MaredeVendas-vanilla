@@ -55,6 +55,7 @@ describe('plan price cooldown', () => {
     expect(getPlanById('plus').name).toBe('Plus')
     expect(getPlanById('plus').priceMonthly).toBe(2.99)
     expect(getPlanById('premium').name).toBe('Premium')
+    expect(getPlanById('premium').priceMonthly).toBe(20)
   })
 
   it('lists plus plan features with 6-item catalog', () => {
@@ -162,15 +163,15 @@ describe('plan catalog limits', () => {
     expect(getPlanProductImageLimit('free')).toBe(0)
     expect(getPlanProductLimit('plus')).toBe(6)
     expect(getPlanProductImageLimit('plus')).toBe(6)
-    expect(getPlanProductLimit('premium')).toBe(20)
-    expect(getPlanProductImageLimit('premium')).toBe(20)
+    expect(getPlanProductLimit('premium')).toBe(30)
+    expect(getPlanProductImageLimit('premium')).toBe(30)
   })
 
   it('blocks product creation at plan cap', () => {
     expect(canCreateProduct('free', 1)).toBe(true)
     expect(canCreateProduct('free', 2)).toBe(false)
-    expect(canCreateProduct('premium', 19)).toBe(true)
-    expect(canCreateProduct('premium', 20)).toBe(false)
+    expect(canCreateProduct('premium', 29)).toBe(true)
+    expect(canCreateProduct('premium', 30)).toBe(false)
   })
 
   it('blocks new product images at plan cap', () => {
@@ -210,6 +211,8 @@ describe('premium store ads limits', () => {
 
   it('lists premium ads feature on premium only', () => {
     expect(getPlanById('plus').features).not.toContain('Até 2 anúncios por mês na aba Anúncios')
+    expect(getPlanById('premium').features).toContain('Até 30 itens (produtos ou serviços)')
+    expect(getPlanById('premium').features).toContain('Imagens em todos os produtos (500 KB cada)')
     expect(getPlanById('premium').features).toContain('Até 2 anúncios por mês na aba Anúncios')
     expect(getPlanById('premium').features).toContain('Ativar ou ocultar produtos à venda')
     expect(getPlanById('premium').features).toContain('Rotação de prioridade no feed a cada 24h')

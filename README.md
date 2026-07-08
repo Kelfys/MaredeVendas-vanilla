@@ -360,7 +360,7 @@ Lojistas no Gratuito podem publicar até **dois** produtos ou serviços **sem fo
 |-------|-------------------|---------------------|----------------------|------------------|-------------------|
 | **Gratuito** | 2 | 0 | Não | Não | 24 h |
 | **Plus** | 6 | 6 | Sim | Não | 12 h |
-| **Premium** | 20 | 20 | Sim | **2/mês** | 6 h |
+| **Premium** | 30 | 30 | Sim | **2/mês** | 6 h |
 
 Detalhes de preços, destaques no feed e lista completa de benefícios: `#/regras` (seção planos) ou painel **Planos** do lojista.
 
@@ -374,7 +374,7 @@ Detalhes de preços, destaques no feed e lista completa de benefícios: `#/regra
 | `canCreateProduct(planId, count)` | Teto de itens no catálogo |
 | `canAddProductImage(planId, …)` | Teto de imagens (Gratuito sempre `false`) |
 | `planAllowsStoreAds(planId)` | Anúncios no feed só no Premium |
-| `canCreateStoreAd(planId, adsThisMonth)` | Teto de 4 anúncios/mês no Premium |
+| `canCreateStoreAd(planId, adsThisMonth)` | Teto de 2 anúncios/mês no Premium |
 
 Testes: `tests/plans.test.js`, `tests/api-premium-ads.test.js`.
 

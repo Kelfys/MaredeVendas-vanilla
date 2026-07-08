@@ -101,7 +101,7 @@ export const PLAN_LIMITS = {
   // Gratuito: 2 itens publicáveis, sem foto no catálogo
   free: { products: 2, productImages: 0 },
   plus: { products: 6, productImages: 6 },
-  premium: { products: 20, productImages: 20 },
+  premium: { products: 30, productImages: 30 },
 }
 
 export function getPlanProductLimit(planId) {
@@ -214,11 +214,11 @@ const PLAN_CONFIGS = [
     id: 'premium',
     nameKey: 'plans.planPremium',
     descriptionKey: 'plans.planPremiumDesc',
-    priceMonthly: 10,
+    priceMonthly: 20,
     priceCooldownHours: PLAN_COOLDOWN_HOURS.premium,
     featureKeys: [
-      'plans.featurePremiumItems20',
-      'plans.featurePremiumImages20',
+      'plans.featurePremiumItems30',
+      'plans.featurePlusImagesAll',
       'plans.featureCustomBanner',
       'plans.featureToggleProducts',
       'plans.featurePremiumAds2',
