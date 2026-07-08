@@ -2,6 +2,8 @@
 .vscode/
 scripts/
 node_modules/
+mcps/
+terminals/
 .env
 .env.*
 !.env.example
