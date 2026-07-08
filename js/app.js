@@ -9,6 +9,7 @@ import { initHeader, initCart } from './ui.js'
 import { registerRoute, initRouter, routeHref, navigate, getCurrentPath, render } from './router.js'
 import { getSupabase } from './db.js'
 import { completeOAuthSignup } from './api.js'
+import { getProductionSiteUrl, isLegacyCustomDomainHost } from './config.js'
 
 const PROTECTED_ROUTE_PREFIXES = ['/dashboard', '/admin', '/moderador']
 
@@ -82,6 +83,11 @@ async function handleAuthCallback() {
         sessionStorage.removeItem('oauth-next')
       } catch {
         postAuthRedirect = '/favoritos'
+      }
+      if (isLegacyCustomDomainHost()) {
+        const next = postAuthRedirect?.startsWith('/') ? postAuthRedirect : '/favoritos'
+        window.location.replace(`${getProductionSiteUrl()}#${next}`)
+        return postAuthRedirect
       }
     }
     const clean = new URL(window.location.href)

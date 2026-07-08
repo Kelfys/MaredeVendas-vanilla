@@ -22,7 +22,7 @@
 import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
 import { generateSlug, sanitizeSearch } from './utils.js'
 import { t } from './strings.js'
-import { DEFAULT_THEME_COLOR } from './config.js'
+import { DEFAULT_THEME_COLOR, getProductionSiteUrl, isProductionSiteHost } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import { normalizeItemType } from './catalog.js'
 import {
@@ -210,10 +210,12 @@ export async function updatePassword(newPassword) {
 
 /**
  * URL de retorno OAuth/recuperação de senha (hash #/auth/callback).
- * Origin + pathname automáticos — funciona em maredevendas.com.br e github.io/Repo/.
- * Allow-list: supabase/config.toml → site_url e additional_redirect_urls.
+ * Produção sempre usa GitHub Pages, mesmo se o visitante cair em maredevendas.com.br.
  */
 export function getAuthRedirectUrl() {
+  if (isProductionSiteHost()) {
+    return `${getProductionSiteUrl()}#/auth/callback`
+  }
   return `${window.location.origin}${window.location.pathname}#/auth/callback`
 }
 

@@ -18,6 +18,22 @@ export const SUPABASE_ANON_KEY = 'sb_publishable_2hCOD3j1j7FRjLMsPF3sdw_4dG7A_HW
 
 export const APP_NAME = 'MaredeVendas'
 
+/** Produção no GitHub Pages (domínio .br redireciona para aqui). */
+export const PRODUCTION_SITE_ORIGIN = 'https://kelfys.github.io'
+export const PRODUCTION_SITE_PATH = '/MaredeVendas-vanilla/'
+
+export function getProductionSiteUrl() {
+  return `${PRODUCTION_SITE_ORIGIN}${PRODUCTION_SITE_PATH}`
+}
+
+export function isLegacyCustomDomainHost(hostname = window.location.hostname) {
+  return hostname === 'maredevendas.com.br' || hostname === 'www.maredevendas.com.br'
+}
+
+export function isProductionSiteHost(hostname = window.location.hostname) {
+  return hostname === 'kelfys.github.io' || isLegacyCustomDomainHost(hostname)
+}
+
 /**
  * Prefixo de path quando o app não está na raiz do host.
  * Vazio em maredevendas.com.br, localhost e /; preenchido em github.io/Repo/.

@@ -21,6 +21,13 @@
   </script>
   <script>
     (function () {
+      var host = location.hostname
+      if ((host === 'maredevendas.com.br' || host === 'www.maredevendas.com.br')
+        && !(location.search && /[?&]code=/.test(location.search))) {
+        location.replace('https://kelfys.github.io/MaredeVendas-vanilla/' + location.search + location.hash)
+        return
+      }
+
       var match = location.pathname.match(/^(\/[^/]+)/)
       window.__MV_BASE__ = (match && !match[1].includes('.')) ? match[1] + '/' : './'
 
