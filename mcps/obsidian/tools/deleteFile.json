@@ -1,0 +1,19 @@
+{
+  "name": "deleteFile",
+  "description": "Permanently deletes a markdown file from the Obsidian vault. Only .md files can be deleted as a safety guard. Provide a file path ending in .md.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "filePath": {
+        "type": "string",
+        "pattern": "\\.md$",
+        "description": "File path relative to vault root (must end in .md)"
+      }
+    },
+    "required": [
+      "filePath"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

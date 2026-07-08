@@ -1,0 +1,23 @@
+{
+  "name": "moveFile",
+  "description": "Moves or renames a file within the Obsidian vault. Creates destination directories if they don't exist.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "sourcePath": {
+        "type": "string",
+        "description": "Current file path relative to vault root"
+      },
+      "destinationPath": {
+        "type": "string",
+        "description": "New file path relative to vault root"
+      }
+    },
+    "required": [
+      "sourcePath",
+      "destinationPath"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

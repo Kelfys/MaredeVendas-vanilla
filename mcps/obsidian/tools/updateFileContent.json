@@ -1,0 +1,23 @@
+{
+  "name": "updateFileContent",
+  "description": "Updates the content of a specified file in the Obsidian vault with new markdown content. If the file doesn't exist, it will be created. Parent directories are created automatically. Accepts a file path (relative to vault root) and the full new content.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "filePath": {
+        "type": "string",
+        "description": "File path relative to the vault root"
+      },
+      "content": {
+        "type": "string",
+        "description": "Markdown content to write to the file"
+      }
+    },
+    "required": [
+      "filePath",
+      "content"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  }
+}

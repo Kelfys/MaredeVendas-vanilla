@@ -1,0 +1,14 @@
+---
+pid: 3272
+cwd: "C:\Users\pearl\Projetos\javascript\maredevendas-vanilla"
+command: "cd /home/kelfis/Projetos/maredevendas-vanilla && python3 -m http.server 8080"
+started_at: 2026-07-08T15:34:48.130Z
+running_for_ms: 5160000  
+---
+No linha:1 caractere:47
++ cd /home/kelfis/Projetos/maredevendas-vanilla && python3 -m http.serv ...
++                                               ~~
+O token '&&' n�o  um separador de instru�es v�lido nesta vers�o.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : InvalidEndOfLine
+ 

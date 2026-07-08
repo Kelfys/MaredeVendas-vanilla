@@ -1,0 +1,18 @@
+---
+pid: 5260
+cwd: "C:\Users\pearl\Projetos\javascript\maredevendas-vanilla"
+command: "npx --yes serve -l 8080 ."
+started_at: 2026-07-08T15:36:21.704Z
+running_for_ms: 5065004  
+---
+No linha:1 caractere:67
++ ... C:\\Users\\pearl\\Projetos\\javascript\\maredevendas-vanilla" ; npx - ...
++                                                                  ~
+')' de fechamento ausente na express�o.
+No linha:1 caractere:95
++ ... jetos\\javascript\\maredevendas-vanilla" ; npx --yes serve -l 8080 .)
++                                                                         ~
+Token ')' inesperado na express�o ou instru�o.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingEndParenthesisInExpression
+ 
