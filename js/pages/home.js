@@ -12,6 +12,7 @@ import { normalizeStorePaymentMethods } from '../payment.js'
 import { getSelectedNeighborhoodId, setSelectedNeighborhoodId, formatNeighborhoodLabel } from '../neighborhood.js'
 import { routeHref } from '../router.js'
 import { t } from '../strings.js'
+import { bindHomeFiltersScroll } from '../home-filters-scroll.js'
 
 const FEED_PRODUCT_LIMIT = 12
 const FEED_ADS_LIMIT = 12
@@ -173,6 +174,9 @@ export async function renderHome(main) {
 
   function renderToolbar() {
     const searchPlaceholder = activeTab === 'ads' ? t('home.searchAds') : t('home.searchStoresProducts')
+    const showNeighborhoods = neighborhoods.length > 0
+    const showCategories = activeTab === 'feed' && categories.length > 0
+    const showFilters = showNeighborhoods || showCategories
 
     return `
       <div class="home-toolbar toolbar toolbar--sticky">
@@ -188,28 +192,32 @@ export async function renderHome(main) {
               autocomplete="off"
             />
           </label>
-          ${neighborhoods.length ? `
-            <div class="home-toolbar__row">
-              <span class="home-toolbar__label">${t('home.neighborhoodsLabel')}</span>
-              <div class="category-scroll category-scroll--fade neighborhood-scroll" id="neighborhoods">
-                <button type="button" class="chip chip--neighborhood ${!neighborhoodId ? 'active' : ''}" data-neighborhood="">${t('home.allNeighborhoods')}</button>
-                ${neighborhoods.map((n) => `
-                  <button type="button" class="chip chip--neighborhood ${neighborhoodId === n.id ? 'active' : ''}" data-neighborhood="${n.id}">
-                    ${escapeHtml(n.name)}
-                  </button>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-          ${activeTab === 'feed' && categories.length ? `
-            <div class="home-toolbar__row">
-              <span class="home-toolbar__label">${t('home.categoriesLabel')}</span>
-              <div class="category-scroll category-scroll--fade" id="categories">
-                <button type="button" class="chip chip--category ${!categoryId ? 'active' : ''}" data-cat="">${t('home.allCategories')}</button>
-                ${categories.map((c) => `
-                  <button type="button" class="chip chip--category ${categoryId === c.id ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>
-                `).join('')}
-              </div>
+          ${showFilters ? `
+            <div class="home-toolbar__filters" id="home-toolbar-filters">
+              ${showNeighborhoods ? `
+                <div class="home-toolbar__row">
+                  <span class="home-toolbar__label">${t('home.neighborhoodsLabel')}</span>
+                  <div class="category-scroll category-scroll--fade neighborhood-scroll" id="neighborhoods">
+                    <button type="button" class="chip chip--neighborhood ${!neighborhoodId ? 'active' : ''}" data-neighborhood="">${t('home.allNeighborhoods')}</button>
+                    ${neighborhoods.map((n) => `
+                      <button type="button" class="chip chip--neighborhood ${neighborhoodId === n.id ? 'active' : ''}" data-neighborhood="${n.id}">
+                        ${escapeHtml(n.name)}
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+              ${showCategories ? `
+                <div class="home-toolbar__row">
+                  <span class="home-toolbar__label">${t('home.categoriesLabel')}</span>
+                  <div class="category-scroll category-scroll--fade" id="categories">
+                    <button type="button" class="chip chip--category ${!categoryId ? 'active' : ''}" data-cat="">${t('home.allCategories')}</button>
+                    ${categories.map((c) => `
+                      <button type="button" class="chip chip--category ${categoryId === c.id ? 'active' : ''}" data-cat="${c.id}">${escapeHtml(c.name)}</button>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           ` : ''}
         </div>
@@ -310,6 +318,7 @@ export async function renderHome(main) {
     })
 
     bindFeedEvents()
+    bindHomeFiltersScroll()
   }
 
   async function load() {
