@@ -429,7 +429,7 @@ export const STRINGS = {
     "howToSubscribe": "Como assinar ou renovar:",
     "subscribeStep1": "Realize o pagamento do plano escolhido.",
     "subscribeStep2": "Clique em <strong>Solicitar</strong> no card do plano para enviar o pedido ao administrador.",
-    "subscribeStep3": "Use o botão do WhatsApp para enviar o comprovante com o <strong>ID da loja</strong>, o nome da loja e o email cadastrado.",
+    "subscribeStep3": "Use o botão do WhatsApp para enviar o comprovante com o <strong>ID da loja</strong> e o nome da loja.",
     "subscribeStep4": "Após aprovação, o plano é ativado automaticamente na sua conta.",
     "planLimitsQuestion": "Dúvidas sobre limites?",
     "readRules": "Leia as regras",

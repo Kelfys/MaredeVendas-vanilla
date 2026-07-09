@@ -452,7 +452,6 @@ function buildPaymentMessage(planName, planPrice, { storeId = null, storeName = 
     '',
     storeId ? t('plans.paymentWhatsappStoreId', { id: storeId }) : '',
     storeNameLine,
-    t('plans.paymentWhatsappEmail'),
   ].filter(Boolean).join('\n')
 }
 
@@ -485,7 +484,6 @@ function buildExtraAdPaymentMessage({ title = '', id = '' } = {}) {
     t('plans.paymentWhatsappReceipt'),
     '',
     t('plans.paymentWhatsappStoreNameBlank'),
-    t('plans.paymentWhatsappEmail'),
   ].filter(Boolean).join('\n')
 }
 
