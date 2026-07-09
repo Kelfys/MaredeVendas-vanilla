@@ -265,10 +265,12 @@ function renderPlanChangeApprovalCards(requests) {
               <span class="badge badge-pending">${t('labels.plan')}</span>
             </div>
             <dl class="admin-approval-card__details">
+              <div><dt>${t('admin.planChangeStoreId')}</dt><dd><code>${escapeHtml(r.store?.id ?? r.store_id ?? '—')}</code></dd></div>
               <div><dt>${t('admin.merchant')}</dt><dd>${escapeHtml(r.store?.owner?.name ?? '—')}</dd></div>
               <div><dt>${t('labels.email')}</dt><dd>${escapeHtml(r.store?.owner?.email ?? '—')}</dd></div>
               <div><dt>${t('common.neighborhood')}</dt><dd>${escapeHtml(r.store?.neighborhood?.name ?? '—')}</dd></div>
               <div><dt>${t('labels.city')}</dt><dd>${escapeHtml(r.store?.city ?? '—')}, ${escapeHtml(r.store?.state ?? '—')}</dd></div>
+              ${r.merchant_note ? `<div class="admin-approval-card__details--full"><dt>${t('labels.note')}</dt><dd>${escapeHtml(r.merchant_note)}</dd></div>` : ''}
             </dl>
             <div class="admin-approval-card__actions">
               <button type="button" class="btn btn-primary btn-sm" data-approve-plan-request="${r.id}">${t('admin.approvePlan')}</button>

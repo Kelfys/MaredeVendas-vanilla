@@ -799,6 +799,8 @@ async function renderMerchantPlansPanel(store) {
         ${t('merchant.planChangePending', {
           planName: escapeHtml(getPlanById(pendingRequest.requested_plan_id).name),
           date: formatDate(pendingRequest.created_at),
+          storeName: escapeHtml(store.name),
+          storeId: escapeHtml(store.id),
         })}
       </div>`
     : ''
@@ -815,11 +817,12 @@ async function renderMerchantPlansPanel(store) {
         <p class="merchant-plans-current__eyebrow">${t('merchant.activePlan')}</p>
         <h2>${escapeHtml(plan.name)} · ${escapeHtml(formatPlanPrice(plan.priceMonthly))}</h2>
         <p class="form-hint">${t('merchant.storeLabel', { name: escapeHtml(store.name) })}</p>
+        <p class="form-hint">${t('merchant.planStoreId', { storeId: escapeHtml(store.id) })}</p>
         ${expiryHint}
       </div>
       ${store.status === 'approved' ? `<span class="badge badge-approved">${t('merchant.storeApprovedBadge')}</span>` : storeStatusBadge(store.status)}
     </div>
-    <div class="plan-grid">${renderSubscriptionPlanCards({ currentPlanId: store.plan_id, requestMode: true })}</div>
+    <div class="plan-grid">${renderSubscriptionPlanCards({ currentPlanId: store.plan_id, requestMode: true, storeId: store.id, storeName: store.name })}</div>
     <div class="plan-payment-info">
       <p><strong>${t('merchant.howToSubscribe')}</strong></p>
       <ol>
@@ -847,7 +850,7 @@ function bindPlanRequestActions(main, store) {
       btn.textContent = t('common.sending')
       try {
         await createPlanChangeRequest(store.id, planId)
-        showToast(t('merchant.planRequestSent'))
+        showToast(t('merchant.planRequestSent', { storeName: store.name, storeId: store.id }))
         renderMerchantDashboard(main, 'plans')
       } catch (err) {
         showToast(err.message)

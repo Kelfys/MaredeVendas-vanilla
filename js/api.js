@@ -30,7 +30,7 @@ import {
   planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE,
   getPlanProductLimit, getPlanProductImageLimit,
   planProductLimitMessage, planProductImageLimitMessage, canAddProductImage,
-  getPriceCooldownRemaining, formatPriceCooldownRemaining, getPlanById,
+  getPriceCooldownRemaining, formatPriceCooldownRemaining, getPlanById, buildPlanRequestStoreNote,
   planAllowsStoreAds, getPlanMonthlyAdLimit, STORE_AD_DURATION_HOURS, STORE_AD_EXTRA_FEE,
   canCreateIncludedStoreAd, canCreateExtraStoreAd, isExtraStoreAdSlot,
 } from './plans.js'
@@ -1629,7 +1629,7 @@ export async function createPlanChangeRequest(storeId, requestedPlanId, merchant
 
   const { data: store, error: storeError } = await client
     .from('stores')
-    .select('id, plan_id, owner_id')
+    .select('id, name, plan_id, owner_id')
     .eq('id', storeId)
     .single()
   if (storeError) throw storeError
@@ -1650,11 +1650,16 @@ export async function createPlanChangeRequest(storeId, requestedPlanId, merchant
     .maybeSingle()
   if (existing) throw new Error(t('errors.planRequestPending'))
 
+  const storeNote = buildPlanRequestStoreNote({ storeId, storeName: store.name })
+  const note = merchantNote?.trim()
+    ? `${storeNote}\n${note}`
+    : storeNote
+
   const { data, error } = await client.from('plan_change_requests').insert({
     store_id: storeId,
     requested_plan_id: requestedPlanId,
     current_plan_id: store.plan_id,
-    merchant_note: merchantNote?.trim() || null,
+    merchant_note: note,
   }).select().single()
   if (error) throw error
   return data

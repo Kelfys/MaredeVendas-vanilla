@@ -28,6 +28,8 @@ import {
   isExtraStoreAdSlot,
   formatStoreAdLimitHint,
   renderSubscriptionPlanCards,
+  buildPlanPaymentUrl,
+  buildPlanRequestStoreNote,
 } from '../js/plans.js'
 
 describe('plan price cooldown', () => {
@@ -253,5 +255,27 @@ describe('renderSubscriptionPlanCards', () => {
     expect(html).toContain('Seu plano atual')
     expect(html).toContain('Assinar — Premium')
     expect(html).not.toContain('Assinar — Plus')
+  })
+
+  it('includes store id and name in dashboard whatsapp payment link', () => {
+    const plan = getPlanById('plus')
+    const url = buildPlanPaymentUrl(plan, { storeId: 'store-abc-123', storeName: 'Loja Teste' })
+    expect(url).toContain(encodeURIComponent('store-abc-123'))
+    expect(url).toContain(encodeURIComponent('Loja Teste'))
+    const html = renderSubscriptionPlanCards({
+      currentPlanId: 'free',
+      requestMode: true,
+      storeId: 'store-abc-123',
+      storeName: 'Loja Teste',
+    })
+    expect(html).toContain(encodeURIComponent('store-abc-123'))
+    expect(html).toContain(encodeURIComponent('Loja Teste'))
+  })
+
+  it('builds default plan request note with store name and id', () => {
+    expect(buildPlanRequestStoreNote({ storeId: 'store-xyz', storeName: 'Minha Loja' }))
+      .toMatch(/Minha Loja/)
+    expect(buildPlanRequestStoreNote({ storeId: 'store-xyz', storeName: 'Minha Loja' }))
+      .toMatch(/store-xyz/)
   })
 })

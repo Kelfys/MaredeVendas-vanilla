@@ -298,7 +298,8 @@ function planRank(planId) {
   return PLAN_RANK[planId] ?? 0
 }
 
-function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOnly = false } = {}) {
+function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOnly = false, storeId = null, storeName = null } = {}) {
+  const storeContext = { storeId, storeName }
   const isDashboard = Boolean(currentPlanId)
   const isCurrent = currentPlanId === plan.id
 
@@ -309,7 +310,7 @@ function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOn
     return ''
   }
   const whatsappBtn = (label) => `
-    <a href="${buildPlanPaymentUrl(plan)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-block btn-sm">
+    <a href="${buildPlanPaymentUrl(plan, storeContext)}" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-block btn-sm">
       ${label}
     </a>`
 
@@ -324,7 +325,7 @@ function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOn
           <p class="plan-card__note">${escapeHtml(t('plans.yourCurrentPlan'))}</p>`
       }
       return `
-        <a href="${buildPlanPaymentUrl(plan)}" target="_blank" rel="noopener noreferrer" class="btn btn-green btn-block btn-sm">
+        <a href="${buildPlanPaymentUrl(plan, storeContext)}" target="_blank" rel="noopener noreferrer" class="btn btn-green btn-block btn-sm">
           ${escapeHtml(t('plans.renewPlan', { plan: plan.name }))}
         </a>
         <p class="plan-card__note">${escapeHtml(t('plans.yourCurrentPlan'))}</p>`
@@ -341,7 +342,7 @@ function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOn
         ${whatsappBtn(escapeHtml(t('plans.sendReceiptWhatsapp')))}`
     }
     return `
-      <a href="${buildPlanPaymentUrl(plan)}" target="_blank" rel="noopener noreferrer" class="btn btn-green btn-block btn-sm">
+      <a href="${buildPlanPaymentUrl(plan, storeContext)}" target="_blank" rel="noopener noreferrer" class="btn btn-green btn-block btn-sm">
         ${escapeHtml(t('plans.subscribePlan', { plan: plan.name }))}
       </a>`
   }
@@ -360,7 +361,7 @@ function renderPlanCardAction(plan, currentPlanId, { requestMode = false, infoOn
 }
 
 /** Cards de planos para login informativo e painel do lojista. */
-export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode = false, infoOnly = false } = {}) {
+export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode = false, infoOnly = false, storeId = null, storeName = null } = {}) {
   return SUBSCRIPTION_PLANS.map((plan) => {
     const isCurrent = currentPlanId === plan.id
     const highlight = plan.id === 'premium' || isCurrent
@@ -375,7 +376,7 @@ export function renderSubscriptionPlanCards({ currentPlanId = null, requestMode 
       <ul class="plan-card__features">
         ${plan.features.map((f) => `<li>${escapeHtml(f)}</li>`).join('')}
       </ul>
-      ${renderPlanCardAction(plan, currentPlanId, { requestMode, infoOnly })}
+      ${renderPlanCardAction(plan, currentPlanId, { requestMode, infoOnly, storeId, storeName })}
     </article>`
   }).join('')
 }
@@ -418,8 +419,11 @@ export function formatPriceCooldownRemaining(remainingMs) {
   return t('plans.cooldownRemainingMinutes', { minutes })
 }
 
-function buildPaymentMessage(planName, planPrice) {
+function buildPaymentMessage(planName, planPrice, { storeId = null, storeName = null } = {}) {
   const priceSuffix = planPrice ? ` (${planPrice})` : ''
+  const storeNameLine = storeName
+    ? t('plans.paymentWhatsappStoreName', { name: storeName })
+    : t('plans.paymentWhatsappStoreNameBlank')
   return [
     t('plans.paymentWhatsappGreeting'),
     '',
@@ -427,13 +431,21 @@ function buildPaymentMessage(planName, planPrice) {
     '',
     t('plans.paymentWhatsappReceipt'),
     '',
-    t('plans.paymentWhatsappStoreName'),
+    storeId ? t('plans.paymentWhatsappStoreId', { id: storeId }) : '',
+    storeNameLine,
     t('plans.paymentWhatsappEmail'),
-  ].join('\n')
+  ].filter(Boolean).join('\n')
 }
 
-export function buildPlanPaymentUrl(plan) {
-  return buildWhatsAppUrl(PAYMENT_WHATSAPP, buildPaymentMessage(plan.name, formatPlanPrice(plan.priceMonthly)))
+export function buildPlanRequestStoreNote({ storeId, storeName }) {
+  return t('plans.planRequestStoreNote', { storeId, storeName })
+}
+
+export function buildPlanPaymentUrl(plan, { storeId = null, storeName = null } = {}) {
+  return buildWhatsAppUrl(
+    PAYMENT_WHATSAPP,
+    buildPaymentMessage(plan.name, formatPlanPrice(plan.priceMonthly), { storeId, storeName }),
+  )
 }
 
 export function buildGenericPaymentUrl() {
