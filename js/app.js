@@ -167,6 +167,7 @@ function boot() {
   registerRoute('/admin/denuncias', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'reports') }))))
   registerRoute('/admin/bairros', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'neighborhoods') }))))
   registerRoute('/admin/moderadores', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'moderators') }))))
+  registerRoute('/admin/perfis', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'profiles') }))))
   registerRoute('/admin/conta', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderAdminDashboard(main, 'account') }))))
   registerRoute('/moderador', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderModeratorDashboard(main, 'overview') }))))
   registerRoute('/moderador/aprovacoes', lazy(() => import('./pages/admin.js').then((m) => ({ default: (main) => m.renderModeratorDashboard(main, 'approvals') }))))

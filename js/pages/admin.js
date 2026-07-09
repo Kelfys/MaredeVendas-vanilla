@@ -2339,6 +2339,63 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
     return
   }
 
+  if (tab === 'profiles') {
+    if (panel !== 'admin') {
+      main.innerHTML = `<div class="empty-state"><h2>${t('admin.restrictedAccess')}</h2></div>`
+      return
+    }
+
+    const profiles = await fetchAdminProfiles()
+
+    main.innerHTML = adminPage(
+      menuItem.label,
+      t('admin.profilesSubtitle'),
+      `
+        <section class="admin-section">
+          <p class="admin-section__hint">${t('admin.profilesHint')}</p>
+          <div class="admin-filter-bar admin-filter-bar--compact">
+            <input
+              type="search"
+              class="form-input admin-filter-bar__search"
+              id="admin-profiles-search"
+              placeholder="${t('admin.searchProfilesPlaceholder')}"
+              autocomplete="off"
+            />
+            <div class="admin-filter-bar__chips" id="admin-profiles-role-filters">
+              <button type="button" class="chip active" data-profile-role="">${t('common.all')}</button>
+              <button type="button" class="chip" data-profile-role="customer">${t('common.customer')}</button>
+              <button type="button" class="chip" data-profile-role="merchant">${t('admin.merchant')}</button>
+              <button type="button" class="chip" data-profile-role="moderator">${t('admin.roleModerator')}</button>
+            </div>
+          </div>
+          <div class="table-wrap" style="margin-top:1rem">
+            <table>
+              <thead>
+                <tr>
+                  <th>${t('labels.name')}</th>
+                  <th>${t('labels.email')}</th>
+                  <th>${t('common.account')}</th>
+                  <th>${t('common.since')}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="admin-profiles-tbody">
+                ${profiles.length === 0
+                  ? `<tr><td colspan="5">${adminEmptyState('👤', t('admin.noProfilesTitle'), t('admin.noProfilesBody'))}</td></tr>`
+                  : profiles.map((profile) => renderProfileRow(profile, user)).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `,
+      '',
+      panel
+    )
+
+    bindProfilesManagement(main, user)
+    return
+  }
+
   if (tab === 'account') {
     const emailSection = panel === 'admin'
       ? `
@@ -2460,6 +2517,22 @@ function bindStoreForm(main) {
     } finally {
       if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = t('admin.createStore') }
     }
+  })
+}
+
+function bindStoreDeletes(main) {
+  main.querySelectorAll('[data-del-store]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.storeName
+      if (!confirm(t('admin.confirmDeleteStore', { name }))) return
+      try {
+        await deleteStoreAsAdmin(btn.dataset.delStore)
+        showToast(t('admin.storeDeleted'))
+        rerenderStaff(main, 'stores')
+      } catch (err) {
+        showToast(err.message ?? t('admin.storeDeleteError'))
+      }
+    })
   })
 }
 
@@ -2814,6 +2887,81 @@ function bindProductEdits(main, selectedStoreId = null) {
         rerenderStaff(main, 'products', selectedStoreId)
       } catch (err) {
         showToast(err.message ?? t('admin.productDeleteError'))
+      }
+    })
+  })
+}
+
+function profileRoleLabel(role) {
+  const labels = {
+    customer: t('common.customer'),
+    merchant: t('admin.merchant'),
+    moderator: t('admin.roleModerator'),
+    admin: t('admin.roleAdmin'),
+  }
+  return labels[role] ?? role
+}
+
+function renderProfileRow(profile, currentUser) {
+  const canDelete = profile.role !== 'admin' && profile.id !== currentUser?.id
+  const searchKey = `${profile.name} ${profile.email} ${profileRoleLabel(profile.role)}`.toLowerCase()
+
+  return `
+    <tr
+      data-profile-row
+      data-profile-role="${profile.role}"
+      data-profile-search="${escapeHtml(searchKey)}"
+      data-profile-id="${profile.id}"
+    >
+      <td><strong>${escapeHtml(profile.name)}</strong></td>
+      <td>${escapeHtml(profile.email)}</td>
+      <td>${escapeHtml(profileRoleLabel(profile.role))}</td>
+      <td>${formatDate(profile.created_at)}</td>
+      <td style="white-space:nowrap">
+        ${canDelete
+          ? `<button type="button" class="btn btn-outline btn-sm" data-del-profile="${profile.id}" data-profile-name="${escapeHtml(profile.name)}">${t('labels.delete')}</button>`
+          : `<span class="admin-permission-badge admin-permission-badge--muted">${t('admin.profileProtected')}</span>`}
+      </td>
+    </tr>
+  `
+}
+
+function bindProfilesManagement(main, currentUser) {
+  const search = main.querySelector('#admin-profiles-search')
+  const roleButtons = main.querySelectorAll('[data-profile-role]')
+  let activeRole = ''
+
+  const applyFilters = () => {
+    const term = (search?.value ?? '').trim().toLowerCase()
+    main.querySelectorAll('[data-profile-row]').forEach((row) => {
+      const matchesRole = !activeRole || row.dataset.profileRole === activeRole
+      const matchesSearch = !term || (row.dataset.profileSearch ?? '').includes(term)
+      row.hidden = !(matchesRole && matchesSearch)
+    })
+  }
+
+  search?.addEventListener('input', applyFilters)
+  roleButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      activeRole = btn.dataset.profileRole ?? ''
+      roleButtons.forEach((b) => b.classList.toggle('active', b === btn))
+      applyFilters()
+    })
+  })
+
+  main.querySelectorAll('[data-del-profile]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.profileName
+      if (!confirm(t('admin.confirmDeleteProfile', { name }))) return
+      try {
+        await deleteUserProfileAsAdmin(btn.dataset.delProfile)
+        main.querySelector(`[data-profile-id="${btn.dataset.delProfile}"]`)?.remove()
+        showToast(t('admin.profileDeleted'))
+        if (!main.querySelector('[data-profile-row]')) {
+          rerenderStaff(main, 'profiles')
+        }
+      } catch (err) {
+        showToast(err.message ?? t('admin.profileDeleteError'))
       }
     })
   })
