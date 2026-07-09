@@ -15,6 +15,7 @@ import {
   adjustProductLikes, fetchProductComments, addProductComment, deleteProductComment,
   fetchPendingContentReports, reviewContentReport,
   fetchPendingStoreAds, approveStoreAd, rejectStoreAd,
+  fetchStoresNeedingPlanRenewal,
   fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood,
 } from '../api.js'
 import { getReportReasonLabel } from '../report-reasons.js'
@@ -38,6 +39,7 @@ import {
   formatProductLimitHint, formatProductImageLimitHint,
   getPlanById, SUBSCRIPTION_PLANS, STORE_AD_DURATION_HOURS,
 } from '../plans.js'
+import { formatRenewalRemaining } from '../plan-renewal.js'
 import {
   PRODUCT_IMAGE_UPLOAD_HINT, STORE_LOGO_UPLOAD_HINT, STORE_BANNER_UPLOAD_HINT,
   validateImageFile, STORAGE_BUCKETS,
@@ -200,6 +202,45 @@ function renderStoreAdApprovalCards(ads) {
             </div>
           </article>
         `).join('')}
+      </div>
+    </section>`
+}
+
+function renderPlanRenewalAlertCards(rows, panel = 'admin') {
+  if (rows.length === 0) return ''
+
+  const expiredCount = rows.filter(({ renewal }) => renewal.status === 'expired').length
+  const warningCount = rows.length - expiredCount
+
+  return `
+    <section class="admin-section">
+      <div class="admin-section__head">
+        <h2>${t('admin.planRenewalAlertsTitle')}</h2>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          ${expiredCount > 0 ? `<span class="admin-stat-chip admin-stat-chip--blocked">${t('admin.planRenewalExpiredChip', { count: expiredCount })}</span>` : ''}
+          ${warningCount > 0 ? `<span class="admin-stat-chip admin-stat-chip--pending">${t('admin.planRenewalWarningChip', { count: warningCount })}</span>` : ''}
+        </div>
+      </div>
+      <div class="admin-cards-list">
+        ${rows.map(({ store, renewal }) => {
+          const isExpired = renewal.status === 'expired'
+          const remaining = formatRenewalRemaining(renewal.msRemaining)
+          const dateLabel = formatDate(renewal.expiresAt)
+          return `
+            <article class="admin-list-card admin-list-card--highlight">
+              <div class="admin-list-card__main">
+                <strong>${escapeHtml(store.name)}</strong>
+                <p>${isExpired
+                  ? t('admin.planRenewalExpiredCard', { planName: renewal.planName, date: dateLabel })
+                  : t('admin.planRenewalWarningCard', { planName: renewal.planName, remaining, date: dateLabel })}</p>
+                <p class="admin-list-card__meta">${escapeHtml(store.owner?.name ?? t('admin.merchant'))} · ${escapeHtml(store.owner?.email ?? '')} · ${escapeHtml(store.neighborhood?.name ?? '—')}</p>
+                <p class="admin-list-card__meta">${t('admin.planRenewalNoPendingRequest')}</p>
+              </div>
+              <div class="admin-list-card__actions">
+                <a href="${staffHref(panel, 'lojas')}" class="btn btn-outline btn-sm">${t('common.view')}</a>
+              </div>
+            </article>`
+        }).join('')}
       </div>
     </section>`
 }
@@ -1335,20 +1376,22 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
   const productsReadOnly = isReadOnlyStaffTab(panel, 'products')
 
   if (tab === 'overview') {
+    const scopeId = getStaffNeighborhoodScope(user, panel)
     const overviewFetches = [
       fetchAdminMetrics(),
       loadStaffApprovalQueue(user, panel),
-      fetchAllStoresAdmin(getStaffNeighborhoodScope(user, panel)),
+      fetchAllStoresAdmin(scopeId),
       fetchAdminOrdersAnalytics(),
       fetchAdminOrders(5),
+      fetchStoresNeedingPlanRenewal(scopeId),
     ]
     if (panel === 'admin') {
       overviewFetches.push(fetchNeighborhoods({ activeOnly: false }), fetchModerators())
     }
     const overviewResults = await Promise.all(overviewFetches)
-    const [metrics, queue, stores, orderAnalytics, recentOrders] = overviewResults
-    const neighborhoods = panel === 'admin' ? overviewResults[5] : []
-    const moderators = panel === 'admin' ? overviewResults[6] : []
+    const [metrics, queue, stores, orderAnalytics, recentOrders, planRenewalAlerts] = overviewResults
+    const neighborhoods = panel === 'admin' ? overviewResults[6] : []
+    const moderators = panel === 'admin' ? overviewResults[7] : []
     const regionalSummary = panel === 'admin'
       ? summarizeRegionalOverview(neighborhoods, stores, moderators)
       : null
@@ -1394,6 +1437,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
           </div>
           ${storeStatusSummary(stores)}
         </section>
+        ${planRenewalAlerts.length > 0 ? renderPlanRenewalAlertCards(planRenewalAlerts.slice(0, 5), panel) : ''}
         <section class="admin-section">
           <div class="admin-section__head">
             <h2>${t('admin.recentApprovals')}</h2>
@@ -1431,7 +1475,11 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
   }
 
   if (tab === 'approvals') {
-    const { pendingStores: pending, planRequests, pendingAds, pendingTotal } = await loadStaffApprovalQueue(user, panel)
+    const scopeId = getStaffNeighborhoodScope(user, panel)
+    const [{ pendingStores: pending, planRequests, pendingAds, pendingTotal }, planRenewalAlerts] = await Promise.all([
+      loadStaffApprovalQueue(user, panel),
+      fetchStoresNeedingPlanRenewal(scopeId),
+    ])
     setAdminPendingCount(pendingTotal)
     import('../ui.js').then(({ renderHeader }) => renderHeader()).catch(() => {})
 
@@ -1440,9 +1488,10 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
       panel === 'moderator'
         ? `${staffScopeSubtitle(user, panel)} · ${t('admin.pendingIssues', { count: pendingTotal })}`
         : t('admin.pendingAwaitingReview', { count: pendingTotal }),
-      pendingTotal === 0
+      pendingTotal === 0 && planRenewalAlerts.length === 0
         ? adminEmptyState('✅', t('admin.emptyQueueTitle'), t('admin.emptyQueueBody'))
-        : `${renderPlanChangeApprovalCards(planRequests)}
+        : `${renderPlanRenewalAlertCards(planRenewalAlerts, panel)}
+          ${renderPlanChangeApprovalCards(planRequests)}
           ${renderStoreAdApprovalCards(pendingAds)}
           ${pending.length > 0 ? `
             <section class="admin-section">

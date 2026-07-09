@@ -34,6 +34,13 @@ import {
   planAllowsStoreAds, getPlanMonthlyAdLimit, STORE_AD_DURATION_HOURS, STORE_AD_EXTRA_FEE,
   canCreateIncludedStoreAd, canCreateExtraStoreAd, isExtraStoreAdSlot,
 } from './plans.js'
+import {
+  isPaidStorePlan,
+  resolveSubscriptionExpiresAt,
+  getPlanRenewalState,
+  PLAN_RENEWAL_WARNING_HOURS,
+  pickProductIdsToKeepActive,
+} from './plan-renewal.js'
 
 async function countStoreProductsWithImages(client, storeId) {
   const { data, error } = await client
@@ -478,7 +485,9 @@ export async function fetchStores(filters = {}) {
 
   const { data, error } = await query
   if (error) throw error
-  return data ?? []
+  const stores = data ?? []
+  if (!filters.marketplaceVisible) return stores
+  return Promise.all(stores.map((store) => downgradeExpiredStoreToFree(client, store)))
 }
 
 export async function fetchStoreBySlug(slug) {
@@ -490,8 +499,9 @@ export async function fetchStoreBySlug(slug) {
     .single()
   if (error) return null
   if (!data || data.status !== 'approved') return null
-  if (!['active', 'trialing'].includes(data.subscription_status)) return null
-  return data
+  const store = await downgradeExpiredStoreToFree(client, data)
+  if (!['active', 'trialing'].includes(store.subscription_status)) return null
+  return store
 }
 
 export async function fetchStoreByOwner(ownerId) {
@@ -502,7 +512,8 @@ export async function fetchStoreByOwner(ownerId) {
     .eq('owner_id', ownerId)
     .maybeSingle()
   if (error) throw error
-  return data
+  if (!data) return null
+  return downgradeExpiredStoreToFree(client, data)
 }
 
 export async function createStore(ownerId, form) {
@@ -580,10 +591,34 @@ export async function updateStoreAsAdmin(storeId, form) {
   if (form.status !== undefined) {
     if (form.status === 'approved') {
       updates.subscription_status = 'active'
-      const { data: current } = await client.from('stores').select('status').eq('id', storeId).single()
-      if (current?.status !== 'approved') updates.approved_at = new Date().toISOString()
+      const { data: current } = await client.from('stores').select('status, plan_id, subscription_expires_at, approved_at').eq('id', storeId).single()
+      if (current?.status !== 'approved') {
+        const approvedAt = new Date().toISOString()
+        updates.approved_at = approvedAt
+        const planId = form.plan_id ?? current?.plan_id
+        if (isPaidStorePlan(planId) && !current?.subscription_expires_at) {
+          updates.subscription_expires_at = resolveSubscriptionExpiresAt({
+            planId,
+            approvedAt,
+          })
+        }
+      }
     } else if (form.status === 'blocked' || form.status === 'pending') {
       updates.subscription_status = 'inactive'
+    }
+  }
+
+  if (form.plan_id !== undefined) {
+    if (isPaidStorePlan(form.plan_id)) {
+      const { data: current } = await client.from('stores').select('subscription_expires_at, approved_at').eq('id', storeId).single()
+      if (!current?.subscription_expires_at) {
+        updates.subscription_expires_at = resolveSubscriptionExpiresAt({
+          planId: form.plan_id,
+          approvedAt: current?.approved_at,
+        })
+      }
+    } else {
+      updates.subscription_expires_at = null
     }
   }
 
@@ -613,11 +648,13 @@ export async function fetchPendingStoreApprovals(neighborhoodId = null) {
 
 export async function approveStoreRegistration(storeId, planId = 'free') {
   const client = await requireClient()
+  const approvedAt = new Date().toISOString()
   const { error } = await client.from('stores').update({
     status: 'approved',
     plan_id: planId,
     subscription_status: 'active',
-    approved_at: new Date().toISOString(),
+    approved_at: approvedAt,
+    subscription_expires_at: resolveSubscriptionExpiresAt({ planId, approvedAt }),
   }).eq('id', storeId)
   if (error) throw error
 }
@@ -1654,15 +1691,28 @@ export async function approvePlanChangeRequest(requestId, reviewNote = '') {
 
   const { data: req, error: fetchError } = await client
     .from('plan_change_requests')
-    .select('id, store_id, requested_plan_id, status')
+    .select('id, store_id, requested_plan_id, current_plan_id, status')
     .eq('id', requestId)
     .single()
   if (fetchError) throw fetchError
   if (req.status !== 'pending') throw new Error(t('errors.planRequestAlreadyReviewed'))
 
+  const { data: store, error: storeFetchError } = await client
+    .from('stores')
+    .select('subscription_expires_at, approved_at')
+    .eq('id', req.store_id)
+    .single()
+  if (storeFetchError) throw storeFetchError
+
   const { error: storeError } = await client.from('stores').update({
     plan_id: req.requested_plan_id,
     subscription_status: 'active',
+    subscription_expires_at: resolveSubscriptionExpiresAt({
+      planId: req.requested_plan_id,
+      currentExpiresAt: store?.subscription_expires_at,
+      approvedAt: store?.approved_at,
+      isRenewal: req.requested_plan_id === req.current_plan_id,
+    }),
   }).eq('id', req.store_id)
   if (storeError) throw storeError
 
@@ -1673,6 +1723,85 @@ export async function approvePlanChangeRequest(requestId, reviewNote = '') {
     reviewed_at: new Date().toISOString(),
   }).eq('id', requestId)
   if (error) throw error
+}
+
+async function downgradeExpiredStoreToFree(client, store) {
+  const renewal = getPlanRenewalState(store)
+  if (renewal.status !== 'expired' || !isPaidStorePlan(store.plan_id)) return store
+
+  const { data: products, error: productsError } = await client
+    .from('products')
+    .select('id, created_at, active')
+    .eq('store_id', store.id)
+    .order('created_at', { ascending: false })
+  if (productsError) throw productsError
+
+  const keepActiveIds = pickProductIdsToKeepActive(products)
+  const toDeactivate = (products ?? [])
+    .filter((product) => product.active && !keepActiveIds.has(product.id))
+    .map((product) => product.id)
+
+  if (toDeactivate.length > 0) {
+    const { error: deactivateError } = await client
+      .from('products')
+      .update({ active: false })
+      .in('id', toDeactivate)
+    if (deactivateError) throw deactivateError
+  }
+
+  const { data: updated, error } = await client
+    .from('stores')
+    .update({
+      plan_id: 'free',
+      subscription_status: 'active',
+      subscription_expires_at: null,
+    })
+    .eq('id', store.id)
+    .select('*')
+    .single()
+  if (error) throw error
+  return { ...store, ...updated }
+}
+
+export async function fetchStoresNeedingPlanRenewal(neighborhoodId = null) {
+  const client = await requireClient()
+  const now = new Date()
+  const warningCutoff = new Date(now.getTime() + PLAN_RENEWAL_WARNING_HOURS * 60 * 60 * 1000)
+
+  let query = client
+    .from('stores')
+    .select('*, neighborhood:neighborhoods(id, name), owner:users(id, name, email)')
+    .eq('status', 'approved')
+    .in('plan_id', ['plus', 'premium'])
+    .not('subscription_expires_at', 'is', null)
+    .lte('subscription_expires_at', warningCutoff.toISOString())
+    .order('subscription_expires_at', { ascending: true })
+
+  if (neighborhoodId) query = query.eq('neighborhood_id', neighborhoodId)
+
+  const { data, error } = await query
+  if (error) throw error
+
+  const stores = await Promise.all((data ?? []).map((store) => downgradeExpiredStoreToFree(client, store)))
+  const storeIds = stores.map((store) => store.id)
+  if (storeIds.length === 0) return []
+
+  const { data: pendingRequests, error: pendingError } = await client
+    .from('plan_change_requests')
+    .select('store_id')
+    .in('store_id', storeIds)
+    .eq('status', 'pending')
+  if (pendingError) throw pendingError
+
+  const pendingStoreIds = new Set((pendingRequests ?? []).map((row) => row.store_id))
+
+  return stores
+    .filter((store) => !pendingStoreIds.has(store.id))
+    .map((store) => ({
+      store,
+      renewal: getPlanRenewalState(store, now),
+    }))
+    .filter(({ renewal }) => renewal.status === 'warning' || renewal.status === 'expired')
 }
 
 export async function rejectPlanChangeRequest(requestId, reviewNote = '') {
@@ -1771,6 +1900,8 @@ export async function createStoreAsAdmin(form) {
 
   if (!form.neighborhood_id) throw new Error(t('errors.selectStoreNeighborhood'))
 
+  const approvedAt = approved ? new Date().toISOString() : null
+  const planId = form.plan_id ?? 'free'
   const { data, error } = await client.from('stores').insert({
     owner_id: form.owner_id,
     name: form.name,
@@ -1786,9 +1917,10 @@ export async function createStoreAsAdmin(form) {
     instagram: form.instagram || null,
     theme_color: form.theme_color ?? DEFAULT_THEME_COLOR,
     status: approved ? 'approved' : 'pending',
-    plan_id: form.plan_id ?? 'free',
+    plan_id: planId,
     subscription_status: approved ? 'active' : 'inactive',
-    approved_at: approved ? new Date().toISOString() : null,
+    approved_at: approvedAt,
+    subscription_expires_at: approved ? resolveSubscriptionExpiresAt({ planId, approvedAt }) : null,
   }).select('*, category:categories(*), neighborhood:neighborhoods(id, name, slug)').single()
   if (error) throw error
   return data

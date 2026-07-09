@@ -31,6 +31,12 @@ import {
   renderSubscriptionPlanCards,
 } from '../plans.js'
 import {
+  getPlanRenewalState,
+  formatRenewalRemaining,
+  storeNeedsRenewalAttention,
+  storeWasDowngradedToFree,
+} from '../plan-renewal.js'
+import {
   STORE_LOGO_UPLOAD_HINT, STORE_BANNER_UPLOAD_HINT, PRODUCT_IMAGE_UPLOAD_HINT,
   validateImageFile, STORAGE_BUCKETS,
 } from '../uploads.js'
@@ -164,6 +170,46 @@ function storeStatusBanner(store) {
         <p>${escapeHtml(messages[store.status] ?? '')}</p>
       </div>
       ${store.status === 'approved' ? `<a href="${routeHref(`/loja/${store.slug}`)}" class="btn btn-outline btn-sm">${t('merchant.viewPublicStore')}</a>` : ''}
+    </div>`
+}
+
+function planRenewalBanner(store, { pendingRenewal = false } = {}) {
+  if (pendingRenewal || !storeNeedsRenewalAttention(store)) return ''
+
+  const renewal = getPlanRenewalState(store)
+  const isExpired = renewal.status === 'expired'
+  const remaining = formatRenewalRemaining(renewal.msRemaining)
+  const expiresLabel = formatDate(renewal.expiresAt)
+
+  return `
+    <div class="merchant-status-banner merchant-status-banner--${isExpired ? 'blocked' : 'pending'}">
+      <div class="merchant-status-banner__main">
+        <strong>${escapeHtml(isExpired ? t('merchant.planRenewalExpiredTitle') : t('merchant.planRenewalWarningTitle'))}</strong>
+        <p>${isExpired
+          ? t('merchant.planRenewalExpiredBody', {
+            planName: renewal.planName,
+            date: expiresLabel,
+          })
+          : `${t('merchant.planRenewalWarningBody', {
+            planName: renewal.planName,
+            remaining,
+            date: expiresLabel,
+          })} ${t('merchant.planRenewalWarningHint')}`}</p>
+      </div>
+      <a href="${merchantHref('planos')}" class="btn btn-primary btn-sm">${t('merchant.planRenewalCta')}</a>
+    </div>`
+}
+
+function planDowngradeBanner(store, products) {
+  if (!storeWasDowngradedToFree(store, products)) return ''
+
+  return `
+    <div class="merchant-status-banner merchant-status-banner--pending">
+      <div class="merchant-status-banner__main">
+        <strong>${escapeHtml(t('merchant.planDowngradedTitle'))}</strong>
+        <p>${t('merchant.planDowngradedBody')}</p>
+      </div>
+      <a href="${merchantHref('planos')}" class="btn btn-primary btn-sm">${t('merchant.planRenewalCta')}</a>
     </div>`
 }
 
@@ -747,6 +793,7 @@ function merchantBrandingSection(store) {
 async function renderMerchantPlansPanel(store) {
   const plan = getPlanById(store.plan_id)
   const pendingRequest = await fetchStorePendingPlanChangeRequest(store.id)
+  const renewal = getPlanRenewalState(store)
   const pendingBanner = pendingRequest
     ? `<div class="alert alert-info" style="margin-bottom:1rem">
         ${t('merchant.planChangePending', {
@@ -756,13 +803,19 @@ async function renderMerchantPlansPanel(store) {
       </div>`
     : ''
 
+  const expiryHint = renewal.expiresAt && renewal.status !== 'not_applicable'
+    ? `<p class="form-hint">${t('merchant.planExpiresOn', { date: formatDate(renewal.expiresAt) })}</p>`
+    : ''
+
   return `
+    ${planRenewalBanner(store, { pendingRenewal: Boolean(pendingRequest) })}
     ${pendingBanner}
     <div class="merchant-plans-current">
       <div>
         <p class="merchant-plans-current__eyebrow">${t('merchant.activePlan')}</p>
         <h2>${escapeHtml(plan.name)} · ${escapeHtml(formatPlanPrice(plan.priceMonthly))}</h2>
         <p class="form-hint">${t('merchant.storeLabel', { name: escapeHtml(store.name) })}</p>
+        ${expiryHint}
       </div>
       ${store.status === 'approved' ? `<span class="badge badge-approved">${t('merchant.storeApprovedBadge')}</span>` : storeStatusBadge(store.status)}
     </div>
@@ -1256,7 +1309,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
 
   if (tab === 'overview') {
     const [
-      products, orders, orderAnalytics, viewStats, reviews, ads, engagementStats,
+      products, orders, orderAnalytics, viewStats, reviews, ads, engagementStats, pendingPlanRequest,
     ] = await Promise.all([
       fetchMerchantProducts(store.id),
       fetchOrdersByStore(store.id),
@@ -1265,6 +1318,7 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
       fetchReviewsByStore(store.id),
       fetchStoreAds(store.id),
       fetchStoreEngagementStats(store.id),
+      fetchStorePendingPlanChangeRequest(store.id),
     ])
 
     const chartSeries = orderAnalytics.timeline
@@ -1273,6 +1327,8 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
       store.name,
       `
         ${storeStatusBanner(store)}
+        ${planRenewalBanner(store, { pendingRenewal: Boolean(pendingPlanRequest) })}
+        ${planDowngradeBanner(store, products)}
         ${merchantMetrics({ products, orders, store, viewStats, engagementStats })}
         ${renderMerchantEngagementPreview(store, engagementStats)}
         ${merchantQuickActions(store)}

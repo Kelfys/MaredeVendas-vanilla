@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseDatabaseUrl } from './db-connect.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -29,22 +30,46 @@ function loadEnvFile(name) {
 }
 
 const env = { ...loadEnvFile('.env'), ...loadEnvFile('.env.local') }
-const dbUrl = env.DATABASE_URL
+const directUrl = env.DATABASE_URL
 
-if (!dbUrl || dbUrl.includes('[YOUR-PASSWORD]')) {
+if (!directUrl || directUrl.includes('[YOUR-PASSWORD]')) {
   console.error('Defina DATABASE_URL em .env.local com a senha do Postgres.')
   console.error('Dashboard: Settings → Database → Connection string (URI)')
   process.exit(1)
 }
 
+function buildPoolerSessionUrl(raw) {
+  const base = parseDatabaseUrl(raw)
+  const projectRef = base.host.match(/^db\.([^.]+)\.supabase\.co$/)?.[1]
+  if (!projectRef) return null
+  const password = encodeURIComponent(base.password)
+  return `postgresql://${encodeURIComponent(`postgres.${projectRef}`)}:${password}@aws-1-us-west-2.pooler.supabase.com:5432/${base.database}`
+}
+
 const includeAll = process.argv.includes('--include-all')
-const args = ['supabase', 'db', 'push', '--db-url', dbUrl, '--yes']
-if (includeAll) args.push('--include-all')
+const candidates = [
+  env.DATABASE_POOLER_URL,
+  buildPoolerSessionUrl(directUrl),
+  directUrl,
+].filter(Boolean)
 
-const result = spawnSync('npx', args, {
-  cwd: root,
-  stdio: 'inherit',
-  shell: true,
-})
+let lastStatus = 1
+for (const dbUrl of candidates) {
+  const masked = dbUrl.replace(/:([^:@/]+)@/, ':***@')
+  console.log(`Tentando supabase db push (${masked})...`)
+  const args = ['supabase', 'db', 'push', '--db-url', dbUrl, '--yes']
+  if (includeAll) args.push('--include-all')
 
-process.exit(result.status ?? 1)
+  const result = spawnSync('npx', args, {
+    cwd: root,
+    stdio: 'inherit',
+    shell: true,
+  })
+
+  if (result.status === 0) {
+    process.exit(0)
+  }
+  lastStatus = result.status ?? 1
+}
+
+process.exit(lastStatus)

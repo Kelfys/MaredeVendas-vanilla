@@ -1,27 +1,6 @@
 /**
- * Catálogo centralizado de textos da interface (pt-BR).
- *
- * Toda cópia visível ao usuário deve vir daqui via t('secao.chave'), não
- * hardcoded em páginas, api.js, whatsapp.js etc. Exceção: mensagens brutas
- * do Supabase (error.message) quando não há mapeamento em formatAuthError.
- *
- * Convenções de chaves:
- *   app.*          — título, meta, fallbacks globais
- *   nav.*          — menus e header
- *   home|store|cart|checkout|customer|auth.* — fluxos públicos
- *   merchant|admin|moderator.* — painéis staff
- *   errors.*       — validações e erros lançados em api.js / utils.js
- *   plans|rules|whatsapp|uploads|catalog.* — domínios específicos
- *
- * Placeholders: t('cart.itemsCount', { count: 3 }) → "Itens (3)"
- *
- * Helpers: deliveryPeriodLabel(), orderStatusLabel() — valores de enum → texto.
- *
- * Edição visual: strings-editor.html (busca, rascunho localStorage, download
- * de strings.js). Após alterar, commitar js/strings.js — o app lê o módulo
- * em runtime, sem build step.
- *
- * Uso: import { t } from './strings.js'  →  t('nav.home')
+ * Textos estáticos da interface — edite em strings-editor.html
+ * Uso: import { t } from './strings.js?v=3788780'  →  t('nav.home')
  */
 
 export const STRINGS = {
@@ -186,21 +165,7 @@ export const STRINGS = {
     "customersOnlyFavorite": "Apenas clientes podem favoritar lojas.",
     "commentsLoadError": "Erro ao carregar comentários.",
     "likeError": "Não foi possível curtir este produto.",
-    "commentError": "Não foi possível publicar o comentário.",
-    "engagementTitle": "Popularidade",
-    "engagementHint": "Clientes que favoritaram a loja e curtidas nos produtos do catálogo."
-  },
-  "engagement": {
-    "statsAria": "Estatísticas de engajamento",
-    "profileActivity": "Sua atividade",
-    "storeFavoriteOne": "favorito",
-    "storeFavorites": "favoritos",
-    "storeLikeOne": "curtida nos produtos",
-    "storeLikes": "curtidas nos produtos",
-    "customerFavoriteOne": "loja favorita",
-    "customerFavorites": "lojas favoritas",
-    "customerLikeOne": "produto curtido",
-    "customerLikes": "produtos curtidos"
+    "commentError": "Não foi possível publicar o comentário."
   },
   "cart": {
     "title": "Carrinho",
@@ -394,8 +359,6 @@ export const STRINGS = {
     "orderVolume": "Volume de pedidos",
     "views": "Visualizações",
     "viewsThisWeek": " · {count} na semana",
-    "storeFavorites": "Favoritos da loja",
-    "storeLikes": "Curtidas nos produtos",
     "viewPlansCta": "Ver planos",
     "productsTitle": "Produtos",
     "manageCatalog": "Gerenciar catálogo",
@@ -541,7 +504,23 @@ export const STRINGS = {
     "statusApprovedBanner": "Sua loja está ativa no marketplace.",
     "statusBlockedBanner": "Sua loja está bloqueada. Entre em contato com o suporte para mais informações.",
     "planPriceLabel": "{price} · Ver planos",
-    "noAdsTitle": "Nenhum anúncio"
+    "noAdsTitle": "Nenhum anúncio",
+    "planRenewalWarningTitle": "Plano prestes a vencer",
+    "planRenewalWarningBody": "Seu plano {planName} vence em {remaining} ({date}). Renove agora para manter sua loja visível no marketplace.",
+    "planRenewalExpiredTitle": "Plano vencido",
+    "planRenewalExpiredBody": "Seu plano {planName} venceu em {date}. Sem renovação, sua loja volta ao plano Gratuito e apenas os 2 produtos mais recentes permanecem ativos.",
+    "planRenewalWarningHint": "Se o plano não for renovado, sua loja volta ao Gratuito e só os 2 últimos produtos adicionados ficam ativos.",
+    "planDowngradedTitle": "Plano Gratuito reativado",
+    "planDowngradedBody": "Seu plano pago expirou. Você está no plano Gratuito e apenas os 2 produtos mais recentes permanecem ativos no catálogo. Renove para reativar os demais.",
+    "planRenewalCta": "Renovar plano",
+    "planExpiresOn": "Vence em {date}"
+  },
+  "planRenewal": {
+    "expiredNow": "agora",
+    "hoursRemainingOne": "{hours} hora",
+    "hoursRemainingMany": "{hours} horas",
+    "daysRemainingOne": "{days} dia",
+    "daysRemainingMany": "{days} dias"
   },
   "admin": {
     "restrictedAccess": "Acesso restrito",
@@ -562,6 +541,12 @@ export const STRINGS = {
     "moderatorPermissionsUpdated": "Permissões do moderador atualizadas",
     "promoteModerator": "Promover a moderador",
     "regionScope": "Região: {name}",
+    "planRenewalAlertsTitle": "Planos a renovar",
+    "planRenewalExpiredChip": "{count} vencido(s)",
+    "planRenewalWarningChip": "{count} vencendo em breve",
+    "planRenewalExpiredCard": "Plano {planName} vencido em {date} — voltará ao Gratuito (2 produtos ativos)",
+    "planRenewalWarningCard": "Plano {planName} vence em {remaining} ({date})",
+    "planRenewalNoPendingRequest": "Sem pedido de renovação enviado",
     "planChangeRequestsTitle": "Pedidos de mudança de plano",
     "merchant": "Lojista",
     "approvePlan": "Aprovar plano",
@@ -845,8 +830,8 @@ export const STRINGS = {
     "productNotFound": "Produto não encontrado."
   },
   "uploads": {
-    "logoHint": "JPG, PNG, WebP ou GIF — máx. 2 MB.",
-    "bannerHint": "JPG, PNG, WebP ou GIF — planos pagos, máx. 5 MB.",
+    "logoHint": "JPG, PNG, WebP ou GIF — máx. 500 kb.",
+    "bannerHint": "JPG, PNG, WebP ou GIF — planos pagos, máx. 500 kb .",
     "productHint": "JPG, PNG, WebP ou GIF — máx. {maxKb} KB.",
     "invalidImage": "Selecione um arquivo de imagem válido.",
     "unsupportedFormat": "Formato não suportado. Use JPG, PNG, WebP ou GIF.",
@@ -1037,27 +1022,6 @@ export function t(key, vars = {}) {
   return value.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`))
 }
 
-const DELIVERY_PERIOD_KEYS = {
-  manha: 'deliveryPeriod.morning',
-  tarde: 'deliveryPeriod.afternoon',
-  noite: 'deliveryPeriod.evening',
-  madrugada: 'deliveryPeriod.dawn',
-}
-
-export function deliveryPeriodLabel(period) {
-  return t(DELIVERY_PERIOD_KEYS[period] ?? period)
-}
-
-const ORDER_STATUS_KEYS = {
-  pending: 'orderStatus.pending',
-  sent: 'orderStatus.sent',
-  viewed: 'orderStatus.viewed',
-}
-
-export function orderStatusLabel(status) {
-  return t(ORDER_STATUS_KEYS[status] ?? status)
-}
-
 export function flattenStrings(obj = STRINGS, prefix = '') {
   const rows = []
   for (const [key, val] of Object.entries(obj)) {
@@ -1083,52 +1047,4 @@ export function unflattenStrings(rows) {
     node[parts[parts.length - 1]] = value
   }
   return root
-}
-
-const STRINGS_FILE_HEADER = `/**
- * Textos estáticos da interface — edite em strings-editor.html
- * Uso: import { t } from './strings.js'  →  t('nav.home')
- */
-
-`
-
-const STRINGS_FILE_HELPERS = `
-/** Resolve chave pontuada (ex.: nav.home) e substitui {placeholders}. */
-export function t(key, vars = {}) {
-  const value = key.split('.').reduce((obj, part) => obj?.[part], STRINGS)
-  if (typeof value !== 'string') return key
-  return value.replace(/\\{(\\w+)\\}/g, (_, name) => String(vars[name] ?? \`{\${name}}\`))
-}
-
-export function flattenStrings(obj = STRINGS, prefix = '') {
-  const rows = []
-  for (const [key, val] of Object.entries(obj)) {
-    const path = prefix ? \`\${prefix}.\${key}\` : key
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
-      rows.push(...flattenStrings(val, path))
-    } else {
-      rows.push({ key: path, value: String(val ?? '') })
-    }
-  }
-  return rows
-}
-
-export function unflattenStrings(rows) {
-  const root = {}
-  for (const { key, value } of rows) {
-    const parts = key.split('.')
-    let node = root
-    for (let i = 0; i < parts.length - 1; i++) {
-      node[parts[i]] ??= {}
-      node = node[parts[i]]
-    }
-    node[parts[parts.length - 1]] = value
-  }
-  return root
-}
-`
-
-/** Gera o conteúdo completo de strings.js para download. */
-export function serializeStringsModule(strings = STRINGS) {
-  return `${STRINGS_FILE_HEADER}export const STRINGS = ${JSON.stringify(strings, null, 2)}\n${STRINGS_FILE_HELPERS}`
 }
