@@ -1730,6 +1730,7 @@ export async function approvePlanChangeRequest(requestId, reviewNote = '') {
   if (error) throw error
 }
 
+/** Plano pago vencido: volta ao Gratuito, assinatura ativa, só 2 produtos recentes ativos. */
 async function downgradeExpiredStoreToFree(client, store) {
   const renewal = getPlanRenewalState(store)
   if (renewal.status !== 'expired' || !isPaidStorePlan(store.plan_id)) return store

@@ -51,9 +51,13 @@ const { rows } = await client.query(`
       SELECT 1 FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'store_ads' AND column_name = 'is_extra'
     ) AS store_ads_extra,
+    EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'stores' AND column_name = 'subscription_expires_at'
+    ) AS subscription_expires_at,
     (
       SELECT count(*)::int FROM supabase_migrations.schema_migrations
-      WHERE version IN ('041', '042', '043', '044')
+      WHERE version IN ('041', '042', '043', '044', '045', '046')
     ) AS migrations_recent
 `)
 console.log(rows[0])

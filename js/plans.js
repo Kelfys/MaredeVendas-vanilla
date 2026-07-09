@@ -434,6 +434,7 @@ export function formatPriceCooldownRemaining(remainingMs) {
   return t('plans.cooldownRemainingMinutes', { minutes })
 }
 
+/** Mensagem WhatsApp do comprovante de plano — inclui nome e ID da loja quando no painel. */
 function buildPaymentMessage(planName, planPrice, { storeId = null, storeName = null } = {}) {
   const priceSuffix = planPrice ? ` (${planPrice})` : ''
   const normalizedName = storeName?.trim() || null

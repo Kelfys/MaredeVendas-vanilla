@@ -1,5 +1,11 @@
 /**
- * Vencimento e avisos de renovação de planos pagos.
+ * Vencimento e avisos de renovação de planos pagos (Plus/Premium).
+ *
+ * Ciclo: 30 dias (`SUBSCRIPTION_PERIOD_DAYS`). Aviso ao lojista com 72 h de
+ * antecedência (`PLAN_RENEWAL_WARNING_HOURS`). Sem renovação, `api.js` faz
+ * downgrade ao Gratuito e mantém só os 2 produtos mais recentes ativos.
+ *
+ * Migration: `045_store_subscription_expires.sql`, `046_downgrade_expired_plans.sql`
  */
 import { getPlanById, getPlanProductLimit } from './plans.js'
 import { t } from './strings.js'

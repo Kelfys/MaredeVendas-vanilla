@@ -1,5 +1,8 @@
 /**
- * Página inicial — feed "Para você" (lojas, produtos e anúncios patrocinados no mix).
+ * Página inicial — feed único "Para você".
+ *
+ * Lojas, produtos e anúncios patrocinados (Premium) entram no mesmo grid via
+ * `buildHomeFeed()` (`js/feed.js`). Não há aba separada de anúncios — ver commit 320d076.
  *
  * Feed filtrado por bairro/região selecionado (localStorage).
  */

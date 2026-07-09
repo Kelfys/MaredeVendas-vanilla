@@ -10,7 +10,7 @@ Marketplace local de lojas — **HTML, CSS e JavaScript vanilla** com backend [S
 
 | Papel | O que pode fazer |
 |-------|------------------|
-| **Visitante** | Ver feed de lojas e produtos (abas **Para você** e **Anúncios**), buscar, adicionar ao carrinho e pedir pelo WhatsApp |
+| **Visitante** | Ver feed de lojas e produtos (**Para você** — anúncios Premium no mix), buscar, adicionar ao carrinho e pedir pelo WhatsApp |
 | **Cliente** | Dashboard em **Minha conta** (`/favoritos`): favoritos, produtos curtidos, histórico de pedidos e perfil editável; curtir/comentar produtos; checkout com dados pré-preenchidos |
 | **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin); **logo da loja** em qualquer plano; **banner personalizado** só em planos pagos; **anúncios no feed** só no plano **Premium** (2 inclusos/mês; extras **R$ 5** com aprovação staff) |
 | **Moderador** | Aprovações (lojas, planos, **anúncios** e denúncias) e pedidos **do bairro atribuído**; lojas/produtos somente leitura na região |
@@ -45,7 +45,8 @@ maredevendas-vanilla/
 │   ├── config.js           # Credenciais Supabase e constantes
 │   ├── db.js               # Cliente Supabase (CDN ESM)
 │   ├── api.js              # Camada de acesso a dados (erros em errors.*)
-│   ├── feed.js             # Algoritmo do feed da home
+│   ├── feed.js             # Algoritmo do feed da home (lojas, produtos e anúncios no mix)
+│   ├── plan-renewal.js     # Vencimento de plano (30 dias), aviso 72 h e downgrade ao Gratuito
 │   ├── home-filters-scroll.js  # Esconde bairros/categorias da home ao rolar
 │   ├── header-scroll.js    # Esconde o cabeçalho no mobile ao rolar
 │   ├── scroll-to-top.js    # Botão flutuante ↑ (topo + atualizar página)
@@ -56,7 +57,7 @@ maredevendas-vanilla/
 │   ├── merchant-nav.js     # Menu do painel do lojista
 │   ├── staff-nav.js        # Menu dos painéis admin e moderador
 │   └── pages/              # Uma página por rota
-├── supabase/migrations/    # Migrations SQL (001 → 044)
+├── supabase/migrations/    # Migrations SQL (001 → 046)
 ├── tools/                  # Scripts de DB (apply-sql, register-migration, db-push)
 ├── tests/                  # Testes unitários (Vitest)
 └── .github/workflows/
@@ -265,7 +266,7 @@ gh workflow run deploy.yml
 
 | Rota | Página |
 |------|--------|
-| `/` | Feed de lojas e produtos (abas **Para você** / **Anúncios**) |
+| `/` | Feed de lojas e produtos (**Para você** — sem aba separada de anúncios) |
 | `/loja/:slug` | Página pública da loja |
 | `/conta/entrar` | Login unificado |
 | `/conta/criar` | Cadastro do cliente (com data de nascimento) |
@@ -402,7 +403,7 @@ Fluxo completo (migration `044_store_ads_approval_billing.sql`):
 2. **Slots inclusos:** até **2/mês calendário** (`is_extra = false`). Contagem só de inclusos, não extras.
 3. **Acima do limite:** anúncio **extra** — taxa **R$ 5** (`STORE_AD_EXTRA_FEE`), checkbox de confirmação e link WhatsApp para comprovante; `fee_acknowledged` obrigatório na API.
 4. **Admin e moderador** analisam na aba **Aprovações** (`#/admin/aprovacoes` ou `#/moderador/aprovacoes`): cards com ID, loja, mensagem, badge de taxa extra quando aplicável.
-5. **Aprovação** define `approved_at` e `expires_at` = **+24 h** (`STORE_AD_DURATION_HOURS`). Só então o anúncio entra na aba **Anúncios** da home.
+5. **Aprovação** define `approved_at` e `expires_at` = **+24 h** (`STORE_AD_DURATION_HOURS`). Só então o anúncio entra no **mix do feed** da home (`js/feed.js`).
 6. **Rejeição** marca `rejected` — não aparece no feed.
 
 | Papel | Onde age |
@@ -430,6 +431,20 @@ Testes: `tests/api-premium-ads.test.js`, `tests/api-store-ad-approval.test.js`, 
 | `isExtraStoreAdSlot(planId, includedThisMonth)` | `true` quando inclusos do mês esgotados |
 
 Testes: `tests/plans.test.js`, `tests/api-premium-ads.test.js`, `tests/api-store-ad-approval.test.js`.
+
+### Renovação de plano pago (migrations `045`, `046`)
+
+| Recurso | Comportamento |
+|---------|----------------|
+| **Ciclo** | 30 dias por assinatura (`stores.subscription_expires_at`) |
+| **Aviso ao lojista** | Banner com **72 h** de antecedência no painel |
+| **Sem pagamento** | Downgrade automático ao **Gratuito**; só os **2 produtos mais recentes** permanecem ativos |
+| **WhatsApp (comprovante)** | Mensagem inclui **nome e ID da loja** (sem linha de email) |
+| **Admin/moderador** | Seção **Planos a renovar** + pedidos com `merchant_note` identificando a loja |
+
+Arquivos: `js/plan-renewal.js`, `js/api.js` (`downgradeExpiredStoreToFree`), `js/pages/merchant.js`, `js/pages/admin.js`.
+
+Testes: `tests/plan-renewal.test.js`.
 
 ---
 
