@@ -1,4 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="8" fill="#2563eb"/>
-  <path d="M8 12h16v2H8v-2zm0 5h12v2H8v-2zm0 5h8v2H8v-2z" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="MaredeVendas">
+  <defs>
+    <linearGradient id="bg" x1="3" y1="1" x2="29" y2="31" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F56040"/>
+      <stop offset="0.5" stop-color="#E1306C"/>
+      <stop offset="1" stop-color="#833AB4"/>
+    </linearGradient>
+  </defs>
+  <!-- Fundo arredondado (cor da marca) -->
+  <rect width="32" height="32" rx="9" fill="url(#bg)"/>
+  <!-- Brilho sutil no topo -->
+  <path fill="#fff" fill-opacity="0.14" d="M9 0h14a9 9 0 0 1 9 9v1.5A18 18 0 0 0 0 9.5V9A9 9 0 0 1 9 0z"/>
+  <!-- Monograma M -->
+  <path
+    fill="#fff"
+    d="M8.4 22.2V9.8c0-.55.45-1 1-1h1.15c.35 0 .68.18.86.48l3.35 5.55a.4.4 0 0 0 .7 0l3.35-5.55c.18-.3.51-.48.86-.48H20.8c.55 0 1 .45 1 1v12.4c0 .55-.45 1-1 1h-1.35c-.55 0-1-.45-1-1v-7.15a.35.35 0 0 0-.62-.22l-2.35 3.55a1.05 1.05 0 0 1-1.76 0l-2.35-3.55a.35.35 0 0 0-.62.22v7.15c0 .55-.45 1-1 1H9.4c-.55 0-1-.45-1-1z"
+  />
+  <!-- Onda (maré) -->
+  <path
+    fill="none"
+    stroke="#fff"
+    stroke-width="1.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M9.5 25.4c1.35-1.15 2.7-1.15 4.05 0s2.7 1.15 4.05 0 2.7-1.15 4.05 0"
+  />
 </svg>

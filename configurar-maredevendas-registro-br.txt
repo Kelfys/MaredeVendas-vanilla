@@ -41,17 +41,45 @@ Remova registros A/CNAME antigos que apontem para outro lugar, se existirem.
 
 
 ================================================================================
-2) GITHUB PAGES
+2) GITHUB PAGES — OBRIGATÓRIO (sem isso o HTTPS falha)
 ================================================================================
 
-Repositório: MaredeVendas-vanilla
-→ Settings → Pages
+Sintoma se faltar este passo:
+  net::ERR_CERT_COMMON_NAME_INVALID
+  "O certificado de segurança é de *.github.io"
+  (GitHub ainda não emitiu cert de maredevendas.com.br)
 
-Custom domain:  maredevendas.com.br
-→ Save
+Link direto:
+https://github.com/Kelfys/MaredeVendas-vanilla/settings/pages
 
-Aguarde a verificação DNS (pode demorar minutos ou até 24–48h).
-Quando aparecer, marque: Enforce HTTPS
+Passo a passo:
+1) Abra o link acima (Settings → Pages do repositório)
+2) Em "Custom domain", digite EXATAMENTE:
+
+maredevendas.com.br
+
+3) Clique em Save
+4) Aguarde aparecer algo como:
+   - DNS check successful  (ou check verde)
+   - Certificate issued / cadeado OK ao lado do domínio
+5) Marque "Enforce HTTPS" (só fica clicável depois do certificado)
+6) Espere 5–60 minutos e teste em aba anônima:
+   https://maredevendas.com.br
+
+Se ficar preso / cert não sair:
+1) Em Custom domain, clique Remove
+2) Espere 1–2 minutos
+3) Digite de novo: maredevendas.com.br
+4) Save
+5) Espere o DNS check + certificado
+
+NÃO digite www.maredevendas.com.br no campo Custom domain
+(use o domínio raiz; o www já aponta via CNAME no Registro.br)
+
+Como saber se ainda está errado:
+- Certificado mostrado: *.github.io  → domínio NÃO configurado no Pages
+- Página "Site not found · GitHub Pages" → domínio NÃO ligado ao repo
+- Site abre com cadeado em maredevendas.com.br → OK
 
 
 ================================================================================
@@ -64,33 +92,54 @@ Quando aparecer, marque: Enforce HTTPS
 
 
 ================================================================================
-4) SUPABASE (Authentication → URL configuration)
+4) SUPABASE — COLAR NO PAINEL (Authentication → URL Configuration)
 ================================================================================
 
-Site URL:
-  https://maredevendas.com.br
+Link direto:
+https://supabase.com/dashboard/project/ulpjsxmilumqedkkfuqw/auth/url-configuration
 
-Redirect URLs (adicione todas):
-  https://maredevendas.com.br/
-  https://maredevendas.com.br/#/auth/callback
-  https://www.maredevendas.com.br/
-  https://www.maredevendas.com.br/#/auth/callback
+--- Site URL (apague o antigo e cole isto, depois Save changes) ---
 
-(Opcional por um tempo — manter o GitHub Pages também)
-  https://kelfys.github.io/MaredeVendas-vanilla/
-  https://kelfys.github.io/MaredeVendas-vanilla/#/auth/callback
+https://maredevendas.com.br
+
+--- Redirect URLs (Add URL — cole UMA por vez, no final deve ter 12) ---
+
+https://maredevendas.com.br
+https://maredevendas.com.br/
+https://maredevendas.com.br/#/auth/callback
+https://www.maredevendas.com.br
+https://www.maredevendas.com.br/
+https://www.maredevendas.com.br/#/auth/callback
+https://kelfys.github.io/MaredeVendas-vanilla/
+https://kelfys.github.io/MaredeVendas-vanilla/#/auth/callback
+https://kelfys.github.io/MaredeVendas-vanilla/**
+http://localhost:8080
+http://localhost:8080/**
+http://127.0.0.1:3000
+
+--- Só as NOVAS (se já tem as 6 do github.io/localhost) ---
+
+https://maredevendas.com.br
+https://maredevendas.com.br/
+https://maredevendas.com.br/#/auth/callback
+https://www.maredevendas.com.br
+https://www.maredevendas.com.br/
+https://www.maredevendas.com.br/#/auth/callback
 
 
 ================================================================================
-5) GOOGLE OAUTH (se usar login Google)
+5) GOOGLE OAUTH (se usar login Google) — COLAR
 ================================================================================
 
-Authorized JavaScript origins:
-  https://maredevendas.com.br
-  https://www.maredevendas.com.br
+Authorized JavaScript origins (Add URI):
 
-Authorized redirect URIs:
-  (use as redirect URLs do Supabase / Auth callback)
+https://maredevendas.com.br
+https://www.maredevendas.com.br
+https://kelfys.github.io
+
+Authorized redirect URIs (só o callback do Supabase):
+
+https://ulpjsxmilumqedkkfuqw.supabase.co/auth/v1/callback
 
 
 ================================================================================
@@ -135,5 +184,8 @@ GitHub Pages — Custom domain:
 
 HTTPS:
   Enforce HTTPS = ligado
+
+Supabase Site URL:
+  https://maredevendas.com.br
 
 Fim.
