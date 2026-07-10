@@ -101,10 +101,28 @@
   </div>
   <script type="module">
     const base = window.__MV_BASE__ || './'
+
+    async function purgeLegacyPwaCache() {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(regs.map((r) => r.unregister()))
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.filter((k) => k.startsWith('maredevendas')).map((k) => caches.delete(k)))
+      }
+    }
+
     // Carrega strings antes do app para mensagem de erro de bootstrap (app.loadError*)
     const [{ t }] = await Promise.all([
       import(base + 'js/strings.js'),
     ]).catch(() => [{ t: (key) => key }])
+
+    await purgeLegacyPwaCache()
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(base + 'sw.js').catch(() => {})
+    }
+
     import(base + 'js/app.js').catch((err) => {
       console.error('[MaredeVendas] Falha ao carregar app:', err)
       const main = document.getElementById('main')
