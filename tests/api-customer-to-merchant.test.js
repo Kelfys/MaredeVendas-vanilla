@@ -1,8 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const updateUser = vi.fn().mockResolvedValue({ error: null })
+const rpc = vi.fn()
 
 function createMockSupabase({ role = 'customer' } = {}) {
+  rpc.mockImplementation(async (fn) => {
+    if (fn === 'promote_self_to_merchant') {
+      if (role === 'customer') return { data: { role: 'merchant' }, error: null }
+      if (role === 'merchant') return { data: { role: 'merchant' }, error: null }
+      return { data: null, error: { message: 'only customers can become merchants' } }
+    }
+    return { data: null, error: null }
+  })
+
   return {
     auth: {
       getUser: vi.fn().mockResolvedValue({
@@ -15,18 +25,13 @@ function createMockSupabase({ role = 'customer' } = {}) {
       }),
       updateUser,
     },
+    rpc,
     from: vi.fn((table) => {
       if (table !== 'users') return {}
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             single: vi.fn().mockResolvedValue({ data: { role }, error: null }),
-          })),
-        })),
-        update: vi.fn(() => ({
-          eq: vi.fn(function () { return this }),
-          select: vi.fn(() => ({
-            single: vi.fn().mockResolvedValue({ data: { role: 'merchant' }, error: null }),
           })),
         })),
       }
@@ -47,6 +52,7 @@ async function loadApi(mockClient) {
 describe('promoteCustomerToMerchant', () => {
   beforeEach(() => {
     updateUser.mockClear()
+    rpc.mockClear()
     vi.stubGlobal('window', {
       location: { pathname: '/', origin: 'http://localhost:8080' },
     })
@@ -54,17 +60,15 @@ describe('promoteCustomerToMerchant', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-  })
-
-  afterEach(() => {
     vi.resetModules()
     vi.doUnmock('../js/db.js')
   })
 
-  it('promotes customer profile to merchant', async () => {
+  it('promotes customer profile to merchant via RPC', async () => {
     const api = await loadApi(createMockSupabase({ role: 'customer' }))
     const result = await api.promoteCustomerToMerchant()
     expect(result).toEqual({ role: 'merchant' })
+    expect(rpc).toHaveBeenCalledWith('promote_self_to_merchant')
     expect(updateUser).toHaveBeenCalledWith({
       data: expect.objectContaining({ role: 'merchant' }),
     })
@@ -74,11 +78,13 @@ describe('promoteCustomerToMerchant', () => {
     const api = await loadApi(createMockSupabase({ role: 'merchant' }))
     const result = await api.promoteCustomerToMerchant()
     expect(result).toEqual({ role: 'merchant' })
+    expect(rpc).not.toHaveBeenCalled()
     expect(updateUser).not.toHaveBeenCalled()
   })
 
   it('rejects admin accounts', async () => {
     const api = await loadApi(createMockSupabase({ role: 'admin' }))
     await expect(api.promoteCustomerToMerchant()).rejects.toThrow(/lojista/i)
+    expect(rpc).not.toHaveBeenCalled()
   })
 })

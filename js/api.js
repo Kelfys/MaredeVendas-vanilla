@@ -207,13 +207,7 @@ export async function updatePassword(newPassword) {
   const client = await requireClient()
   const { data, error } = await client.auth.updateUser({ password: newPassword })
   if (error) throw error
-
-  try {
-    await client.rpc('save_user_password_for_admin', { p_password: newPassword })
-  } catch {
-    // Tabela opcional — não bloqueia a troca no Auth
-  }
-
+  // Senhas só no Supabase Auth — vault admin_user_passwords removido (055)
   return data
 }
 
@@ -265,7 +259,11 @@ export async function signInWithGoogle({ nextPath = '/favoritos', role } = {}) {
   return data
 }
 
-/** Promove cliente logado a lojista. Idempotente se o perfil já for merchant. */
+/**
+ * Promove cliente logado a lojista (RPC SECURITY DEFINER).
+ * Idempotente se o perfil já for merchant.
+ * Não usa UPDATE direto em users.role (bloqueado pelo trigger 049).
+ */
 export async function promoteCustomerToMerchant() {
   const client = await requireClient()
   const { data: { user } } = await client.auth.getUser()
@@ -276,20 +274,15 @@ export async function promoteCustomerToMerchant() {
   if (profile.role === 'merchant') return profile
   if (profile.role !== 'customer') throw new Error(t('auth.notMerchantAccount'))
 
+  const { data, error: roleError } = await client.rpc('promote_self_to_merchant')
+  if (roleError) throw roleError
+
   const { error: metaError } = await client.auth.updateUser({
     data: { ...user.user_metadata, role: 'merchant' },
   })
   if (metaError) throw metaError
 
-  const { data, error: roleError } = await client
-    .from('users')
-    .update({ role: 'merchant' })
-    .eq('id', user.id)
-    .eq('role', 'customer')
-    .select('role')
-    .single()
-  if (roleError) throw roleError
-  return data
+  return data ?? { role: 'merchant' }
 }
 
 /** Após OAuth: aplica papel lojista se veio de /lojista/cadastro (oauth-role em sessionStorage). */
