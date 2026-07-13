@@ -47,6 +47,8 @@ jobs:
         run: |
           mkdir -p dist
           cp index.html strings-editor.html favicon.jpg favicon.svg 404.html README.md sw.js dist/
+          # Preview social (WhatsApp/OG) — na raiz do site, caminho simples /og.jpg
+          cp og.jpg dist/og.jpg
           # assets/ — estáticos servidos via assetHref() em js/config.js
           cp -r css js assets dist/
           touch dist/.nojekyll
