@@ -83,6 +83,19 @@ export function assetHref(relativePath = '') {
   return `${APP_BASE_PATH}/assets/${normalized}`
 }
 
+/** Query de cache-bust para ícones trocados com frequência. */
+export const ASSET_CACHE_BUST = '20260713'
+
+/** Favicon na raiz do site (favicon.svg). */
+export function faviconHref() {
+  return `${APP_BASE_PATH}/favicon.svg?v=${ASSET_CACHE_BUST}`
+}
+
+/** Ícone de perfil do header / conta do cliente. */
+export function profileIconHref() {
+  return `${assetHref('icone_perfil.jpg')}?v=${ASSET_CACHE_BUST}`
+}
+
 /** Hash (#/rota) — único modo confiável no GitHub Pages (rotas diretas dão 404). */
 export const USE_HISTORY_ROUTER = false
 export const CART_STORAGE_KEY = 'maredevendas-cart'

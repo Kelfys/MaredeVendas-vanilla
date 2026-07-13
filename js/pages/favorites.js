@@ -18,6 +18,7 @@ import { normalizeStorePaymentMethods, getPaymentMethodLabel } from '../payment.
 import { t, deliveryPeriodLabel, orderStatusLabel } from '../strings.js'
 import { bindPasswordToggles } from '../password-field.js'
 import { bindReportTriggers, getReportLoginPath } from '../reporting.js'
+import { profileIconHref } from '../config.js'
 
 const DELIVERY_LABELS = {
   manha: deliveryPeriodLabel('manha'),
@@ -31,7 +32,11 @@ const TABS = [
   { id: 'favorites', label: t('nav.customerFavorites'), icon: '❤️' },
   { id: 'liked', label: t('nav.customerLiked'), icon: '👍' },
   { id: 'orders', label: t('nav.customerOrders'), icon: '📦' },
-  { id: 'profile', label: t('nav.customerProfile'), icon: '👤' },
+  {
+    id: 'profile',
+    label: t('nav.customerProfile'),
+    icon: `<img class="profile-avatar" src="${profileIconHref()}" alt="" width="20" height="20" decoding="async" />`,
+  },
 ]
 
 function renderRegisterStoreCallout() {

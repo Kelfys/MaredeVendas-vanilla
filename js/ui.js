@@ -6,7 +6,7 @@
  *
  * Também: store-card, feed-product-card, cart-drawer e checkout com pagamentos por loja.
  */
-import { APP_NAME } from './config.js'
+import { APP_NAME, faviconHref, profileIconHref } from './config.js'
 import { t, deliveryPeriodLabel } from './strings.js'
 import { getStoreThemeColor } from './config.js'
 import { escapeHtml, formatCurrency, formatPhone } from './utils.js'
@@ -67,11 +67,15 @@ function renderCartHeaderButton(cartCount) {
     </button>`
 }
 
+function renderProfileAvatar(className = 'profile-avatar') {
+  return `<img class="${className}" src="${escapeHtml(profileIconHref())}" alt="" width="32" height="32" decoding="async" />`
+}
+
 function renderCustomerMobileNav(user, customerTab) {
   const firstName = escapeHtml(user.name?.split(' ')[0] ?? t('customer.defaultName'))
   return `
     <div class="nav-mobile__user">
-      <span class="nav-mobile__avatar" aria-hidden="true">👤</span>
+      <span class="nav-mobile__avatar" aria-hidden="true">${renderProfileAvatar('profile-avatar profile-avatar--lg')}</span>
       <div class="nav-mobile__user-text">
         <strong>${firstName}</strong>
         <span>${escapeHtml(t('nav.customerMenuTitle'))}</span>
@@ -152,7 +156,9 @@ export function renderHeader() {
     ${menuOpen ? `<button type="button" class="header__backdrop" id="header-backdrop" aria-label="${escapeHtml(t('nav.closeMenu'))}"></button>` : ''}
     <div class="header__inner">
       <a href="${routeHref('/')}" class="logo">
-        <div class="logo__icon">🏪</div>
+        <div class="logo__icon logo__icon--image">
+          <img src="${escapeHtml(faviconHref())}" alt="" width="28" height="28" decoding="async" />
+        </div>
         <span class="logo__text">${APP_NAME.replace('Vendas', '')}<span class="accent">Vendas</span></span>
       </a>
 
@@ -166,7 +172,7 @@ export function renderHeader() {
           <span>${t('nav.login')}</span>
         </a>` : ''}
         ${user?.role === 'customer' ? `<a href="${customerMenuHref(CUSTOMER_MENU[0])}" class="nav-btn${onCustomerAccount ? ' active' : ''}">
-          <span class="nav-btn__icon" aria-hidden="true">👤</span>
+          <span class="nav-btn__icon nav-btn__icon--avatar" aria-hidden="true">${renderProfileAvatar()}</span>
           <span>${t('nav.customerMenuTitle')}</span>
         </a>` : ''}
       </nav>
@@ -175,7 +181,7 @@ export function renderHeader() {
         ${isCustomerPublic ? renderCartHeaderButton(cartCount) : ''}
         <button type="button" class="icon-btn header__action--desktop" id="theme-toggle" title="${t('nav.toggleTheme')}" aria-label="${t('nav.toggleTheme')}">${themeIcon}</button>
 
-        ${user?.role === 'customer' ? `<a href="${customerMenuHref(CUSTOMER_MENU[0])}" class="icon-btn header__action--desktop" title="${t('nav.myAccount')}" aria-label="${t('nav.myAccount')}">👤</a>` : ''}
+        ${user?.role === 'customer' ? `<a href="${customerMenuHref(CUSTOMER_MENU[0])}" class="icon-btn icon-btn--avatar header__action--desktop" title="${t('nav.myAccount')}" aria-label="${t('nav.myAccount')}">${renderProfileAvatar()}</a>` : ''}
         ${user?.role === 'merchant' ? `
           <div class="header-dropdown ${staffMenuOpen ? 'open' : ''}" id="staff-dropdown-merchant">
             <button type="button" class="icon-btn ${onMerchant ? 'icon-btn--active' : ''}" id="staff-menu-toggle-merchant" title="${MERCHANT_PANEL.label}" aria-expanded="${staffMenuOpen}" aria-haspopup="true">${MERCHANT_PANEL.icon}</button>

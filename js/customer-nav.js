@@ -3,13 +3,18 @@
  */
 import { getCurrentPath, routeHref, getHashQueryParam } from './router.js'
 import { t } from './strings.js'
+import { profileIconHref } from './config.js'
 
 export const CUSTOMER_MENU = [
   { id: 'overview', label: t('nav.customerOverview'), icon: '🏠' },
   { id: 'favorites', label: t('nav.customerFavorites'), icon: '❤️' },
   { id: 'liked', label: t('nav.customerLiked'), icon: '👍' },
   { id: 'orders', label: t('nav.customerOrders'), icon: '📦' },
-  { id: 'profile', label: t('nav.customerProfile'), icon: '👤' },
+  {
+    id: 'profile',
+    label: t('nav.customerProfile'),
+    icon: `<img class="profile-avatar" src="${profileIconHref()}" alt="" width="20" height="20" decoding="async" />`,
+  },
 ]
 
 const CUSTOMER_TAB_IDS = new Set(CUSTOMER_MENU.map((item) => item.id))
