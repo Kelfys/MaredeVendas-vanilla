@@ -131,6 +131,7 @@ export async function renderHome(main) {
           labelPlural: t('pagination.cardPlural'),
           prevAttr: 'data-feed-page-prev',
           nextAttr: 'data-feed-page-next',
+          showInfo: false,
         })}
       </div>`
   }

@@ -12,6 +12,8 @@ export function renderPaginationHtml({
   labelPlural,
   prevAttr = 'data-page-prev',
   nextAttr = 'data-page-next',
+  /** Se false, omite o texto "X–Y de N itens" (ex.: feed da home). */
+  showInfo = true,
 }) {
   if (matchedCount === 0) return ''
 
@@ -20,15 +22,20 @@ export function renderPaginationHtml({
   const end = Math.min(currentPage * pageSize, matchedCount)
 
   if (totalPages <= 1) {
+    if (!showInfo) return ''
     return `
       <div class="admin-pagination admin-pagination--single">
         <p class="admin-pagination__info">${matchedCount} ${label}</p>
       </div>`
   }
 
+  const infoHtml = showInfo
+    ? `<p class="admin-pagination__info">${t('pagination.rangeOf', { start, end, count: matchedCount, label })}</p>`
+    : ''
+
   return `
-    <div class="admin-pagination">
-      <p class="admin-pagination__info">${t('pagination.rangeOf', { start, end, count: matchedCount, label })}</p>
+    <div class="admin-pagination${!showInfo ? ' admin-pagination--controls-only' : ''}">
+      ${infoHtml}
       <div class="admin-pagination__controls">
         <button type="button" class="btn btn-outline btn-sm" ${prevAttr} ${currentPage <= 1 ? 'disabled' : ''}>${t('pagination.previous')}</button>
         <span class="admin-pagination__status">${t('pagination.pageStatus', { current: currentPage, total: totalPages })}</span>
