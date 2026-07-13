@@ -455,12 +455,99 @@ export async function setModeratorNeighborhood(moderatorId, neighborhoodId) {
   return data
 }
 
-// --- Categories ---
+// --- Categories (tags de tipo — CRUD só no admin) ---
 export async function fetchCategories() {
   const client = await requireClient()
   const { data, error } = await client.from('categories').select('*').order('name')
   if (error) throw error
   return data ?? []
+}
+
+export async function createCategory({ name }) {
+  const client = await requireClient()
+  const trimmedName = String(name ?? '').trim()
+  if (!trimmedName) throw new Error(t('errors.informCategoryName'))
+
+  const { data, error } = await client.from('categories').insert({
+    name: trimmedName,
+    slug: generateSlug(trimmedName),
+  }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateCategory(categoryId, updates) {
+  const client = await requireClient()
+  if (!categoryId) throw new Error(t('errors.invalidCategory'))
+  const payload = {}
+  if (updates.name !== undefined) {
+    const trimmed = String(updates.name).trim()
+    if (!trimmed) throw new Error(t('errors.informCategoryName'))
+    payload.name = trimmed
+    payload.slug = generateSlug(trimmed)
+  }
+  if (Object.keys(payload).length === 0) throw new Error(t('errors.noChanges'))
+
+  const { data, error } = await client
+    .from('categories')
+    .update(payload)
+    .eq('id', categoryId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteCategory(categoryId) {
+  const client = await requireClient()
+  if (!categoryId) throw new Error(t('errors.invalidCategory'))
+
+  const { count: storeCount, error: storeError } = await client
+    .from('stores')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', categoryId)
+  if (storeError) throw storeError
+  if ((storeCount ?? 0) > 0) {
+    throw new Error(t('errors.cannotDeleteCategoryStores', { count: storeCount }))
+  }
+
+  const { count: productCount, error: productError } = await client
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('category_id', categoryId)
+  if (productError) throw productError
+  if ((productCount ?? 0) > 0) {
+    throw new Error(t('errors.cannotDeleteCategoryProducts', { count: productCount }))
+  }
+
+  const { error } = await client.from('categories').delete().eq('id', categoryId)
+  if (error) throw error
+}
+
+/** Resolve cidade/UF a partir de um bairro ativo criado pelo admin. */
+async function resolveActiveNeighborhoodLocation(client, neighborhoodId) {
+  if (!neighborhoodId) throw new Error(t('errors.selectStoreNeighborhood'))
+  const { data, error } = await client
+    .from('neighborhoods')
+    .select('id, city, state, active')
+    .eq('id', neighborhoodId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error(t('errors.invalidNeighborhood'))
+  if (!data.active) throw new Error(t('errors.neighborhoodInactive'))
+  return data
+}
+
+async function assertCategoryExists(client, categoryId) {
+  if (!categoryId) throw new Error(t('errors.selectStoreCategory'))
+  const { data, error } = await client
+    .from('categories')
+    .select('id')
+    .eq('id', categoryId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error(t('errors.invalidCategory'))
+  return data
 }
 
 // --- Stores ---
@@ -508,7 +595,7 @@ export async function fetchStoreByOwner(ownerId) {
   const client = await requireClient()
   const { data, error } = await client
     .from('stores')
-    .select('*, category:categories(*)')
+    .select('*, category:categories(*), neighborhood:neighborhoods(id, name, slug, city, state, active)')
     .eq('owner_id', ownerId)
     .maybeSingle()
   if (error) throw error
@@ -518,7 +605,8 @@ export async function fetchStoreByOwner(ownerId) {
 
 export async function createStore(ownerId, form) {
   const client = await requireClient()
-  if (!form.neighborhood_id) throw new Error(t('errors.selectStoreNeighborhood'))
+  const neighborhood = await resolveActiveNeighborhoodLocation(client, form.neighborhood_id)
+  await assertCategoryExists(client, form.category_id)
   const slug = generateSlug(form.name)
   const { data, error } = await client.from('stores').insert({
     owner_id: ownerId,
@@ -527,10 +615,10 @@ export async function createStore(ownerId, form) {
     description: form.description,
     whatsapp: form.whatsapp,
     address: form.address,
-    city: form.city,
-    state: form.state,
-    neighborhood_id: form.neighborhood_id,
-    category_id: form.category_id || null,
+    city: neighborhood.city,
+    state: neighborhood.state,
+    neighborhood_id: neighborhood.id,
+    category_id: form.category_id,
     opening_hours: form.opening_hours,
     instagram: form.instagram || null,
     theme_color: form.theme_color ?? DEFAULT_THEME_COLOR,
@@ -548,6 +636,14 @@ export async function updateStore(storeId, form) {
   for (const key of ['name', 'description', 'whatsapp', 'address', 'city', 'state', 'opening_hours', 'instagram', 'category_id', 'theme_color', 'payment_methods', 'neighborhood_id']) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
+
+  if (updates.neighborhood_id) {
+    const neighborhood = await resolveActiveNeighborhoodLocation(client, updates.neighborhood_id)
+    updates.neighborhood_id = neighborhood.id
+    updates.city = neighborhood.city
+    updates.state = neighborhood.state
+  }
+  if (updates.category_id) await assertCategoryExists(client, updates.category_id)
 
   // Logo: todos os planos. Banner: validado em assertStoreBannerAllowed.
   if (form.remove_logo) updates.logo = null
@@ -576,6 +672,21 @@ export async function updateStoreAsAdmin(storeId, form) {
   for (const key of ['name', 'description', 'whatsapp', 'address', 'city', 'state', 'opening_hours', 'instagram', 'category_id', 'theme_color', 'plan_id', 'status', 'neighborhood_id']) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
+
+  if (updates.neighborhood_id) {
+    // Admin pode reatribuir inclusive bairro inativo (só valida existência).
+    const { data: neighborhood, error: nErr } = await client
+      .from('neighborhoods')
+      .select('id, city, state')
+      .eq('id', updates.neighborhood_id)
+      .maybeSingle()
+    if (nErr) throw nErr
+    if (!neighborhood) throw new Error(t('errors.invalidNeighborhood'))
+    updates.neighborhood_id = neighborhood.id
+    updates.city = neighborhood.city
+    updates.state = neighborhood.state
+  }
+  if (updates.category_id) await assertCategoryExists(client, updates.category_id)
 
   if (form.remove_logo) updates.logo = null
   else if (form.logo instanceof File) {
@@ -1944,7 +2055,8 @@ export async function createStoreAsAdmin(form) {
   const slug = form.slug?.trim() || generateSlug(form.name)
   const approved = form.approved !== false
 
-  if (!form.neighborhood_id) throw new Error(t('errors.selectStoreNeighborhood'))
+  const neighborhood = await resolveActiveNeighborhoodLocation(client, form.neighborhood_id)
+  if (form.category_id) await assertCategoryExists(client, form.category_id)
 
   const approvedAt = approved ? new Date().toISOString() : null
   const planId = form.plan_id ?? 'free'
@@ -1955,9 +2067,9 @@ export async function createStoreAsAdmin(form) {
     description: form.description ?? '',
     whatsapp: form.whatsapp,
     address: form.address ?? '',
-    city: form.city,
-    state: form.state,
-    neighborhood_id: form.neighborhood_id,
+    city: neighborhood.city,
+    state: neighborhood.state,
+    neighborhood_id: neighborhood.id,
     category_id: form.category_id || null,
     opening_hours: form.opening_hours ?? '',
     instagram: form.instagram || null,

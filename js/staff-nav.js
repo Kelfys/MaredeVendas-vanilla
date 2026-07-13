@@ -31,6 +31,7 @@ export const ADMIN_MENU = [
   { id: 'approvals', label: t('nav.staffApprovals'), icon: '✅', href: '#/admin/aprovacoes' },
   { id: 'reports', label: t('nav.staffReports'), icon: '🚩', href: '#/admin/denuncias' },
   { id: 'neighborhoods', label: t('nav.staffNeighborhoods'), icon: '📍', href: '#/admin/bairros' },
+  { id: 'categories', label: t('nav.staffCategories'), icon: '🏷️', href: '#/admin/categorias' },
   { id: 'moderators', label: t('nav.staffModerators'), icon: '🛡️', href: '#/admin/moderadores' },
   { id: 'profiles', label: t('nav.staffProfiles'), icon: '👤', href: '#/admin/perfis' },
   // external: true → ui.js abre strings-editor.html em nova aba (fora do hash router)

@@ -439,40 +439,62 @@ export async function renderMerchantRegister(main) {
 
   const [categories, neighborhoods] = await Promise.all([
     fetchCategories(),
-    fetchNeighborhoods(),
+    fetchNeighborhoods({ activeOnly: true }),
   ])
+
+  const { bindNeighborhoodLocationFields, formatNeighborhoodLabel } = await import('../neighborhood.js')
+
+  const listsReady = neighborhoods.length > 0 && categories.length > 0
+  const emptyListsAlert = !listsReady
+    ? `<div class="alert alert-error">${escapeHtml(
+      neighborhoods.length === 0
+        ? t('auth.noNeighborhoodsAvailable')
+        : t('auth.noCategoriesAvailable'),
+    )}</div>`
+    : ''
 
   main.innerHTML = authLayout(
     t('auth.registerStoreTitle'),
     t('auth.registerStoreFormDescription'),
     `
+      ${emptyListsAlert}
       <form id="store-form">
         <div class="form-group"><label class="form-label">${t('auth.storeName')}</label><input class="form-input" name="name" required /></div>
         <div class="form-group"><label class="form-label">${t('auth.neighborhoodRegion')}</label>
-          <select class="form-input" name="neighborhood_id" required>
+          <select class="form-input" name="neighborhood_id" required ${neighborhoods.length === 0 ? 'disabled' : ''}>
             <option value="">${t('app.selectPlaceholder')}</option>
-            ${neighborhoods.map((n) => `<option value="${n.id}">${escapeHtml(n.name)} · ${escapeHtml(n.city)}</option>`).join('')}
+            ${neighborhoods.map((n) => `
+              <option value="${n.id}" data-city="${escapeHtml(n.city)}" data-state="${escapeHtml(n.state)}">
+                ${escapeHtml(formatNeighborhoodLabel(n))}
+              </option>
+            `).join('')}
           </select>
+          <p class="form-hint">${t('auth.neighborhoodAdminOnlyHint')}</p>
         </div>
         <div class="form-group"><label class="form-label">${t('labels.category')}</label>
-          <select class="form-input" name="category_id" required>
+          <select class="form-input" name="category_id" required ${categories.length === 0 ? 'disabled' : ''}>
+            <option value="">${t('app.selectPlaceholder')}</option>
             ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
           </select>
+          <p class="form-hint">${t('auth.categoryAdminOnlyHint')}</p>
         </div>
         <div class="form-group"><label class="form-label">${t('auth.whatsappWithDdd')}</label><input class="form-input" name="whatsapp" required placeholder="11999999999" /></div>
         <div class="form-group"><label class="form-label">${t('labels.description')}</label><textarea class="form-input" name="description" rows="2"></textarea></div>
         <div class="form-group"><label class="form-label">${t('labels.address')}</label><input class="form-input" name="address" /></div>
         <div style="display:grid;grid-template-columns:1fr 80px;gap:0.5rem">
-          <div class="form-group"><label class="form-label">${t('labels.city')}</label><input class="form-input" name="city" required /></div>
-          <div class="form-group"><label class="form-label">${t('labels.state')}</label><input class="form-input" name="state" required maxlength="2" /></div>
+          <div class="form-group"><label class="form-label">${t('labels.city')}</label><input class="form-input" name="city" required readonly placeholder="${escapeHtml(t('auth.cityFromNeighborhood'))}" /></div>
+          <div class="form-group"><label class="form-label">${t('labels.state')}</label><input class="form-input" name="state" required maxlength="2" readonly placeholder="UF" /></div>
         </div>
         <div class="form-group"><label class="form-label">${t('auth.openingHoursLabel')}</label><input class="form-input" name="opening_hours" placeholder="${escapeHtml(t('auth.openingHoursPlaceholder'))}" /></div>
-        <button type="submit" class="btn btn-primary btn-block">${t('auth.submitStoreRegistration')}</button>
+        <button type="submit" class="btn btn-primary btn-block" ${listsReady ? '' : 'disabled'}>${t('auth.submitStoreRegistration')}</button>
       </form>
     `
   )
 
-  main.querySelector('#store-form').addEventListener('submit', async (e) => {
+  const storeForm = main.querySelector('#store-form')
+  bindNeighborhoodLocationFields(storeForm)
+
+  storeForm.addEventListener('submit', async (e) => {
     e.preventDefault()
     const form = e.target
     try {
@@ -483,8 +505,6 @@ export async function renderMerchantRegister(main) {
         whatsapp: form.whatsapp.value,
         description: form.description.value,
         address: form.address.value,
-        city: form.city.value,
-        state: form.state.value.toUpperCase(),
         opening_hours: form.opening_hours.value,
       })
       main.querySelector('#auth-error').innerHTML = `<div class="alert alert-success">${escapeHtml(t('auth.storeSubmittedSuccess'))}</div>`

@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 vi.stubGlobal('localStorage', {
@@ -12,6 +13,7 @@ import {
   getModeratorNeighborhoodId,
   getStaffNeighborhoodScope,
   formatNeighborhoodLabel,
+  bindNeighborhoodLocationFields,
 } from '../js/neighborhood.js'
 const NEIGHBORHOOD_STORAGE_KEY = 'maredevendas-neighborhood'
 
@@ -37,5 +39,36 @@ describe('neighborhood helpers', () => {
     expect(getModeratorNeighborhoodId(mod)).toBe('n1')
     expect(getStaffNeighborhoodScope(mod, 'moderator')).toBe('n1')
     expect(getStaffNeighborhoodScope(mod, 'admin')).toBeUndefined()
+  })
+
+  it('fills city/state from neighborhood select and locks fields', () => {
+    document.body.innerHTML = `
+      <form id="f">
+        <select name="neighborhood_id">
+          <option value="">—</option>
+          <option value="n1" data-city="Rio de Janeiro" data-state="RJ">Copacabana</option>
+          <option value="n2" data-city="Niterói" data-state="RJ">Icaraí</option>
+        </select>
+        <input name="city" />
+        <input name="state" />
+      </form>
+    `
+    const form = document.querySelector('#f')
+    bindNeighborhoodLocationFields(form)
+    const select = form.querySelector('[name="neighborhood_id"]')
+    const city = form.querySelector('[name="city"]')
+    const state = form.querySelector('[name="state"]')
+
+    expect(city.readOnly).toBe(true)
+    expect(state.readOnly).toBe(true)
+
+    select.value = 'n1'
+    select.dispatchEvent(new Event('change'))
+    expect(city.value).toBe('Rio de Janeiro')
+    expect(state.value).toBe('RJ')
+
+    select.value = 'n2'
+    select.dispatchEvent(new Event('change'))
+    expect(city.value).toBe('Niterói')
   })
 })

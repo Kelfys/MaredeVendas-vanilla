@@ -12,6 +12,7 @@ import {
   fetchAllStoresAdmin,
   fetchAdminProducts, createStoreAsAdmin, createProduct, updateProduct,
   updateStoreAsAdmin, deleteStoreAsAdmin, deleteProductAsAdmin, fetchCategories,
+  createCategory, updateCategory, deleteCategory,
   fetchAdminProfiles, deleteUserProfileAsAdmin,
   adjustProductLikes, fetchProductComments, addProductComment, deleteProductComment,
   fetchPendingContentReports, reviewContentReport,
@@ -21,7 +22,7 @@ import {
   fetchNeighborhoods, createNeighborhood, updateNeighborhood, deleteNeighborhood,
 } from '../api.js'
 import { getReportReasonLabel } from '../report-reasons.js'
-import { getStaffNeighborhoodScope, formatNeighborhoodLabel } from '../neighborhood.js'
+import { getStaffNeighborhoodScope, formatNeighborhoodLabel, bindNeighborhoodLocationFields } from '../neighborhood.js'
 import { getUser, loadUser, setAdminPendingCount } from '../state.js'
 import { navigate } from '../router.js'
 import {
@@ -73,7 +74,12 @@ function staffScopeSubtitle(user, panel) {
 
 function renderNeighborhoodOptions(neighborhoods, selectedId = '') {
   return neighborhoods.map((n) => `
-    <option value="${n.id}" ${selectedId === n.id ? 'selected' : ''}>${escapeHtml(formatNeighborhoodLabel(n))}</option>
+    <option
+      value="${n.id}"
+      data-city="${escapeHtml(n.city ?? '')}"
+      data-state="${escapeHtml(n.state ?? '')}"
+      ${selectedId === n.id ? 'selected' : ''}
+    >${escapeHtml(formatNeighborhoodLabel(n))}</option>
   `).join('')
 }
 
@@ -1464,6 +1470,7 @@ function quickActions(panel = 'admin') {
       { href: staffHref(panel, 'lojas'), icon: '🏪', title: t('admin.quickNewStore'), text: t('admin.quickNewStoreDesc') },
       { href: staffHref(panel, 'produtos'), icon: '📦', title: t('admin.newProduct'), text: t('admin.addToCatalog') },
       { href: staffHref(panel, 'bairros'), icon: '📍', title: t('nav.staffNeighborhoods'), text: t('admin.marketplaceRegions') },
+      { href: staffHref(panel, 'categorias'), icon: '🏷️', title: t('nav.staffCategories'), text: t('admin.marketplaceCategories') },
       { href: staffHref(panel, 'moderadores'), icon: '🛡️', title: t('nav.staffModerators'), text: t('admin.regionalTeam') },
       { href: stringsEditorHref(), icon: '✏️', title: t('admin.stringsEditor'), text: t('admin.stringsEditorDesc'), external: true },
     )
@@ -1743,6 +1750,7 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
             <div class="form-group">
               <label class="form-label">${t('labels.category')}</label>
               <select class="form-input" name="category_id" required>
+                <option value="">${t('app.selectPlaceholder')}</option>
                 ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
               </select>
             </div>
@@ -1754,16 +1762,16 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
               <label class="form-label">${t('labels.neighborhoodRegion')}</label>
               <select class="form-input" name="neighborhood_id" required>
                 <option value="">${t('app.selectPlaceholder')}</option>
-                ${renderNeighborhoodOptions(neighborhoods)}
+                ${renderNeighborhoodOptions(neighborhoods.filter((n) => n.active))}
               </select>
             </div>
             <div class="form-group">
               <label class="form-label">${t('labels.city')}</label>
-              <input class="form-input" name="city" required />
+              <input class="form-input" name="city" required readonly placeholder="${escapeHtml(t('auth.cityFromNeighborhood'))}" />
             </div>
             <div class="form-group">
               <label class="form-label">${t('labels.state')}</label>
-              <input class="form-input" name="state" required maxlength="2" value="RJ" />
+              <input class="form-input" name="state" required maxlength="2" readonly placeholder="UF" />
             </div>
             <div class="form-group admin-form-grid__full">
               <label class="form-label">${t('labels.description')}</label>
@@ -1869,15 +1877,16 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
                       </div>
                       <div class="form-group">
                         <label class="form-label">${t('labels.city')}</label>
-                        <input class="form-input" name="city" value="${escapeHtml(s.city)}" required />
+                        <input class="form-input" name="city" value="${escapeHtml(s.city)}" required readonly />
                       </div>
                       <div class="form-group">
                         <label class="form-label">${t('labels.state')}</label>
-                        <input class="form-input" name="state" value="${escapeHtml(s.state)}" maxlength="2" required />
+                        <input class="form-input" name="state" value="${escapeHtml(s.state)}" maxlength="2" required readonly />
                       </div>
                       <div class="form-group">
                         <label class="form-label">${t('labels.category')}</label>
-                        <select class="form-input" name="category_id">
+                        <select class="form-input" name="category_id" required>
+                          <option value="">${t('app.selectPlaceholder')}</option>
                           ${categories.map((c) => `<option value="${c.id}" ${s.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
                         </select>
                       </div>
@@ -2235,6 +2244,106 @@ export async function renderStaffDashboard(main, tab = 'overview', selectedStore
     return
   }
 
+  if (tab === 'categories') {
+    if (panel !== 'admin') {
+      navigate('/moderador')
+      return
+    }
+
+    const [categories, stores] = await Promise.all([
+      fetchCategories(),
+      fetchAllStoresAdmin(),
+    ])
+
+    const storeCountByCategory = {}
+    for (const s of stores) {
+      if (!s.category_id) continue
+      storeCountByCategory[s.category_id] = (storeCountByCategory[s.category_id] ?? 0) + 1
+    }
+
+    main.innerHTML = adminPage(
+      menuItem.label,
+      t('admin.categoriesSubtitle'),
+      `
+        <section class="admin-section">
+          <div class="admin-section__head"><h2>${t('admin.newCategory')}</h2></div>
+          <p class="form-hint">${t('admin.categoriesHint')}</p>
+          <form id="category-form" class="admin-form-grid">
+            <div class="form-group">
+              <label class="form-label">${t('labels.name')}</label>
+              <input class="form-input" name="name" required placeholder="${t('admin.categoryNamePlaceholder')}" />
+            </div>
+            <div class="admin-form-grid__full">
+              <div id="category-form-msg"></div>
+              <button type="submit" class="btn btn-primary btn-sm">${t('admin.createCategory')}</button>
+            </div>
+          </form>
+        </section>
+        <section class="admin-section">
+          <div class="admin-section__head">
+            <h2>${t('admin.registeredCategories')}</h2>
+            <span class="admin-stat-chip admin-stat-chip--sent">${t('admin.categoriesCount', { count: categories.length })}</span>
+          </div>
+          ${categories.length === 0
+            ? adminEmptyState('🏷️', t('admin.noCategoriesTitle'), t('admin.createFirstCategory'))
+            : `<div class="table-wrap">
+                <table>
+                  <thead><tr><th>${t('labels.name')}</th><th>${t('nav.staffStores')}</th><th>${t('common.slug')}</th><th></th></tr></thead>
+                  <tbody>
+                    ${categories.map((c) => {
+                      const storeCount = storeCountByCategory[c.id] ?? 0
+                      const canDelete = storeCount === 0
+                      const deleteTitle = !canDelete
+                        ? t('admin.categoryHasStores', { count: storeCount })
+                        : t('admin.deleteCategoryPermanent')
+                      return `
+                      <tr data-category-row data-category-id="${c.id}">
+                        <td><strong>${escapeHtml(c.name)}</strong></td>
+                        <td>${storeCount}</td>
+                        <td><code>/${escapeHtml(c.slug)}</code></td>
+                        <td style="white-space:nowrap">
+                          <button type="button" class="btn btn-outline btn-sm" data-edit-category="${c.id}">${t('labels.edit')}</button>
+                          <button
+                            type="button"
+                            class="btn btn-outline btn-sm"
+                            data-delete-category="${c.id}"
+                            data-category-name="${escapeHtml(c.name)}"
+                            ${canDelete ? '' : 'disabled'}
+                            title="${escapeHtml(deleteTitle)}"
+                          >${t('labels.delete')}</button>
+                        </td>
+                      </tr>
+                      <tr class="admin-edit-row" id="edit-category-row-${c.id}" hidden>
+                        <td colspan="4">
+                          <form class="admin-edit-panel admin-form-grid" data-category-edit="${c.id}">
+                            <div class="form-group">
+                              <label class="form-label">${t('labels.name')}</label>
+                              <input class="form-input" name="name" value="${escapeHtml(c.name)}" required />
+                            </div>
+                            <div class="form-group admin-form-grid__full">
+                              <p class="form-hint">${t('admin.slugAutoUpdateHint')}</p>
+                            </div>
+                            <div class="admin-form-grid__full admin-edit-panel__actions">
+                              <button type="submit" class="btn btn-primary btn-sm">${t('admin.saveCategory')}</button>
+                              <button type="button" class="btn btn-outline btn-sm" data-cancel-category="${c.id}">${t('labels.cancel')}</button>
+                            </div>
+                          </form>
+                        </td>
+                      </tr>`
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>`}
+        </section>
+      `,
+      '',
+      panel
+    )
+
+    bindCategoryManagement(main)
+    return
+  }
+
   if (tab === 'moderators') {
     if (panel !== 'admin') {
       navigate('/moderador')
@@ -2474,7 +2583,10 @@ function bindProductSearch(main) {
 }
 
 function bindStoreForm(main) {
-  main.querySelector('#admin-store-form')?.addEventListener('submit', async (e) => {
+  const createForm = main.querySelector('#admin-store-form')
+  if (createForm) bindNeighborhoodLocationFields(createForm)
+
+  createForm?.addEventListener('submit', async (e) => {
     e.preventDefault()
     const f = e.target
     const msgEl = main.querySelector('#admin-store-msg')
@@ -2487,8 +2599,6 @@ function bindStoreForm(main) {
         category_id: f.category_id.value,
         whatsapp: f.whatsapp.value.trim(),
         neighborhood_id: f.neighborhood_id.value,
-        city: f.city.value.trim(),
-        state: f.state.value.trim().toUpperCase(),
         description: f.description.value.trim(),
         address: f.address.value.trim(),
         opening_hours: f.opening_hours.value.trim(),
@@ -2560,6 +2670,7 @@ function bindStoreEdits(main) {
     const bannerInput = form.querySelector('input[name="banner"]')
     bindImagePreview(logoInput, form.querySelector(`[data-preview-logo="${id}"]`))
     bindImagePreview(bannerInput, form.querySelector(`[data-preview-banner="${id}"]`))
+    bindNeighborhoodLocationFields(form)
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -2572,8 +2683,6 @@ function bindStoreEdits(main) {
         await updateStoreAsAdmin(id, {
           name: form.name.value.trim(),
           whatsapp: form.whatsapp.value.trim(),
-          city: form.city.value.trim(),
-          state: form.state.value.trim().toUpperCase(),
           category_id: form.category_id.value,
           theme_color: form.theme_color.value,
           status: form.status.value,
@@ -3191,6 +3300,69 @@ function bindModeratorsList(main) {
 
   updateModeratorsSortButtons(main, sortField, sortDirection)
   apply()
+}
+
+function bindCategoryManagement(main) {
+  main.querySelector('#category-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const form = e.target
+    const msgEl = main.querySelector('#category-form-msg')
+    try {
+      await createCategory({ name: form.name.value })
+      showToast(t('admin.categoryCreated'))
+      rerenderStaff(main, 'categories')
+    } catch (err) {
+      msgEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`
+    }
+  })
+
+  main.querySelectorAll('[data-edit-category]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.editCategory
+      main.querySelectorAll('.admin-edit-row[id^="edit-category-row-"]').forEach((row) => {
+        row.hidden = row.id !== `edit-category-row-${id}`
+      })
+      main.querySelector(`#edit-category-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  })
+
+  main.querySelectorAll('[data-cancel-category]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      main.querySelector(`#edit-category-row-${btn.dataset.cancelCategory}`).hidden = true
+    })
+  })
+
+  main.querySelectorAll('[data-category-edit]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const id = form.dataset.categoryEdit
+      const submitBtn = form.querySelector('button[type="submit"]')
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = t('common.saving') }
+      try {
+        await updateCategory(id, { name: form.name.value })
+        showToast(t('admin.categoryUpdated'))
+        rerenderStaff(main, 'categories')
+      } catch (err) {
+        showToast(err.message)
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = t('admin.saveCategory') }
+      }
+    })
+  })
+
+  main.querySelectorAll('[data-delete-category]:not([disabled])').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.categoryName || t('admin.thisCategory')
+      if (!window.confirm(t('admin.confirmDeleteCategory', { name }))) return
+      try {
+        await deleteCategory(btn.dataset.deleteCategory)
+        showToast(t('toasts.categoryDeleted'))
+        rerenderStaff(main, 'categories')
+      } catch (err) {
+        showToast(err.message)
+      }
+    })
+  })
 }
 
 function bindNeighborhoodManagement(main) {

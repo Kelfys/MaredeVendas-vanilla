@@ -3,7 +3,7 @@
  */
 import {
   fetchStoreByOwner, fetchMerchantProducts, fetchOrdersByStore,
-  createProduct, updateProduct, deleteProduct, updateStore, fetchCategories,
+  createProduct, updateProduct, deleteProduct, updateStore, fetchCategories, fetchNeighborhoods,
   updatePassword, fetchMerchantOrdersAnalytics, fetchStoreViewStats,
   fetchReviewsByStore, fetchStoreAds, createStoreAd, updateOrderStatus,
   fetchProductPriceHistory, countUnreadMerchantOrders, subscribeToStoreOrders,
@@ -41,6 +41,7 @@ import {
   validateImageFile, STORAGE_BUCKETS,
 } from '../uploads.js'
 import { MERCHANT_PANEL, getMerchantMenuItem, merchantHref } from '../merchant-nav.js'
+import { bindNeighborhoodLocationFields, formatNeighborhoodLabel } from '../neighborhood.js'
 import { renderOrdersChart, bindOrdersChart } from '../order-charts.js'
 import { renderEngagementStats } from '../ui.js'
 import { bindPaginatedSortableList } from '../list-utils.js'
@@ -1112,6 +1113,8 @@ function bindSettingsForm(main, store) {
   const previewName = main.querySelector('[data-preview-name]')
   const previewSwatch = main.querySelector('[data-preview-swatch]')
 
+  bindNeighborhoodLocationFields(form)
+
   const updatePreview = () => {
     if (previewName && form?.name) {
       previewName.textContent = form.name.value.trim() || store.name
@@ -1159,6 +1162,7 @@ function bindSettingsForm(main, store) {
         name: f.name.value.trim(),
         whatsapp: f.whatsapp.value.trim(),
         description: f.description.value.trim(),
+        neighborhood_id: f.neighborhood_id?.value,
         category_id: f.category_id.value,
         theme_color: f.theme_color.value,
         opening_hours: f.opening_hours.value.trim(),
@@ -1643,8 +1647,16 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
   }
 
   if (tab === 'settings') {
-    const categories = await fetchCategories()
+    const [categories, neighborhoods] = await Promise.all([
+      fetchCategories(),
+      fetchNeighborhoods({ activeOnly: true }),
+    ])
     const plan = getPlanById(store.plan_id)
+    // Mantém o bairro atual na lista mesmo se inativo (para não perder o valor selecionado).
+    const neighborhoodOptions = [...neighborhoods]
+    if (store.neighborhood_id && !neighborhoodOptions.some((n) => n.id === store.neighborhood_id)) {
+      if (store.neighborhood) neighborhoodOptions.unshift(store.neighborhood)
+    }
 
     main.innerHTML = merchantPage(
       menuItem.label,
@@ -1681,10 +1693,32 @@ export async function renderMerchantDashboard(main, tab = 'overview') {
                   <textarea class="form-input" name="description" rows="3">${escapeHtml(store.description ?? '')}</textarea>
                 </div>
                 <div class="form-group">
+                  <label class="form-label">${t('auth.neighborhoodRegion')}</label>
+                  <select class="form-input" name="neighborhood_id" required>
+                    <option value="">${t('app.selectPlaceholder')}</option>
+                    ${neighborhoodOptions.map((n) => `
+                      <option value="${n.id}" data-city="${escapeHtml(n.city ?? '')}" data-state="${escapeHtml(n.state ?? '')}" ${store.neighborhood_id === n.id ? 'selected' : ''}>
+                        ${escapeHtml(formatNeighborhoodLabel(n))}
+                      </option>
+                    `).join('')}
+                  </select>
+                  <p class="form-hint">${t('auth.neighborhoodAdminOnlyHint')}</p>
+                </div>
+                <div class="form-group">
                   <label class="form-label">${t('labels.category')}</label>
-                  <select class="form-input" name="category_id">
+                  <select class="form-input" name="category_id" required>
+                    <option value="">${t('app.selectPlaceholder')}</option>
                     ${categories.map((c) => `<option value="${c.id}" ${store.category_id === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')}
                   </select>
+                  <p class="form-hint">${t('auth.categoryAdminOnlyHint')}</p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">${t('labels.city')}</label>
+                  <input class="form-input" name="city" value="${escapeHtml(store.city ?? '')}" required readonly />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">${t('labels.state')}</label>
+                  <input class="form-input" name="state" value="${escapeHtml(store.state ?? '')}" required maxlength="2" readonly />
                 </div>
                 <div class="form-group">
                   <label class="form-label">${t('merchant.themeColor')}</label>
