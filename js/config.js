@@ -84,24 +84,32 @@ export function assetHref(relativePath = '') {
 }
 
 /** Query de cache-bust para ícones trocados com frequência. */
-export const ASSET_CACHE_BUST = '20260713b'
+export const ASSET_CACHE_BUST = '20260713c'
 
 /**
- * Marca colorida (assets/icone_perfil.jpg).
- * O favicon.svg atual é silhueta preta (export) e escurece no header.
+ * Foto de marca completa (assets/icone_perfil.jpg) — avatares / perfil.
+ * Não usar como favicon: em 16×16 o fundo da cena fica escuro.
  */
-export function brandIconHref() {
+export function brandPhotoHref() {
   return `${assetHref('icone_perfil.jpg')}?v=${ASSET_CACHE_BUST}`
 }
 
-/** Favicon / logo do site — mesma arte colorida da marca. */
+/**
+ * Monograma claro (favicon.svg) — amarelo + M azul.
+ * Substitui o export antigo em silhueta preta (fill #000).
+ */
+export function brandIconHref() {
+  return `${APP_BASE_PATH}/favicon.svg?v=${ASSET_CACHE_BUST}`
+}
+
+/** Favicon / logo do header — monograma colorido legível. */
 export function faviconHref() {
   return brandIconHref()
 }
 
 /** Ícone de perfil do header / conta do cliente. */
 export function profileIconHref() {
-  return brandIconHref()
+  return brandPhotoHref()
 }
 
 /** Hash (#/rota) — único modo confiável no GitHub Pages (rotas diretas dão 404). */
