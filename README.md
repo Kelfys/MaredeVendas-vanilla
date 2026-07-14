@@ -182,8 +182,18 @@ npm test
 | Admin | `brunopdaraujo@gmail.com` | `MarecAdmin2026!` | global |
 | Moderador | `moderador@maredevendas.com` | `DemoModerador2026!` | bairro ativo (ex.: Baixa do sapateiro) |
 | **Lojas fake (seed)** | `lojasfake@gmail.com` | `LojasFake2026!` | dono de **todas** as lojas ads/seed; **pode ter N lojas** |
+| **Produtos fake (seed)** | `produtosfake@gmail.com` | `ProdutosFake2026!` | dono da **vitrine** `seed-produtos-fake`; **N produtos** demo |
 
 O moderador demo: login em `#/moderador/entrar`.
+
+### Resumo das contas seed
+
+| Conta | Serve para | Limpeza |
+|-------|------------|---------|
+| `lojasfake@gmail.com` | Várias **lojas** fake no feed (ads/demo) | Apagar o perfil → cascade nas lojas |
+| `produtosfake@gmail.com` | **Produtos** demo na vitrine seed (1 loja-balde) | Apagar o perfil → loja + produtos em cascade |
+
+Regra de produto no banco: **todo produto tem `store_id`**. Não se cria “órfão” real; o admin coloca itens demo na vitrine de `produtosfake@`.
 
 ### Lojas fake (`lojasfake@gmail.com`)
 
@@ -208,26 +218,23 @@ Contas `demo-gratuito@…` / `demo-plus@…` antigas **sem loja** foram removida
 
 ### Produtos demo (`produtosfake@gmail.com`)
 
-No banco **não existe produto sem loja** (`store_id` obrigatório). “Produto órfão de lojista real” = item na **vitrine seed**:
+No schema **não existe produto sem loja** (`store_id` obrigatório). “Produto sem lojista real” = item na **vitrine seed** desta conta.
 
 | Item | Detalhe |
 |------|---------|
 | **E-mail / senha** | `produtosfake@gmail.com` / `ProdutosFake2026!` |
-| **Loja** | `Vitrine demo (produtos seed)` · slug `seed-produtos-fake` |
-| **Plano da loja** | Premium (UI) + **sem teto** na API para esta loja |
-| **Constantes** | `SEED_PRODUCTS_OWNER_EMAIL`, `SEED_PRODUCTS_STORE_SLUG` em `js/config.js` |
-| **Como usar** | Admin → **Produtos** → loja seed no **topo** da lista → **+ novo item** |
-| **Limpeza** | Excluir o perfil `produtosfake@` → loja + produtos caem em cascade |
+| **Papel** | merchant |
+| **Loja** | `Vitrine demo (produtos seed)` · slug **`seed-produtos-fake`** |
+| **Plano da loja** | Premium na UI; na API **sem teto** de itens/fotos para esta loja (`isSeedProductsStoreId`) |
+| **Constantes** | `SEED_PRODUCTS_OWNER_EMAIL`, `SEED_PRODUCTS_STORE_SLUG`, `SEED_PRODUCTS_STORE_NAME` em `js/config.js` |
+| **Como usar (admin)** | `#/admin/produtos` → loja seed no **topo** da sidebar (badge **seed**) → **+ novo item** |
+| **Limpeza** | Excluir o perfil `produtosfake@gmail.com` → loja + produtos em cascade |
 
 ```bash
+# Pasta scripts/ é local (gitignored). Requer DATABASE_URL em .env.local
 node scripts/ensure-produtosfake.mjs           # dry-run
-node scripts/ensure-produtosfake.mjs --apply   # cria conta + loja
+node scripts/ensure-produtosfake.mjs --apply   # cria conta + loja se faltarem
 ```
-
-| Conta seed | Serve para |
-|------------|------------|
-| `lojasfake@gmail.com` | Várias **lojas** fake no feed |
-| `produtosfake@gmail.com` | Vitrine com **muitos produtos** demo (1 loja balde) |
 
 ---
 
@@ -394,7 +401,7 @@ Bairros são geridos em `#/admin/bairros` (criar, editar, ativar/desativar, excl
 | **Bairros** | `#/admin/bairros` | Criar região (nome, cidade, UF); ativar/desativar |
 | **Moderadores** | `#/admin/moderadores` | Promover usuário existente **com bairro obrigatório**; alterar região depois; permissão de aprovar mudança de plano |
 | **Lojas** | `#/admin/lojas` | Ver/editar bairro; **criar loja** por **e-mail** do dono (cliente → lojista; 1 loja/lojista, **exceto** `lojasfake@gmail.com`) |
-| **Produtos** | `#/admin/produtos` | Sidebar de lojas (ordenação sem emoji) + catálogo; admin **sem cooldown** de preço |
+| **Produtos** | `#/admin/produtos` | Sidebar de lojas + catálogo; loja seed **`seed-produtos-fake`** (`produtosfake@`) no topo, **sem teto** de itens; admin **sem cooldown** de preço |
 | **Conta** | `#/admin/conta` | Senha, e-mail e **cor de alerta do logo** |
 
 ### Moderador regional
@@ -566,10 +573,11 @@ Em `#/admin/lojas` → **+ Nova loja**:
 5. **Exceção seed:** `lojasfake@gmail.com` (`SEED_MULTI_STORE_OWNER_EMAIL`) **pode ter N lojas** — use este e-mail para novas lojas demo/ads
 6. Admin e moderador **não** podem ser donos de loja
 
-| Objetivo | E-mail do dono |
-|----------|----------------|
+| Objetivo | E-mail do dono / loja |
+|----------|----------------------|
 | Loja de pessoa real | Conta nova ou lojista **sem** loja |
 | Mais lojas fake no feed | `lojasfake@gmail.com` |
+| Muitos produtos demo | Loja `seed-produtos-fake` (conta `produtosfake@gmail.com`) em `#/admin/produtos` |
 
 Testes: `tests/api-resolve-owner-email.test.js`, `tests/api-fetch-merchants.test.js`.
 
