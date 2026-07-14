@@ -144,6 +144,13 @@ function setupStaffMocks(user) {
     createNeighborhood: vi.fn(),
     updateNeighborhood: vi.fn(),
     deleteNeighborhood: vi.fn(),
+    fetchLogoAccentMode: vi.fn().mockResolvedValue('normal'),
+    setLogoAccentMode: vi.fn().mockResolvedValue('normal'),
+  }))
+  vi.doMock('../js/logo-accent.js', () => ({
+    logoAccentOptionsHtml: () => '<option value="normal">Normal</option>',
+    applyLogoAccentMode: vi.fn(),
+    logoAccentModeLabel: () => 'Normal',
   }))
   vi.doMock('../js/router.js', () => ({
     routeHref: (path) => `#${path}`,
