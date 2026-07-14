@@ -15,6 +15,8 @@ export const LOGO_ACCENT_MODES = [
   { id: 'alerta', labelKey: 'admin.logoAccentAlert', hintKey: 'admin.logoAccentAlertHint' },
   { id: 'urgente', labelKey: 'admin.logoAccentUrgent', hintKey: 'admin.logoAccentUrgentHint' },
   { id: 'info', labelKey: 'admin.logoAccentInfo', hintKey: 'admin.logoAccentInfoHint' },
+  { id: 'rosa', labelKey: 'admin.logoAccentPink', hintKey: 'admin.logoAccentPinkHint' },
+  { id: 'preto', labelKey: 'admin.logoAccentBlack', hintKey: 'admin.logoAccentBlackHint' },
 ]
 
 const MODE_IDS = new Set(LOGO_ACCENT_MODES.map((m) => m.id))

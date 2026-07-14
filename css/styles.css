@@ -226,25 +226,31 @@ html[data-logo-accent='normal'] {
   color: var(--primary-600);
 }
 
-/* Presets sólidos (promo / alerta / urgente / info) — light + dark */
+/* Presets sólidos — light + dark */
 html[data-logo-accent='promo'] .logo span.accent,
 html[data-logo-accent='alerta'] .logo span.accent,
 html[data-logo-accent='urgente'] .logo span.accent,
-html[data-logo-accent='info'] .logo span.accent {
+html[data-logo-accent='info'] .logo span.accent,
+html[data-logo-accent='rosa'] .logo span.accent,
+html[data-logo-accent='preto'] .logo span.accent {
   background: none !important;
   -webkit-background-clip: unset !important;
   background-clip: unset !important;
 }
 
 html[data-logo-accent='promo'] .logo span.accent { color: #e65100 !important; }
-html[data-logo-accent='alerta'] .logo span.accent { color: #c9a100 !important; }
+html[data-logo-accent='alerta'] .logo span.accent { color: #2e7d32 !important; } /* verde (era amarelo) */
 html[data-logo-accent='urgente'] .logo span.accent { color: #c62828 !important; }
 html[data-logo-accent='info'] .logo span.accent { color: #1565c0 !important; }
+html[data-logo-accent='rosa'] .logo span.accent { color: #c2185b !important; }
+html[data-logo-accent='preto'] .logo span.accent { color: #1a1a1a !important; }
 
 html[data-theme='dark'][data-logo-accent='promo'] .logo span.accent { color: #ff9800 !important; }
-html[data-theme='dark'][data-logo-accent='alerta'] .logo span.accent { color: #fbd000 !important; }
+html[data-theme='dark'][data-logo-accent='alerta'] .logo span.accent { color: #66bb6a !important; }
 html[data-theme='dark'][data-logo-accent='urgente'] .logo span.accent { color: #ef5350 !important; }
 html[data-theme='dark'][data-logo-accent='info'] .logo span.accent { color: #42a5f5 !important; }
+html[data-theme='dark'][data-logo-accent='rosa'] .logo span.accent { color: #f48fb1 !important; }
+html[data-theme='dark'][data-logo-accent='preto'] .logo span.accent { color: #e7e9ea !important; } /* claro no dark */
 
 .nav-desktop {
   display: none;

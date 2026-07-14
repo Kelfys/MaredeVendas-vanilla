@@ -37,9 +37,9 @@ describe('logo accent modes', () => {
     expect(document.documentElement.dataset.logoAccent).toBe('normal')
   })
 
-  it('exposes five modes for the admin selector', () => {
+  it('exposes all modes for the admin selector', () => {
     expect(LOGO_ACCENT_MODES.map((m) => m.id)).toEqual([
-      'normal', 'promo', 'alerta', 'urgente', 'info',
+      'normal', 'promo', 'alerta', 'urgente', 'info', 'rosa', 'preto',
     ])
   })
 })
