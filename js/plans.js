@@ -47,6 +47,17 @@ export function planAllowsStoreBanner(planId) {
 }
 
 /**
+ * URL do banner para exibição pública (feed, página da loja).
+ * Plano Gratuito nunca mostra banner personalizado — mesmo se a URL ainda existir no banco
+ * (loja que caiu de plano pago, seed, etc.). Upload continua bloqueado em assertStoreBannerAllowed.
+ */
+export function getStorePublicBanner(store) {
+  if (!store?.banner) return null
+  if (!planAllowsStoreBanner(store.plan_id)) return null
+  return store.banner
+}
+
+/**
  * Anúncios no feed (store_ads):
  * - Premium: 2 inclusos/mês calendário (is_extra=false).
  * - Acima do limite: extras pagos (STORE_AD_EXTRA_FEE), duração STORE_AD_DURATION_HOURS após aprovação staff.

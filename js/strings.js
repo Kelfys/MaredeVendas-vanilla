@@ -429,7 +429,7 @@ export const STRINGS = {
     "storeBanner": "Banner da loja",
     "removeBanner": "Remover banner atual",
     "viewPlansUpgrade": "Ver planos e fazer upgrade",
-    "bannerReadonlyHint": "Banner atual (somente leitura no plano Gratuito):",
+    "bannerReadonlyHint": "Banner guardado (não aparece no feed nem na vitrine no plano Gratuito). Assine Plus/Premium para exibir:",
     "planChangePending": "Pedido de mudança para <strong>{planName}</strong> aguardando aprovação desde {date}. Loja: <strong>{storeName}</strong> · ID: <code>{storeId}</code>.",
     "activePlan": "Plano ativo",
     "storeLabel": "Loja: {name}",

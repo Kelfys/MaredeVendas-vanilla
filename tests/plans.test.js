@@ -19,6 +19,7 @@ import {
   canAddProductImage,
   planAllowsStoreLogo,
   planAllowsStoreBanner,
+  getStorePublicBanner,
   planAllowsStoreAds,
   getPlanMonthlyAdLimit,
   countStoreAdsThisMonth,
@@ -80,6 +81,13 @@ describe('plan store images', () => {
     expect(planAllowsStoreBanner('free')).toBe(false)
     expect(planAllowsStoreBanner('plus')).toBe(true)
     expect(planAllowsStoreBanner('premium')).toBe(true)
+  })
+
+  it('hides banner URL on free plan even if stored in database', () => {
+    expect(getStorePublicBanner({ plan_id: 'free', banner: 'https://cdn.example/b.jpg' })).toBeNull()
+    expect(getStorePublicBanner({ plan_id: 'plus', banner: 'https://cdn.example/b.jpg' })).toBe('https://cdn.example/b.jpg')
+    expect(getStorePublicBanner({ plan_id: 'premium', banner: null })).toBeNull()
+    expect(getStorePublicBanner(null)).toBeNull()
   })
 })
 

@@ -28,6 +28,7 @@ import { normalizeStorePaymentMethods } from '../payment.js'
 import { navigate } from '../router.js'
 import { showToast } from '../utils.js'
 import { t } from '../strings.js'
+import { getStorePublicBanner } from '../plans.js'
 import { bindReportTriggers, renderReportButton, getReportLoginPath } from '../reporting.js'
 
 export async function renderStorePage(main, { slug }) {
@@ -89,13 +90,14 @@ export async function renderStorePage(main, { slug }) {
     const cartCount = getCartItemCount()
     const currentUser = getUser()
     const bannerStyle = `background:linear-gradient(135deg,${theme.gradientFrom},${theme.gradientTo})`
+    const publicBanner = getStorePublicBanner(store)
     const btnStyle = storeThemeButtonStyle(theme)
     const onColor = storeThemeOnColor(theme.hex)
 
     main.innerHTML = `
       <div class="store-hero">
-        ${store.banner
-          ? `<img src="${escapeHtml(store.banner)}" alt="" />`
+        ${publicBanner
+          ? `<img src="${escapeHtml(publicBanner)}" alt="" />`
           : `<div style="${bannerStyle};width:100%;height:100%"></div>`}
         <div class="store-hero__overlay"></div>
         <a href="#/" class="store-hero__back">${t('store.backShort')}</a>

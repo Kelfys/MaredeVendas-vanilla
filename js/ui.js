@@ -10,7 +10,7 @@ import { APP_NAME, faviconHref, profileIconHref, getStoreThemeColor, storeThemeB
 import { t, deliveryPeriodLabel } from './strings.js'
 import { escapeHtml, formatCurrency, formatPhone } from './utils.js'
 import { isCatalogItemAvailable, getCatalogItemIcon, getCatalogItemLabel, isUsedProduct } from './catalog.js'
-import { getPlanById } from './plans.js'
+import { getPlanById, getStorePublicBanner } from './plans.js'
 import {
   getUser, logout, onAuthChange, toggleTheme, getTheme, getAdminPendingCount,
   getMerchantNewOrdersCount,
@@ -466,6 +466,7 @@ export function renderStoreCard(store, options = {}) {
   const btnStyle = storeThemeButtonStyle(theme)
   const onColor = storeThemeOnColor(theme.hex)
   const bannerStyle = `background: linear-gradient(135deg, ${theme.gradientFrom}, ${theme.gradientTo})`
+  const publicBanner = getStorePublicBanner(store)
   const plan = getPlanById(store.plan_id)
   const planBadge = showPlanBadge && store.plan_id && store.plan_id !== 'free'
     ? `<span class="store-card__plan-badge store-card__plan-badge--${escapeHtml(store.plan_id)}">${escapeHtml(plan.name)}</span>`
@@ -475,8 +476,8 @@ export function renderStoreCard(store, options = {}) {
     <article class="store-card">
       <div class="store-card__banner">
         ${planBadge}
-        ${store.banner
-          ? `<img src="${escapeHtml(store.banner)}" alt="" loading="lazy" />`
+        ${publicBanner
+          ? `<img src="${escapeHtml(publicBanner)}" alt="" loading="lazy" />`
           : `<div style="${bannerStyle};width:100%;height:100%"></div>`}
         ${store.logo
           ? `<img class="store-card__logo" src="${escapeHtml(store.logo)}" alt="${escapeHtml(store.name)}" />`
