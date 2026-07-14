@@ -6,6 +6,8 @@ import {
   rankStoresForFeed,
   rankProductsForFeed,
   buildHomeFeed,
+  mergeFeedProducts,
+  enrichProductsWithStoreEngagement,
   paginateFeedItems,
   FEED_PAGE_SIZE,
 } from '../js/feed.js'
@@ -110,6 +112,40 @@ describe('feed algorithm', () => {
     if (productItems.length >= 2) {
       expect(productItems[0].product.store_id).not.toBe(productItems[1].product.store_id)
     }
+  })
+
+  it('mergeFeedProducts keeps higher likes when same product appears twice', () => {
+    const merged = mergeFeedProducts(
+      [{ id: 'p1', name: 'A', likes_count: 0, store: { plan_id: 'free' } }],
+      [{ id: 'p1', name: 'A', likes_count: 12, liked_by_user: true, store: { plan_id: 'free' } }],
+    )
+    expect(merged).toHaveLength(1)
+    expect(merged[0].likes_count).toBe(12)
+    expect(merged[0].liked_by_user).toBe(true)
+  })
+
+  it('enrichProductsWithStoreEngagement copies store favorites/likes onto product.store', () => {
+    const enriched = enrichProductsWithStoreEngagement(
+      [{ id: 'p1', store_id: 'a', store: { id: 'a', plan_id: 'free' }, likes_count: 1 }],
+      [{ id: 'a', plan_id: 'free', favorites_count: 9, likes_count: 40 }],
+    )
+    expect(enriched[0].store.favorites_count).toBe(9)
+    expect(enriched[0].store.likes_count).toBe(40)
+  })
+
+  it('buildHomeFeed ranks products higher when their store has engagement stats', () => {
+    const now = Date.parse('2026-01-01T00:00:00Z')
+    const feedStores = [
+      { id: 'quiet', name: 'Quiet', plan_id: 'free', created_at: '2024-01-01T00:00:00Z', favorites_count: 0, likes_count: 0 },
+      { id: 'hot', name: 'Hot', plan_id: 'free', created_at: '2024-01-01T00:00:00Z', favorites_count: 50, likes_count: 100 },
+    ]
+    const feedProducts = [
+      { id: 'pq', store_id: 'quiet', name: 'Q', created_at: '2025-06-01T00:00:00Z', likes_count: 5, store: { id: 'quiet', plan_id: 'free' } },
+      { id: 'ph', store_id: 'hot', name: 'H', created_at: '2025-06-01T00:00:00Z', likes_count: 5, store: { id: 'hot', plan_id: 'free' } },
+    ]
+    const items = buildHomeFeed(feedStores, feedProducts, [], [], { now })
+    const productOrder = items.filter((i) => i.kind === 'product').map((i) => i.product.id)
+    expect(productOrder.indexOf('ph')).toBeLessThan(productOrder.indexOf('pq'))
   })
 
   it('paginates feed into pages of 44 cards', () => {

@@ -121,6 +121,76 @@ describe('engagement stats', () => {
     ])
   })
 
+  it('fetchStores marketplaceVisible attaches favorites_count and likes_count', async () => {
+    const storeRows = [
+      {
+        id: 'store-1',
+        name: 'A',
+        status: 'approved',
+        subscription_status: 'active',
+        plan_id: 'free',
+        created_at: '2024-01-01T00:00:00Z',
+      },
+      {
+        id: 'store-2',
+        name: 'B',
+        status: 'approved',
+        subscription_status: 'trialing',
+        plan_id: 'plus',
+        created_at: '2024-01-01T00:00:00Z',
+      },
+    ]
+
+    const storesBuilder = {
+      select: vi.fn(function select() { return this }),
+      order: vi.fn(function order() { return this }),
+      eq: vi.fn(function eq() { return this }),
+      in: vi.fn(function inn() { return this }),
+      limit: vi.fn(function limit() { return this }),
+      then: (onFulfilled, onRejected) => Promise.resolve({ data: storeRows, error: null }).then(onFulfilled, onRejected),
+    }
+
+    const mockClient = {
+      from: vi.fn((table) => {
+        if (table === 'stores') return storesBuilder
+        if (table === 'favorites') {
+          return chainable(() => ({
+            data: [
+              { store_id: 'store-1' },
+              { store_id: 'store-1' },
+              { store_id: 'store-2' },
+            ],
+            error: null,
+          }))
+        }
+        if (table === 'products') {
+          return chainable(() => ({
+            data: [
+              { id: 'p1', store_id: 'store-1', likes_adjustment: 0 },
+              { id: 'p3', store_id: 'store-2', likes_adjustment: 0 },
+            ],
+            error: null,
+          }))
+        }
+        if (table === 'product_likes') {
+          return chainable(() => ({
+            data: [{ product_id: 'p1' }, { product_id: 'p1' }, { product_id: 'p3' }],
+            error: null,
+          }))
+        }
+        return chainable(() => ({ data: null, error: null }))
+      }),
+    }
+
+    const { fetchStores } = await loadApi(mockClient)
+    const result = await fetchStores({ marketplaceVisible: true })
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'store-1', favorites_count: 2, likes_count: 2 }),
+      expect.objectContaining({ id: 'store-2', favorites_count: 1, likes_count: 1 }),
+    ])
+  })
+
   it('fetchUserEngagementStats returns user favorites and likes given', async () => {
     const { fetchUserEngagementStats } = await loadApi(createStatsMockSupabase({
       favoritesCount: 4,

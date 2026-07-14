@@ -567,7 +567,11 @@ export async function fetchStores(filters = {}) {
   if (error) throw error
   const stores = data ?? []
   if (!filters.marketplaceVisible) return stores
-  return Promise.all(stores.map((store) => downgradeExpiredStoreToFree(client, store)))
+  const marketplaceStores = await Promise.all(
+    stores.map((store) => downgradeExpiredStoreToFree(client, store)),
+  )
+  // Feed ranking usa favorites_count / likes_count (getStoreEngagementBoost).
+  return attachStoreEngagementStats(marketplaceStores)
 }
 
 export async function fetchStoreBySlug(slug) {
@@ -923,7 +927,8 @@ export async function fetchMarketplaceProducts(filters = {}) {
 export async function fetchNewProducts(filters = {}) {
   const limit = filters.limit ?? 12
   const products = await fetchMarketplaceProducts({ ...filters, fetchLimit: limit * 3 })
-  return products.slice(0, limit)
+  const withEngagement = await attachProductEngagement(products, filters.userId ?? null)
+  return withEngagement.slice(0, limit)
 }
 
 export async function fetchTopLikedProducts(filters = {}) {

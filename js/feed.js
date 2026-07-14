@@ -148,14 +148,62 @@ function takeAd(ads, seenAdIds) {
 }
 
 /**
+ * Une listas de produtos do feed sem perder likes_count / liked_by_user
+ * quando o mesmo id aparece em "novos" e "curtidos".
+ */
+export function mergeFeedProducts(newProducts, likedProducts) {
+  const map = new Map()
+  for (const product of newProducts ?? []) {
+    map.set(product.id, product)
+  }
+  for (const product of likedProducts ?? []) {
+    const prev = map.get(product.id)
+    if (!prev) {
+      map.set(product.id, product)
+      continue
+    }
+    map.set(product.id, {
+      ...prev,
+      ...product,
+      likes_count: Math.max(prev.likes_count ?? 0, product.likes_count ?? 0),
+      organic_likes_count: Math.max(prev.organic_likes_count ?? 0, product.organic_likes_count ?? 0),
+      comments_count: Math.max(prev.comments_count ?? 0, product.comments_count ?? 0),
+      liked_by_user: Boolean(prev.liked_by_user || product.liked_by_user),
+      store: product.store ?? prev.store,
+    })
+  }
+  return [...map.values()]
+}
+
+/** Copia favorites_count/likes_count das lojas do feed para product.store (score de produto). */
+export function enrichProductsWithStoreEngagement(products, stores) {
+  if (!products?.length) return products ?? []
+  const storeById = new Map((stores ?? []).map((store) => [store.id, store]))
+  return products.map((product) => {
+    const storeId = getProductStoreId(product)
+    const fromList = storeId ? storeById.get(storeId) : null
+    if (!fromList) return product
+    return {
+      ...product,
+      store: {
+        ...(product.store ?? {}),
+        id: product.store?.id ?? fromList.id,
+        plan_id: product.store?.plan_id ?? fromList.plan_id,
+        favorites_count: fromList.favorites_count ?? product.store?.favorites_count ?? 0,
+        likes_count: fromList.likes_count ?? product.store?.likes_count ?? 0,
+      },
+    }
+  })
+}
+
+/**
  * Monta feed com prioridade de plano, engajamento, diversidade de lojas e anúncios.
  */
 export function buildHomeFeed(stores, newProducts, likedProducts, ads = [], options = {}) {
   const now = options.now ?? Date.now()
   const rankedStores = rankStoresForFeed(stores, options)
   const mergedProducts = rankProductsForFeed(
-    [...(newProducts ?? []), ...(likedProducts ?? [])]
-      .filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i),
+    enrichProductsWithStoreEngagement(mergeFeedProducts(newProducts, likedProducts), stores),
     options,
   )
 
