@@ -13,9 +13,9 @@ Marketplace local de lojas — **HTML, CSS e JavaScript vanilla** com backend [S
 |-------|------------------|
 | **Visitante** | Ver feed de lojas e produtos (**Para você** — anúncios Premium no mix), buscar, adicionar ao carrinho e pedir pelo WhatsApp |
 | **Cliente** | Dashboard em **Minha conta** (`/favoritos`): favoritos, produtos curtidos, histórico de pedidos e perfil editável; curtir/comentar produtos; checkout com dados pré-preenchidos |
-| **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin); **logo da loja** em qualquer plano; **banner personalizado** só em planos pagos; **anúncios no feed** só no plano **Premium** (2 inclusos/mês; extras **R$ 5** com aprovação staff) |
+| **Lojista** | Painel com produtos, pedidos, anúncios e configurações (após aprovação do admin); **logo e banner** só em planos **pagos** (Plus/Premium); catálogo Gratuito = **1 item + 1 foto**; **anúncios no feed** só no plano **Premium** (2 inclusos/mês; extras **R$ 5** com aprovação staff) |
 | **Moderador** | Aprovações (lojas, planos, **anúncios** e denúncias) e pedidos **do bairro atribuído**; lojas/produtos somente leitura na região |
-| **Admin** | Métricas globais, gestão de **bairros**, moderadores por região, lojistas, **aprovação de anúncios** e configuração |
+| **Admin** | Métricas globais, gestão de **bairros**, moderadores por região, lojistas, **aprovação de anúncios**, **cor de alerta do logo** (`#/admin/conta`) e configuração |
 
 ---
 
@@ -48,17 +48,18 @@ maredevendas-vanilla/
 │   ├── api.js              # Camada de acesso a dados (erros em errors.*)
 │   ├── feed.js             # Algoritmo do feed da home (lojas, produtos e anúncios no mix)
 │   ├── plan-renewal.js     # Vencimento de plano (30 dias), aviso 72 h e downgrade ao Gratuito
+│   ├── logo-accent.js      # Cor de alerta do “Maré” no logo (presets; admin em Conta)
 │   ├── home-filters-scroll.js  # Esconde bairros/categorias da home ao rolar
 │   ├── header-scroll.js    # Esconde o cabeçalho no mobile ao rolar
 │   ├── scroll-to-top.js    # Botão flutuante ↑ (topo + atualizar página)
 │   ├── payment.js          # Formas de pagamento no checkout
-│   ├── ui.js               # Header, carrinho, cards e checkout
+│   ├── ui.js               # Header (logo Maré de Vendas), carrinho, cards e checkout
 │   ├── utils.js            # Formatação, escape HTML, validação de idade
 │   ├── neighborhood.js     # Seleção de bairro no feed e escopo do moderador
 │   ├── merchant-nav.js     # Menu do painel do lojista
 │   ├── staff-nav.js        # Menu dos painéis admin e moderador
 │   └── pages/              # Uma página por rota
-├── supabase/migrations/    # Migrations SQL (001 → 046)
+├── supabase/migrations/    # Migrations SQL (001 → 057)
 ├── tools/                  # Scripts de DB (apply-sql, register-migration, db-push)
 ├── tests/                  # Testes unitários (Vitest)
 └── .github/workflows/
@@ -184,7 +185,7 @@ npm test
 | Admin | `brunopdaraujo@gmail.com` | `MarecAdmin2026!` |
 | Moderador | `moderador@maredevendas.com` | `DemoModerador2026!` |
 
-O moderador demo está vinculado ao bairro **Copacabana** (migration `033`). Login em `#/moderador/entrar`.
+O moderador demo fica vinculado a um **bairro ativo** (ex.: Baixa do sapateiro). Login em `#/moderador/entrar`.
 
 ---
 
@@ -240,11 +241,26 @@ Comportamento ao rolar a página (listener `passive` em `window`):
 |---------|---------|-----------|---------------|
 | **Header mobile** | `js/header-scroll.js` | Telas ≤767px | Cabeçalho some ao rolar para baixo e volta ao rolar para cima; não esconde com menu ☰ aberto |
 | **Filtros da home** | `js/home-filters-scroll.js` | `#/` (bairros + categorias) | Chips somem ao rolar para baixo; a busca permanece fixa |
+| **Chips bairro/categoria** | `js/pages/home.js` (`bindChipRowScroll`) | `#/` desktop e mobile | Arrastar / roda do mouse no desktop; toque no mobile; fade dinâmico nas pontas |
 | **Botão ↑** | `js/scroll-to-top.js` | Global | Aparece após ~280px; clique sobe ao topo e chama `render()` (atualiza a rota) |
 
-Classes CSS: `.header--scroll-hidden`, `.home-toolbar__filters--hidden`, `.scroll-to-top--visible`.
+Classes CSS: `.header--scroll-hidden`, `.home-toolbar__filters--hidden`, `.scroll-to-top--visible`, `.category-scroll--dragging`.
 
 Inicialização no boot (`app.js`); estados resetados a cada troca de rota (`router.js`).
+
+### Logo e cor de alerta (admin)
+
+O cabeçalho mostra **Maré** · **de** · **Vendas**:
+
+| Parte | Cor |
+|-------|-----|
+| **Maré** | Muda com o **status de alerta** (admin) |
+| **de** | Cor do texto (preto/cinza) |
+| **Vendas** | Dourado fixo |
+
+Admin → **Conta** (`#/admin/conta`) → **Cor de alerta do logo** → Aplicar no site.  
+Valor público em `platform_settings.logo_accent` (migration `057`); presets: normal, promo, alerta (verde), urgente, info, rosa, preto.  
+Arquivos: `js/logo-accent.js`, `css/styles.css` (`html[data-logo-accent]`), `js/app.js` (`loadLogoAccent`).
 
 ---
 
@@ -305,20 +321,21 @@ A plataforma é **multi-bairro**: um único site, várias regiões. O admin cont
 
 ```
 Admin (visão global)
-  └── Bairros (Copacabana, Ipanema, …)
-        └── Moderador regional (1 bairro)
-              └── Lojas e pedidos daquele bairro
+  └── Bairros (regiões ativas no painel)
+        └── Moderador regional (1 bairro ou todos)
+              └── Lojas e pedidos daquele escopo
 ```
 
-### Modelo de dados (migration `033`)
+### Modelo de dados (migration `033`+)
 
 | Tabela / coluna | Função |
 |-----------------|--------|
 | `neighborhoods` | Bairros/regiões (nome, slug, cidade, UF, ativo) |
 | `stores.neighborhood_id` | Loja pertence a um bairro (obrigatório no cadastro) |
-| `users.neighborhood_id` | Moderador vinculado a um bairro |
+| `users.neighborhood_id` | Moderador vinculado a um bairro (ou null = todos, conforme fluxo atual) |
+| `platform_settings` | Config pública da UI (ex.: `logo_accent`) — migration `057` |
 
-Bairros demo no Rio (seed na migration): **Copacabana**, **Ipanema**, **Leblon**, **Centro**, **Tijuca**. Lojas antigas foram vinculadas a Copacabana.
+Bairros são geridos em `#/admin/bairros` (criar, editar, ativar/desativar, excluir se vazio). O seed antigo da migration `033` (Copacabana, Ipanema, etc.) pode não refletir a produção atual.
 
 ### Marketplace (visitante / cliente)
 
@@ -334,7 +351,9 @@ Bairros demo no Rio (seed na migration): **Copacabana**, **Ipanema**, **Leblon**
 |-----|------|-----------|
 | **Bairros** | `#/admin/bairros` | Criar região (nome, cidade, UF); ativar/desativar |
 | **Moderadores** | `#/admin/moderadores` | Promover usuário existente **com bairro obrigatório**; alterar região depois; permissão de aprovar mudança de plano |
-| **Lojas** | `#/admin/lojas` | Ver/editar bairro de cada loja |
+| **Lojas** | `#/admin/lojas` | Ver/editar bairro; criar loja só com **lojista sem loja** |
+| **Produtos** | `#/admin/produtos` | Sidebar de lojas (ordenação sem emoji) + catálogo; admin **sem cooldown** de preço |
+| **Conta** | `#/admin/conta` | Senha, e-mail e **cor de alerta do logo** |
 
 ### Moderador regional
 
@@ -372,7 +391,7 @@ Em `#/lojista/cadastro`, o lojista escolhe **Bairro / região** antes de enviar.
 
 ## Planos de assinatura (lojistas)
 
-Limites e regras ficam em **`js/plans.js`** (`PLAN_LIMITS`, `canCreateProduct`, `canAddProductImage`, `planAllowsStoreBanner`). A API (`js/api.js`) e o painel do lojista bloqueiam cadastro/upload além do plano. Textos exibidos ao usuário em `js/strings.js` (seção `plans.*`).
+Limites e regras ficam em **`js/plans.js`** (`PLAN_LIMITS`, `canCreateProduct`, `canAddProductImage`, `planAllowsStoreLogo`, `planAllowsStoreBanner`). A API (`js/api.js`) e o painel do lojista bloqueiam cadastro/upload além do plano. Textos em `js/strings.js` (seção `plans.*`).
 
 O plano **Gratuito** é ativado após aprovação do cadastro da loja. Planos pagos (Plus, Premium) são solicitados em **Dashboard → Planos** e confirmados pelo admin após comprovante.
 
@@ -382,22 +401,23 @@ O plano **Gratuito** é ativado após aprovação do cadastro da loja. Planos pa
 |---------|--------|
 | **Itens no catálogo** (produtos ou serviços) | **1** no total |
 | **Imagens nos produtos** | **1 foto** no catálogo |
-| **Logo** da loja (foto de perfil) | Sim |
-| **Banner** personalizado da vitrine | Não — apenas cor/tema padrão |
-| **Alteração de preço** | A cada **24 h** |
+| **Logo** da loja (foto de perfil) | **Não** — só planos pagos (Plus/Premium) |
+| **Banner** personalizado da vitrine | **Não** — apenas cor/tema padrão |
+| **Alteração de preço** (lojista) | A cada **24 h** |
+| **Alteração de preço** (admin) | **Sem espera** (bypass do cooldown) |
 | **Anúncios no feed** | **Não** — exclusivo Premium |
 | **Pedidos** | Via WhatsApp |
 | **Ativar/ocultar** itens no catálogo | Sim |
 
-Lojistas no Gratuito publicam **1 produto/serviço** com **1 foto**. Para ampliar o catálogo, assinar Plus ou Premium.
+Lojistas no Gratuito publicam **1 produto/serviço** com **1 foto**. Logo e banner exigem upgrade.
 
 ### Comparativo de catálogo (todos os planos)
 
-| Plano | Itens no catálogo | Produtos com imagem | Banner personalizado | Anúncios no feed | Cooldown de preço |
-|-------|-------------------|---------------------|----------------------|------------------|-------------------|
-| **Gratuito** | 1 | 1 | Não | Não | 24 h |
-| **Plus** | 6 | 6 | Sim | Não | 12 h |
-| **Premium** | 30 | 30 | Sim | **2 inclusos/mês** (+ extras pagos) | 6 h |
+| Plano | Itens | Fotos no catálogo | Logo | Banner | Anúncios no feed | Cooldown de preço (lojista) |
+|-------|-------|-------------------|------|--------|------------------|-----------------------------|
+| **Gratuito** | 1 | 1 | Não | Não | Não | 24 h |
+| **Plus** | 6 | 6 | Sim | Sim | Não | 12 h |
+| **Premium** | 30 | 30 | Sim | Sim | **2 inclusos/mês** (+ extras) | 6 h |
 
 Detalhes de preços, destaques no feed e lista completa de benefícios: `#/regras` (seção planos) ou painel **Planos** do lojista.
 
@@ -426,7 +446,7 @@ Testes: `tests/api-premium-ads.test.js`, `tests/api-store-ad-approval.test.js`, 
 
 | Função | O que valida |
 |--------|----------------|
-| `planAllowsStoreLogo()` | Logo liberado em todos os planos |
+| `planAllowsStoreLogo(planId)` | Logo só em planos **pagos** (não no Gratuito) |
 | `planAllowsStoreBanner(planId)` | Banner só em planos pagos |
 | `planAllowsProductImages(planId)` | Fotos no catálogo só se `productImages > 0` |
 | `canCreateProduct(planId, count)` | Teto de itens no catálogo |
