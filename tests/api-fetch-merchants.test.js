@@ -100,6 +100,10 @@ describe('createStoreAsAdmin owner guard', () => {
           return {
             select: vi.fn(() => ({
               eq: vi.fn(() => ({
+                limit: vi.fn().mockResolvedValue({
+                  data: [{ id: 'store-1', name: 'Loja Existente' }],
+                  error: null,
+                }),
                 maybeSingle: vi.fn().mockResolvedValue({
                   data: { id: 'store-1', name: 'Loja Existente' },
                   error: null,

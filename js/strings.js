@@ -899,6 +899,7 @@ export const STRINGS = {
     "merchantAlreadyHasStore": "Este lojista já tem a loja \"{name}\". Use outro e-mail (um lojista = uma loja).",
     "informStoreName": "Informe o nome da loja.",
     "storeNameTaken": "Já existe uma loja com este nome (ou slug). Escolha outro nome.",
+    "storeCreateNoRow": "Não foi possível criar a loja (nenhum registro retornado). Confirme se você está logado como admin e tente de novo.",
     "informCategoryName": "Informe o nome da categoria.",
     "invalidCategory": "Categoria inválida.",
     "cannotDeleteCategoryStores": "Não é possível excluir: {count} loja(s) vinculada(s). Reatribua as lojas antes.",

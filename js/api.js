@@ -608,12 +608,15 @@ export async function fetchStoreBySlug(slug) {
 
 export async function fetchStoreByOwner(ownerId) {
   const client = await requireClient()
-  const { data, error } = await client
+  // limit(1): seed pode ter várias lojas no mesmo owner (lojasfake@); maybeSingle quebra com N>1
+  const { data: rows, error } = await client
     .from('stores')
     .select('*, category:categories(*), neighborhood:neighborhoods(id, name, slug, city, state, active)')
     .eq('owner_id', ownerId)
-    .maybeSingle()
+    .order('created_at', { ascending: true })
+    .limit(1)
   if (error) throw error
+  const data = Array.isArray(rows) ? rows[0] : rows
   if (!data) return null
   return downgradeExpiredStoreToFree(client, data)
 }
@@ -2306,15 +2309,28 @@ export async function resolveOwnerForAdminStore(email) {
   let owner = user
 
   if (user.role === 'customer') {
+    // maybeSingle: evita PGRST116 se 0 linhas (corrida/role já mudou)
     const { data, error } = await client
       .from('users')
       .update({ role: 'merchant' })
       .eq('id', user.id)
       .eq('role', 'customer')
       .select('id, name, email, role')
-      .single()
+      .maybeSingle()
     if (error) throw error
-    owner = data
+    if (data) {
+      owner = data
+    } else {
+      // já merchant (ou update bloqueado) — relê perfil
+      const { data: again, error: againErr } = await client
+        .from('users')
+        .select('id, name, email, role')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (againErr) throw againErr
+      if (!again) throw new Error(t('errors.userNotFound'))
+      owner = again
+    }
   }
 
   if (owner.role !== 'merchant') {
@@ -2347,13 +2363,16 @@ export async function createStoreAsAdmin(form) {
   }
   if (!ownerId) throw new Error(t('errors.informResponsibleMerchantEmail'))
 
-  // Um lojista = uma loja (mesma regra do cadastro em /lojista/cadastro).
-  const { data: existingStore, error: existingErr } = await client
+  // Um lojista = uma loja (regra do app). NÃO usar maybeSingle/single aqui:
+  // seed (lojasfake@) pode ter N lojas no mesmo owner_id → PGRST116
+  // "JSON object requested, multiple (or no) rows returned".
+  const { data: existingRows, error: existingErr } = await client
     .from('stores')
     .select('id, name')
     .eq('owner_id', ownerId)
-    .maybeSingle()
+    .limit(1)
   if (existingErr) throw existingErr
+  const existingStore = Array.isArray(existingRows) ? existingRows[0] : existingRows
   if (existingStore) throw new Error(t('errors.merchantAlreadyHasStore', { name: existingStore.name }))
 
   const neighborhood = await resolveActiveNeighborhoodLocation(client, form.neighborhood_id)
@@ -2380,8 +2399,18 @@ export async function createStoreAsAdmin(form) {
     subscription_status: approved ? 'active' : 'inactive',
     approved_at: approvedAt,
     subscription_expires_at: approved ? resolveSubscriptionExpiresAt({ planId, approvedAt }) : null,
-  }).select('*, category:categories(*), neighborhood:neighborhoods(id, name, slug)').single()
-  if (error) throw error
+  }).select('*, category:categories(*), neighborhood:neighborhoods(id, name, slug)').maybeSingle()
+  if (error) {
+    if (error.code === '23505' || /duplicate|unique/i.test(error.message ?? '')) {
+      throw new Error(t('errors.storeNameTaken'))
+    }
+    // PGRST116 = 0 ou N linhas no retorno do single/maybeSingle
+    if (error.code === 'PGRST116' || /multiple \(or no\) rows/i.test(error.message ?? '')) {
+      throw new Error(t('errors.storeCreateNoRow'))
+    }
+    throw error
+  }
+  if (!data) throw new Error(t('errors.storeCreateNoRow'))
   return data
 }
 

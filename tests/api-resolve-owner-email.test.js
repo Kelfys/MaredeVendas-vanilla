@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 function createMockClient({
   user = null,
   existingStore = null,
+  /** When true, existing-store query returns 2 rows (simula lojasfake) — limit(1) pega a 1ª */
+  multipleExistingStores = false,
   neighborhood = { id: 'n1', city: 'Rio', state: 'RJ', active: true },
   promoteResult = null,
   promoteError = null,
@@ -12,15 +14,30 @@ function createMockClient({
     from: vi.fn((table) => {
       if (table === 'users') {
         return {
-          select: vi.fn(() => ({
-            ilike: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({ data: user, error: null }),
-            })),
-          })),
+          select: vi.fn((cols) => {
+            // fetchUserByEmail: .ilike().maybeSingle()
+            // re-fetch after promote: .eq().maybeSingle()
+            const chain = {
+              ilike: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({ data: user, error: null }),
+              })),
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: promoteResult ?? (user ? { ...user, role: 'merchant' } : null),
+                  error: null,
+                }),
+              })),
+            }
+            return chain
+          }),
           update: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
                 select: vi.fn(() => ({
+                  maybeSingle: vi.fn().mockResolvedValue({
+                    data: promoteResult ?? { ...user, role: 'merchant' },
+                    error: promoteError,
+                  }),
                   single: vi.fn().mockResolvedValue({
                     data: promoteResult ?? { ...user, role: 'merchant' },
                     error: promoteError,
@@ -32,14 +49,30 @@ function createMockClient({
         }
       }
       if (table === 'stores') {
+        const existingList = multipleExistingStores
+          ? [
+              existingStore ?? { id: 'store-1', name: 'Loja A' },
+              { id: 'store-2', name: 'Loja B' },
+            ]
+          : existingStore
+            ? [existingStore]
+            : []
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              maybeSingle: vi.fn().mockResolvedValue({ data: existingStore, error: null }),
+              limit: vi.fn().mockResolvedValue({ data: existingList, error: null }),
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: existingList[0] ?? null,
+                error: null,
+              }),
             })),
           })),
           insert: vi.fn(() => ({
             select: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: insertResult ?? { id: 'store-new', name: 'Nova Loja' },
+                error: null,
+              }),
               single: vi.fn().mockResolvedValue({
                 data: insertResult ?? { id: 'store-new', name: 'Nova Loja' },
                 error: null,
@@ -180,6 +213,23 @@ describe('createStoreAsAdmin with owner_email', () => {
       api.createStoreAsAdmin({
         owner_email: 'ana@test.com',
         name: 'Outra',
+        whatsapp: '21999999999',
+        neighborhood_id: 'n1',
+        category_id: 'c1',
+      }),
+    ).rejects.toThrow(/já tem a loja/i)
+  })
+
+  it('rejects with friendly message when owner has multiple stores (no PGRST116)', async () => {
+    const merchant = { id: 'fake', name: 'Fake', email: 'lojasfake@gmail.com', role: 'merchant' }
+    const api = await loadApi(createMockClient({
+      user: merchant,
+      multipleExistingStores: true,
+    }))
+    await expect(
+      api.createStoreAsAdmin({
+        owner_email: 'lojasfake@gmail.com',
+        name: 'Mais uma',
         whatsapp: '21999999999',
         neighborhood_id: 'n1',
         category_id: 'c1',
