@@ -56,6 +56,8 @@ jobs:
           # Mantém domínio customizado no GitHub Pages após cada deploy
           echo 'maredevendas.com.br' > dist/CNAME
           BUILD_ID="${GITHUB_SHA::7}"
+          # Cache bust CSS em qualquer domínio (antes só GitHub Pages reescrevia o href).
+          sed -i "s|href=\"css/styles.css\"|href=\"css/styles.css?v=${BUILD_ID}\"|g" dist/index.html
           sed -i "s|+ 'css/styles.css'|+ 'css/styles.css?v=${BUILD_ID}'|g" dist/index.html
           sed -i "s|+ 'js/app.js'|+ 'js/app.js?v=${BUILD_ID}'|g" dist/index.html
           chmod +x .github/bust-js-cache.sh .github/copy-spa-shells.sh

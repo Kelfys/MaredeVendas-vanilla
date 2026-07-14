@@ -27,7 +27,7 @@ import { DEFAULT_THEME_COLOR } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import { normalizeItemType } from './catalog.js'
 import {
-  planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE,
+  planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE, stripStoreBannerIfPlanDisallows,
   getPlanProductLimit, getPlanProductImageLimit,
   planProductLimitMessage, planProductImageLimitMessage, canAddProductImage,
   getPriceCooldownRemaining, formatPriceCooldownRemaining, getPlanById, buildPlanRequestStoreNote,
@@ -571,7 +571,9 @@ export async function fetchStores(filters = {}) {
     stores.map((store) => downgradeExpiredStoreToFree(client, store)),
   )
   // Feed ranking usa favorites_count / likes_count (getStoreEngagementBoost).
-  return attachStoreEngagementStats(marketplaceStores)
+  const withEngagement = await attachStoreEngagementStats(marketplaceStores)
+  // Plano free: não vazar URL de banner (legado/seed) para o cliente.
+  return withEngagement.map(stripStoreBannerIfPlanDisallows)
 }
 
 export async function fetchStoreBySlug(slug) {
@@ -585,7 +587,7 @@ export async function fetchStoreBySlug(slug) {
   if (!data || data.status !== 'approved') return null
   const store = await downgradeExpiredStoreToFree(client, data)
   if (!['active', 'trialing'].includes(store.subscription_status)) return null
-  return store
+  return stripStoreBannerIfPlanDisallows(store)
 }
 
 export async function fetchStoreByOwner(ownerId) {

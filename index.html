@@ -81,16 +81,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <!-- Deploy injeta ?v=BUILD_ID no href (domínio .br também precisa — CSS antigo cacheava logo como banner). -->
+  <link rel="stylesheet" href="css/styles.css" data-mv-styles />
   <script>
     (function () {
-      if (window.__MV_BASE__ === './') return
-      var css = document.querySelector('link[href="css/styles.css"]')
-      if (css) css.href = window.__MV_BASE__ + 'css/styles.css'
+      var css = document.querySelector('link[data-mv-styles]')
+      if (css && window.__MV_BASE__ && window.__MV_BASE__ !== './') {
+        var href = css.getAttribute('href') || 'css/styles.css'
+        css.href = window.__MV_BASE__ + href.replace(/^\.\//, '')
+      }
       document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]').forEach(function (el) {
         var href = el.getAttribute('href') || ''
         if (href.indexOf('assets/') === 0 || href.indexOf('favicon') !== -1) {
-          el.href = window.__MV_BASE__ + href.replace(/^\.\//, '')
+          el.href = (window.__MV_BASE__ || './') + href.replace(/^\.\//, '')
         }
       })
     })()

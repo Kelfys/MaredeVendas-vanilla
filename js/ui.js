@@ -477,8 +477,8 @@ export function renderStoreCard(store, options = {}) {
       <div class="store-card__banner">
         ${planBadge}
         ${publicBanner
-          ? `<img src="${escapeHtml(publicBanner)}" alt="" loading="lazy" />`
-          : `<div style="${bannerStyle};width:100%;height:100%"></div>`}
+          ? `<img class="store-card__banner-img" src="${escapeHtml(publicBanner)}" alt="" loading="lazy" />`
+          : `<div class="store-card__banner-fill" style="${bannerStyle}"></div>`}
         ${store.logo
           ? `<img class="store-card__logo" src="${escapeHtml(store.logo)}" alt="${escapeHtml(store.name)}" />`
           : `<div class="store-card__logo-placeholder" style="background:${theme.hex};color:${onColor}">🏪</div>`}

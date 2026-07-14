@@ -57,6 +57,12 @@ export function getStorePublicBanner(store) {
   return store.banner
 }
 
+/** Zera banner no payload se o plano não permitir (API marketplace / listas públicas). */
+export function stripStoreBannerIfPlanDisallows(store) {
+  if (!store || planAllowsStoreBanner(store.plan_id) || !store.banner) return store
+  return { ...store, banner: null }
+}
+
 /**
  * Anúncios no feed (store_ads):
  * - Premium: 2 inclusos/mês calendário (is_extra=false).

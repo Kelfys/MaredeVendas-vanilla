@@ -20,6 +20,7 @@ import {
   planAllowsStoreLogo,
   planAllowsStoreBanner,
   getStorePublicBanner,
+  stripStoreBannerIfPlanDisallows,
   planAllowsStoreAds,
   getPlanMonthlyAdLimit,
   countStoreAdsThisMonth,
@@ -88,6 +89,13 @@ describe('plan store images', () => {
     expect(getStorePublicBanner({ plan_id: 'plus', banner: 'https://cdn.example/b.jpg' })).toBe('https://cdn.example/b.jpg')
     expect(getStorePublicBanner({ plan_id: 'premium', banner: null })).toBeNull()
     expect(getStorePublicBanner(null)).toBeNull()
+  })
+
+  it('stripStoreBannerIfPlanDisallows nulls banner only on free', () => {
+    expect(stripStoreBannerIfPlanDisallows({ plan_id: 'free', banner: 'https://x/b.jpg', name: 'A' }))
+      .toEqual({ plan_id: 'free', banner: null, name: 'A' })
+    expect(stripStoreBannerIfPlanDisallows({ plan_id: 'plus', banner: 'https://x/b.jpg' }).banner)
+      .toBe('https://x/b.jpg')
   })
 })
 
