@@ -18,6 +18,17 @@ export const SUPABASE_ANON_KEY = 'sb_publishable_2hCOD3j1j7FRjLMsPF3sdw_4dG7A_HW
 
 export const APP_NAME = 'MaredeVendas'
 
+/**
+ * Conta seed que pode ter N lojas (ads/demo).
+ * Admin pode criar mais lojas para este e-mail; demais lojistas = 1 loja.
+ * Apagar o usuário remove as lojas (ON DELETE CASCADE).
+ */
+export const SEED_MULTI_STORE_OWNER_EMAIL = 'lojasfake@gmail.com'
+
+export function isSeedMultiStoreOwnerEmail(email) {
+  return String(email ?? '').trim().toLowerCase() === SEED_MULTI_STORE_OWNER_EMAIL
+}
+
 /** Produção canônica no domínio próprio (Registro.br → GitHub Pages). */
 export const PRODUCTION_SITE_ORIGIN = 'https://maredevendas.com.br'
 export const PRODUCTION_SITE_PATH = '/'

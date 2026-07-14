@@ -96,6 +96,18 @@ describe('createStoreAsAdmin owner guard', () => {
   it('rejects when the merchant already has a store', async () => {
     const mockClient = {
       from: vi.fn((table) => {
+        if (table === 'users') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: { email: 'merchant@real.com' },
+                  error: null,
+                }),
+              })),
+            })),
+          }
+        }
         if (table === 'stores') {
           return {
             select: vi.fn(() => ({

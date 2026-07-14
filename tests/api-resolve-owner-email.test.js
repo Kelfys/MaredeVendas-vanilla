@@ -220,20 +220,37 @@ describe('createStoreAsAdmin with owner_email', () => {
     ).rejects.toThrow(/já tem a loja/i)
   })
 
-  it('rejects with friendly message when owner has multiple stores (no PGRST116)', async () => {
+  it('allows seed multi-store owner (lojasfake@) to receive another store', async () => {
     const merchant = { id: 'fake', name: 'Fake', email: 'lojasfake@gmail.com', role: 'merchant' }
     const api = await loadApi(createMockClient({
       user: merchant,
       multipleExistingStores: true,
+      insertResult: { id: 's-new', name: 'Mais uma', owner_id: 'fake' },
+    }))
+    const store = await api.createStoreAsAdmin({
+      owner_email: 'lojasfake@gmail.com',
+      name: 'Mais uma',
+      whatsapp: '21999999999',
+      neighborhood_id: 'n1',
+      category_id: 'c1',
+    })
+    expect(store.id).toBe('s-new')
+  })
+
+  it('still blocks normal merchant who already has a store', async () => {
+    const merchant = { id: 'm1', name: 'Ana', email: 'ana@real.com', role: 'merchant' }
+    const api = await loadApi(createMockClient({
+      user: merchant,
+      existingStore: { id: 'store-1', name: 'suzy mega hair' },
     }))
     await expect(
       api.createStoreAsAdmin({
-        owner_email: 'lojasfake@gmail.com',
-        name: 'Mais uma',
+        owner_email: 'ana@real.com',
+        name: 'Outra',
         whatsapp: '21999999999',
         neighborhood_id: 'n1',
         category_id: 'c1',
       }),
-    ).rejects.toThrow(/já tem a loja/i)
+    ).rejects.toThrow(/suzy mega hair/i)
   })
 })

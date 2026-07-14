@@ -23,7 +23,7 @@ import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
 import { generateSlug, sanitizeSearch, getProductEngagementWeight, computeProductLikesCount } from './utils.js'
 import { REPORT_REASON_IDS } from './report-reasons.js'
 import { t } from './strings.js'
-import { DEFAULT_THEME_COLOR } from './config.js'
+import { DEFAULT_THEME_COLOR, isSeedMultiStoreOwnerEmail } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import { normalizeItemType } from './catalog.js'
 import {
@@ -2344,7 +2344,7 @@ export async function resolveOwnerForAdminStore(email) {
  * Cria loja pelo admin.
  * Dono: `form.owner_email` (preferido — resolve e-mail) ou `form.owner_id` (legado).
  * Regra de negócio: 1 merchant = 1 loja (igual /lojista/cadastro).
- * Exceção de dados: seed demo concentrado em lojasfake@gmail.com (várias lojas no mesmo dono via SQL).
+ * Exceção: SEED_MULTI_STORE_OWNER_EMAIL (lojasfake@) pode ter N lojas (ads/demo).
  *
  * @param {object} form
  * @param {string} [form.owner_email]
@@ -2357,23 +2357,36 @@ export async function createStoreAsAdmin(form) {
 
   // Preferir e-mail (UI admin); owner_id mantido para scripts/testes.
   let ownerId = form.owner_id || null
+  let ownerEmail = form.owner_email ? String(form.owner_email).trim() : ''
   if (form.owner_email) {
     const owner = await resolveOwnerForAdminStore(form.owner_email)
     ownerId = owner.id
+    ownerEmail = owner.email || ownerEmail
   }
   if (!ownerId) throw new Error(t('errors.informResponsibleMerchantEmail'))
 
-  // Um lojista = uma loja (regra do app). NÃO usar maybeSingle/single aqui:
-  // seed (lojasfake@) pode ter N lojas no mesmo owner_id → PGRST116
-  // "JSON object requested, multiple (or no) rows returned".
-  const { data: existingRows, error: existingErr } = await client
-    .from('stores')
-    .select('id, name')
-    .eq('owner_id', ownerId)
-    .limit(1)
-  if (existingErr) throw existingErr
-  const existingStore = Array.isArray(existingRows) ? existingRows[0] : existingRows
-  if (existingStore) throw new Error(t('errors.merchantAlreadyHasStore', { name: existingStore.name }))
+  // Sem e-mail no form (só owner_id): busca para saber se é a conta seed multi-loja
+  if (!ownerEmail) {
+    const { data: ownerRow } = await client
+      .from('users')
+      .select('email')
+      .eq('id', ownerId)
+      .maybeSingle()
+    ownerEmail = ownerRow?.email ?? ''
+  }
+
+  // Um lojista = uma loja — exceto conta seed (várias lojas ads no mesmo dono).
+  // limit(1): NÃO usar maybeSingle (PGRST116 se N>1).
+  if (!isSeedMultiStoreOwnerEmail(ownerEmail)) {
+    const { data: existingRows, error: existingErr } = await client
+      .from('stores')
+      .select('id, name')
+      .eq('owner_id', ownerId)
+      .limit(1)
+    if (existingErr) throw existingErr
+    const existingStore = Array.isArray(existingRows) ? existingRows[0] : existingRows
+    if (existingStore) throw new Error(t('errors.merchantAlreadyHasStore', { name: existingStore.name }))
+  }
 
   const neighborhood = await resolveActiveNeighborhoodLocation(client, form.neighborhood_id)
   if (form.category_id) await assertCategoryExists(client, form.category_id)

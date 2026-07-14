@@ -687,7 +687,7 @@ export const STRINGS = {
     "noMerchantsHint": "Informe o e-mail de uma conta existente. Se for cliente, será promovido a lojista ao criar a loja. Cadastro novo: <a href=\"#/lojista/cadastro\">Área do Lojista</a>.",
     "newStoreSummary": "+ Nova loja",
     "responsibleMerchant": "E-mail do lojista responsável",
-    "responsibleMerchantHint": "Conta já cadastrada no site. Lojista sem loja, ou cliente (promovido a lojista automaticamente). Um lojista = uma loja.",
+    "responsibleMerchantHint": "Conta já cadastrada. Cliente vira lojista na hora. Um lojista = uma loja — exceto lojasfake@gmail.com (várias lojas demo/seed).",
     "openingHours": "Horário",
     "themeColor": "Cor do tema",
     "planFree": "Gratuito",
