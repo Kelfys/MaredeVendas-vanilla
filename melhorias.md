@@ -9,16 +9,16 @@ Reaplicação: **com calma, uma por uma**, testando local e em produção antes 
 
 | | |
 |---|---|
-| **HEAD atual (prod)** | `af5dedd` (tema claro amarelo, botões por loja, favicon SVG) |
+| **HEAD atual (prod)** | verificar: `git log -1 --oneline` (main avança com deploys) |
 | **Rollback de emergência** | `8bb11b1` (purge SW legado) — **não** é o HEAD; só se o site cair |
-| **Total de itens (lista A–E)** | 28 |
+| **Total de itens (lista A–F)** | 31 |
 | **Feitos** | 1 (`E9`) |
 | **Em andamento** | 0 |
-| **Pendentes** | 27 |
+| **Pendentes** | 30 |
 | **Modo de trabalho** | **1 código por vez** → testar → só então o próximo |
 | **Próximo sugerido** | `C1` (medalhas de plano) — baixo risco, sem banco |
 | **Evitar por ora** | `E6`, `E16` e **vários E de uma vez** |
-| **Última atualização** | 13/07/2026 |
+| **Última atualização** | 14/07/2026 |
 
 ---
 
@@ -68,6 +68,7 @@ Reaplicação: **com calma, uma por uma**, testando local e em produção antes 
 - [C — Visual / UI](#c--visual--ui)
 - [D — Uploads](#d--uploads)
 - [E — Fases 1–3](#e--fases-13)
+- [F — Segurança / conta (senha)](#f--segurança--conta-senha)
 - [Fora da lista (já no main)](#fora-da-lista-já-no-main)
 - [Dependências](#dependências)
 - [Histórico de commits (quando existia na árvore antiga)](#histórico-de-commits-quando-existia-na-árvore-antiga)
@@ -197,6 +198,9 @@ Ordem segura para ir marcando ✅:
 | 10 | **B3** | Baixo | Não | CSS feed |
 | 11 | **B1** | Médio | Sim (`050`?) | Produto no anúncio — checar schema |
 | … | **E3** | Baixo | Não | QR Code |
+| … | **F1** | Médio | Não* | Senha atual ao trocar (*Auth Supabase) |
+| … | **F2** | Médio | Não* | E-mail ao trocar senha |
+| … | **F3** | Médio | Não* | Encerrar outras sessões após troca |
 | … | **E12**→**E13** | Médio | Sim | Log staff + tela |
 | … | **E10** | Médio | Sim | Métricas bairro |
 | — | **E6**, **E16** | Alto | Não | **Adiar** |
@@ -312,6 +316,43 @@ Use só como **mapa mental**. Na prática: peça **um código** da coluna.
 
 ---
 
+## F — Segurança / conta (senha)
+
+Contexto (14/07/2026): senhas só no **Supabase Auth** (vault `admin_user_passwords` removido).  
+Hoje: `updatePassword` chama `auth.updateUser({ password })` **sem** pedir senha atual e **sem** e-mail de alerta; sessões antigas em outros aparelhos **podem continuar** até o token expirar.
+
+| Código | Melhoria | Quem | Onde | Banco | Risco | Status |
+|--------|----------|------|------|-------|-------|--------|
+| **F1** | Exigir **senha atual** antes de definir a nova | Cliente / lojista / staff | Conta → alterar senha | Não* | Médio | ⬜ |
+| **F2** | **E-mail de alerta** quando a senha for alterada | Todos com e-mail | Supabase Auth / template | Não* | Médio | ⬜ |
+| **F3** | Após troca bem-sucedida: **encerrar outras sessões** (ou `signOut` global + relogin) | Todos | `updatePassword` + Auth | Não* | Médio | ⬜ |
+
+\* Não é migration SQL do app; pode exigir config no **Dashboard Supabase** (Auth → e-mails, políticas de sessão) e/ou reauth com `signInWithPassword` da senha atual no front.
+
+### Detalhe por item
+
+| Código | Comportamento desejado | Arquivos prováveis |
+|--------|------------------------|--------------------|
+| **F1** | Form com “senha atual” + “nova” + “confirmar”; validar atual com `signInWithPassword` (e-mail da sessão) **antes** de `updateUser({ password })`. Bloqueia quem só tem a sessão aberta sem saber a senha. | `js/api.js` (`updatePassword`), `js/pages/favorites.js`, `js/pages/merchant.js`, admin conta se houver |
+| **F2** | Notificar o e-mail da conta: “sua senha foi alterada em …”. Preferir template Auth do Supabase se existir; senão Edge Function / hook. Evita silêncio em takeover. | Dashboard Supabase + docs; opcional `js/api.js` |
+| **F3** | Depois de trocar: invalidar refresh tokens de outros devices (`signOut({ scope: 'others' })` se disponível na versão do SDK) **ou** `signOut` completo e redirecionar ao login. Reduz sessão hijack residual. | `js/api.js` `updatePassword`, `js/state.js` |
+
+### Ordem sugerida (F)
+
+```
+F1 → F3 → F2
+```
+
+`F1` e `F3` no front/SDK; `F2` depende mais de config Supabase.
+
+### O que já está ok (não reabrir como bug)
+
+- “Esqueci a senha” → `resetPasswordForEmail` + `#/auth/callback`
+- Sem vault de senha em texto no Postgres (security P0)
+- Admin do app **não** redefine senha de usuário pelo painel MaredeVendas
+
+---
+
 ## Fora da lista (já no main)
 
 Trabalho recente **não** mapeado como A–E, mas está em produção:
@@ -322,6 +363,11 @@ Trabalho recente **não** mapeado como A–E, mas está em produção:
 | `92167d2` | Paginação lista de lojas no admin |
 | `af5dedd` | Tema claro amarelo (papel), botões na cor da loja, favicon SVG |
 | `6f6d891` … `27f52c4` | Favicon / marca colorida |
+| `597eb03` | Feed com engajamento real (lojas/produtos) |
+| `7bd5677` / `9dc7049` | Banner free oculto + fix CSS logo ≠ banner |
+| `3dba8f0` | Plano Gratuito: **1 produto + 1 foto** |
+| `3a60ba7` | Categorias marketplace v2 (migration `056`) |
+| `b5c9471` | Editor de textos (download com helpers completos) |
 
 ---
 
@@ -334,6 +380,8 @@ B1                                →  migration 050?
 B5                                →  052
 C4                                →  melhor depois de C1/C5
 E6 + E16                          →  NUNCA sem acordo e estratégia de cache
+F3                                →  melhor depois de F1 (mesmo fluxo updatePassword)
+F2                                →  independente; config Supabase Auth
 ```
 
 ---
@@ -387,10 +435,17 @@ Referência da época em que o pacote existia (muitos commits **não** estão no
 | 13/07/2026 | Pacotes = referência de ordem; **não** implementar o pacote inteiro de uma vez |
 | 13/07/2026 | `E9` marcado ✅ (paginação feed no main) |
 | 13/07/2026 | Evitar E6/E16; emergência SW = `8bb11b1` |
+| 14/07/2026 | Incluída seção **F** (segurança de senha: F1 senha atual, F2 e-mail, F3 outras sessões) |
+| 14/07/2026 | Plano free = 1 item + 1 foto; categorias marketplace `056`; editor de textos atualizado |
 
 ---
 
 ## Diário
+
+### 2026-07-14
+- Seção **F — Segurança / conta (senha)** adicionada (`F1`, `F2`, `F3`).
+- Contexto: se alguém troca a senha (sessão aberta / e-mail / Auth), senha antiga falha no login; sessão residual e falta de alerta são lacunas a cobrir com F1–F3.
+- Também em produção (fora A–E): engajamento no feed, banner free, free 1+1, categorias v2, editor de textos.
 
 ### 2026-07-13
 - Arquivo atualizado para fluxo **1 código → testar → próximo**.
