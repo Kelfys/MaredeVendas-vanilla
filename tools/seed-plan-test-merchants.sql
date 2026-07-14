@@ -39,7 +39,7 @@ SELECT
   NOW(),
   'pixel-green'
 FROM public.categories c
-WHERE c.slug = 'alimentacao'
+WHERE c.slug = 'alimentacao-bebidas'
 LIMIT 1
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name,
@@ -75,7 +75,7 @@ SELECT
   NOW(),
   'pixel-blue'
 FROM public.categories c
-WHERE c.slug = 'moda'
+WHERE c.slug = 'moda-acessorios'
 LIMIT 1
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name,
