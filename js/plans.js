@@ -5,7 +5,7 @@
  * Plano Gratuito (free) — ver PLAN_LIMITS e README § Planos de assinatura:
  *   • 1 item no catálogo (produto ou serviço)
  *   • 1 foto no catálogo (productImages: 1)
- *   • logo da loja sim; banner personalizado não (planAllowsStoreBanner)
+ *   • logo (foto de perfil) e banner personalizado: não (só planos pagos)
  *   • alteração de preço a cada 24 h (PLAN_COOLDOWN_HOURS.free)
  * Anúncios no feed (store_ads): exclusivo Premium — até 2 inclusos/mês; extras R$ 5 (STORE_AD_EXTRA_FEE), 24h após aprovação.
  * Validação na API: js/api.js (assertProductCountAllowed, assertProductImageAllowed, assertStoreAdAllowed).
@@ -33,12 +33,15 @@ function buildPlanFeatures(featureKeys, cooldownHours, cooldownAfterIndex) {
 /** Mensagem exibida quando lojista free tenta enviar banner personalizado. */
 export const FREE_PLAN_BANNER_MESSAGE = t('plans.freeBannerMessage')
 
-/** @deprecated Use FREE_PLAN_BANNER_MESSAGE */
+/** Mensagem quando free tenta enviar logo (foto de perfil da loja). */
+export const FREE_PLAN_LOGO_MESSAGE = t('plans.freeLogoMessage')
+
+/** @deprecated Use FREE_PLAN_BANNER_MESSAGE / FREE_PLAN_LOGO_MESSAGE */
 export const FREE_PLAN_BRANDING_MESSAGE = FREE_PLAN_BANNER_MESSAGE
 
-/** Logo (foto de perfil da loja) — liberado em todos os planos, inclusive Gratuito. */
-export function planAllowsStoreLogo() {
-  return true
+/** Logo (foto de perfil da loja) — somente planos pagos (plus, premium). */
+export function planAllowsStoreLogo(planId) {
+  return Boolean(planId && planId !== 'free')
 }
 
 /** Banner da vitrine — somente planos pagos (plus, premium). */
@@ -145,9 +148,9 @@ export function formatStoreAdExtraFeeHint() {
   return t('plans.extraAdFeeHint', { fee: formatCurrency(STORE_AD_EXTRA_FEE), hours: STORE_AD_DURATION_HOURS })
 }
 
-/** @deprecated Use planAllowsStoreBanner — banner exige plano pago; logo é liberado em todos os planos */
+/** @deprecated Use planAllowsStoreBanner / planAllowsStoreLogo — branding exige plano pago */
 export function planAllowsStoreBranding(planId) {
-  return planAllowsStoreBanner(planId)
+  return planAllowsStoreBanner(planId) || planAllowsStoreLogo(planId)
 }
 
 /**
@@ -245,7 +248,7 @@ const PLAN_CONFIGS = [
     featureKeys: [
       'plans.featureFreeItems1',
       'plans.featureFreeOneImage',
-      'plans.featureStoreLogo',
+      'plans.featureDefaultAvatar',
       'plans.featureDefaultBanner',
       'plans.featureToggleProducts',
       'plans.featureWhatsappOrders',
@@ -261,11 +264,12 @@ const PLAN_CONFIGS = [
     featureKeys: [
       'plans.featurePlusItems6',
       'plans.featurePlusImages6',
+      'plans.featureStoreLogo',
       'plans.featureCustomBanner',
       'plans.featureHomeHighlight',
       'plans.featureToggleProducts',
     ],
-    cooldownAfterIndex: 3,
+    cooldownAfterIndex: 4,
   },
   {
     id: 'premium',
@@ -276,13 +280,14 @@ const PLAN_CONFIGS = [
     featureKeys: [
       'plans.featurePremiumItems30',
       'plans.featurePlusImagesAll',
+      'plans.featureStoreLogo',
       'plans.featureCustomBanner',
       'plans.featureToggleProducts',
       'plans.featurePremiumAds2',
       'plans.featurePremiumAdsRotation24h',
       'plans.featureFeedRotation24h',
     ],
-    cooldownAfterIndex: 4,
+    cooldownAfterIndex: 5,
   },
 ]
 

@@ -40,7 +40,8 @@ import {
   MODERATOR_PERMISSIONS, getModeratorPermissionValue,
 } from '../roles.js'
 import {
-  planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE,
+  planAllowsStoreBanner, planAllowsStoreLogo,
+  FREE_PLAN_BANNER_MESSAGE, FREE_PLAN_LOGO_MESSAGE,
   countProductsWithImages, canAddProductImage, canCreateProduct,
   planProductImageLimitMessage, planProductLimitMessage,
   formatProductLimitHint, formatProductImageLimitHint,
@@ -1146,21 +1147,23 @@ function bindImagePreview(input, previewEl) {
   })
 }
 
-/** Logo sempre no DOM; banner fica hidden + aviso de upgrade quando plano é free. */
+/** Logo e banner: hidden + aviso no plano free; liberados em planos pagos. */
 function storeBrandingFieldsHtml(planId, store = null) {
   const id = store?.id ?? ''
+  const canLogo = planAllowsStoreLogo(planId)
   const canBanner = planAllowsStoreBanner(planId)
+  const canAnyBranding = canLogo || canBanner
 
   return `
-    <div class="form-group" data-branding-field data-branding-logo>
+    <div class="form-group" data-branding-field data-branding-logo ${canLogo ? '' : 'hidden'}>
       <label class="form-label">${t('admin.logo')}</label>
       ${store
         ? `<div class="admin-image-field">
             <div data-preview-logo="${id}">${imagePreviewBlock(store.logo, store.name, 'square')}</div>
-            <input class="form-input" type="file" name="logo" accept="image/*" />
+            <input class="form-input" type="file" name="logo" accept="image/*" ${canLogo ? '' : 'disabled'} />
           </div>
-          ${store.logo ? `<label class="admin-check"><input type="checkbox" name="remove_logo" /> ${t('admin.removeCurrentLogo')}</label>` : ''}`
-        : `<input class="form-input" type="file" name="logo" accept="image/*" />
+          ${store.logo && canLogo ? `<label class="admin-check"><input type="checkbox" name="remove_logo" /> ${t('admin.removeCurrentLogo')}</label>` : ''}`
+        : `<input class="form-input" type="file" name="logo" accept="image/*" ${canLogo ? '' : 'disabled'} />
            <small class="form-hint">${STORE_LOGO_UPLOAD_HINT}</small>`}
     </div>
     <div class="form-group admin-form-grid__full" data-branding-field data-branding-banner ${canBanner ? '' : 'hidden'}>
@@ -1168,14 +1171,15 @@ function storeBrandingFieldsHtml(planId, store = null) {
       ${store
         ? `<div class="admin-image-field">
             <div data-preview-banner="${id}">${imagePreviewBlock(store.banner, store.name, 'banner')}</div>
-            <input class="form-input" type="file" name="banner" accept="image/*" />
+            <input class="form-input" type="file" name="banner" accept="image/*" ${canBanner ? '' : 'disabled'} />
           </div>
-          ${store.banner ? `<label class="admin-check"><input type="checkbox" name="remove_banner" /> ${t('admin.removeCurrentBanner')}</label>` : ''}`
-        : `<input class="form-input" type="file" name="banner" accept="image/*" />
+          ${store.banner && canBanner ? `<label class="admin-check"><input type="checkbox" name="remove_banner" /> ${t('admin.removeCurrentBanner')}</label>` : ''}`
+        : `<input class="form-input" type="file" name="banner" accept="image/*" ${canBanner ? '' : 'disabled'} />
            <small class="form-hint">${STORE_BANNER_UPLOAD_HINT}</small>`}
     </div>
-    <div class="form-group admin-form-grid__full" data-branding-locked ${canBanner ? 'hidden' : ''}>
-      <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_BANNER_MESSAGE)}</p>
+    <div class="form-group admin-form-grid__full" data-branding-locked ${canAnyBranding ? 'hidden' : ''}>
+      <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_LOGO_MESSAGE)}</p>
+      <p class="form-hint form-hint--info" style="margin-top:0.5rem">${escapeHtml(FREE_PLAN_BANNER_MESSAGE)}</p>
     </div>`
 }
 
@@ -1483,7 +1487,7 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
     </div>`
 }
 
-/** Alterna visibilidade do campo banner ao mudar plan_id no formulário admin. */
+/** Alterna logo/banner ao mudar plan_id no formulário admin. */
 function bindPlanBrandingToggle(scope) {
   scope.querySelectorAll('[data-plan-branding-form]').forEach((form) => {
     const planSelect = form.querySelector('[name="plan_id"]')
@@ -1491,7 +1495,15 @@ function bindPlanBrandingToggle(scope) {
     if (!planSelect || !brandingWrap) return
 
     const sync = () => {
+      const canLogo = planAllowsStoreLogo(planSelect.value)
       const canBanner = planAllowsStoreBanner(planSelect.value)
+      brandingWrap.querySelectorAll('[data-branding-logo]').forEach((el) => {
+        el.hidden = !canLogo
+        el.querySelectorAll('input[type="file"]').forEach((inp) => {
+          inp.disabled = !canLogo
+          if (!canLogo) inp.value = ''
+        })
+      })
       brandingWrap.querySelectorAll('[data-branding-banner]').forEach((el) => {
         el.hidden = !canBanner
         el.querySelectorAll('input[type="file"]').forEach((inp) => {
@@ -1500,7 +1512,7 @@ function bindPlanBrandingToggle(scope) {
         })
       })
       const locked = brandingWrap.querySelector('[data-branding-locked]')
-      if (locked) locked.hidden = canBanner
+      if (locked) locked.hidden = canLogo || canBanner
     }
 
     planSelect.addEventListener('change', sync)
@@ -2711,9 +2723,12 @@ function bindStoreForm(main) {
         approved: f.approved.checked,
       })
 
-      const logoFile = f.logo?.files?.[0]
-      const bannerFile = f.banner?.files?.[0]
+      const logoFile = planAllowsStoreLogo(f.plan_id.value) ? f.logo?.files?.[0] : null
+      const bannerFile = planAllowsStoreBanner(f.plan_id.value) ? f.banner?.files?.[0] : null
       if (logoFile || bannerFile) {
+        if (logoFile && !planAllowsStoreLogo(f.plan_id.value)) {
+          throw new Error(FREE_PLAN_LOGO_MESSAGE)
+        }
         if (bannerFile && !planAllowsStoreBanner(f.plan_id.value)) {
           throw new Error(FREE_PLAN_BANNER_MESSAGE)
         }

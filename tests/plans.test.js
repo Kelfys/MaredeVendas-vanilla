@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   PLAN_LIMITS,
   FREE_PLAN_BANNER_MESSAGE,
+  FREE_PLAN_LOGO_MESSAGE,
   getPlanPriceCooldownHours,
   getPriceCooldownRemaining,
   formatPriceCooldownRemaining,
@@ -73,8 +74,9 @@ describe('plan price cooldown', () => {
 })
 
 describe('plan store images', () => {
-  it('allows logo on all plans including free', () => {
-    expect(planAllowsStoreLogo('free')).toBe(true)
+  it('restricts logo to paid plans', () => {
+    expect(planAllowsStoreLogo('free')).toBe(false)
+    expect(planAllowsStoreLogo('plus')).toBe(true)
     expect(planAllowsStoreLogo('premium')).toBe(true)
   })
 
@@ -116,14 +118,17 @@ describe('free plan limits', () => {
     const plan = getPlanById('free')
     expect(plan.features).toContain('1 item no catálogo (produto ou serviço)')
     expect(plan.features).toContain('1 foto no catálogo')
+    expect(plan.features).toContain('Avatar padrão da loja (sem logo personalizada)')
+    expect(plan.features).not.toContain('Logo da loja (foto de perfil)')
     expect(plan.features.some((f) => /Alteração de preços/i.test(f))).toBe(true)
   })
 
-  it('allows logo and one product image but not banner', () => {
-    expect(planAllowsStoreLogo('free')).toBe(true)
+  it('allows one product image but not logo or banner on free', () => {
+    expect(planAllowsStoreLogo('free')).toBe(false)
     expect(planAllowsStoreBanner('free')).toBe(false)
     expect(planAllowsProductImages('free')).toBe(true)
     expect(planAllowsProductImages('plus')).toBe(true)
+    expect(planAllowsStoreLogo('plus')).toBe(true)
   })
 
   it('allows creating only while under 1 catalog item', () => {
@@ -149,6 +154,7 @@ describe('free plan limits', () => {
       'O plano Gratuito permite imagens em até 1 produto(s). Assine um plano superior para liberar mais.',
     )
     expect(FREE_PLAN_BANNER_MESSAGE).toContain('banner personalizado')
+    expect(FREE_PLAN_LOGO_MESSAGE).toMatch(/logo|foto de perfil/i)
   })
 
   it('formats catalog hint for free merchants', () => {

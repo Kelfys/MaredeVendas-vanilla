@@ -11,13 +11,14 @@ Reaplicação: **com calma, uma por uma**, testando local e em produção antes 
 |---|---|
 | **HEAD atual (prod)** | verificar: `git log -1 --oneline` (main avança com deploys) |
 | **Rollback de emergência** | `8bb11b1` (purge SW legado) — **não** é o HEAD; só se o site cair |
-| **Total de itens (lista A–F)** | 31 |
+| **Total de itens (lista A–G)** | 35 |
 | **Feitos** | 1 (`E9`) |
 | **Em andamento** | 0 |
-| **Pendentes** | 30 |
+| **Pendentes** | 34 |
 | **Modo de trabalho** | **1 código por vez** → testar → só então o próximo |
 | **Próximo sugerido** | `C1` (medalhas de plano) — baixo risco, sem banco |
 | **Evitar por ora** | `E6`, `E16` e **vários E de uma vez** |
+| **Não urgente** | Seção **G** (dashboard produtos) — backlog de polish |
 | **Última atualização** | 14/07/2026 |
 
 ---
@@ -69,6 +70,7 @@ Reaplicação: **com calma, uma por uma**, testando local e em produção antes 
 - [D — Uploads](#d--uploads)
 - [E — Fases 1–3](#e--fases-13)
 - [F — Segurança / conta (senha)](#f--segurança--conta-senha)
+- [G — Dashboard de produtos](#g--dashboard-de-produtos)
 - [Fora da lista (já no main)](#fora-da-lista-já-no-main)
 - [Dependências](#dependências)
 - [Histórico de commits (quando existia na árvore antiga)](#histórico-de-commits-quando-existia-na-árvore-antiga)
@@ -353,6 +355,41 @@ F1 → F3 → F2
 
 ---
 
+## G — Dashboard de produtos
+
+> **Não urgente.** Levantado em 14/07/2026 ao visualizar os painéis.  
+> Funciona em produção; itens abaixo são **polish / alinhamento UX**. Fazer só quando sobrar tempo — **não** puxar antes de C1/F1 se houver prioridade.
+
+| Código | Melhoria | Quem | Onde | Banco | Risco | Status |
+|--------|----------|------|------|-------|-------|--------|
+| **G1** | Alinhar form de criar item (admin ↔ lojista): mesmos campos, ordem e hints | Staff / lojista | `#/admin/produtos`, `#/dashboard/produtos` | Não | Baixo | ⬜ |
+| **G2** | Chips ativo/inativo na lista de produtos do **admin** (lojista já tem) | Admin | `#/admin/produtos/:storeId` | Não | Baixo | ⬜ |
+| **G3** | Corrigir label do botão submit admin (`createItem` vs `createProduct` no finally) | Admin | `js/pages/admin.js` `bindProductForm` | Não | Baixo | ⬜ |
+| **G4** | Revisar edição em linha na tabela (UX datada; painel lateral ou modal — opcional) | Staff / lojista | Produtos admin + lojista | Não | Médio | ⬜ |
+
+### Contexto (mapa rápido)
+
+| Painel | Rota | Arquivo | Estado atual |
+|--------|------|---------|--------------|
+| Admin / Moderador | `#/admin/produtos` · `#/admin/produtos/:storeId` | `js/pages/admin.js` | Sidebar lojas + catálogo da loja; engajamento só admin |
+| Lojista | `#/dashboard/produtos` | `js/pages/merchant.js` | Form aberto, chips ativo/inativo, sort nome/preço/estoque |
+
+**Já ok (não reabrir):**
+- Limites de plano (itens + imagens) e tipo produto/serviço (`catalog.js`)
+- Sidebar admin com busca loja/bairro/telefone (`fetchStoresAdminLite`)
+- Paginação client-side (`bindPaginatedSortableList`)
+- Moderador read-only em produtos
+
+### Ordem sugerida (G) — quando for a vez
+
+```
+G3 → G2 → G1 → G4
+```
+
+`G3` é minúsculo; `G4` só se a edição em linha realmente incomodar.
+
+---
+
 ## Fora da lista (já no main)
 
 Trabalho recente **não** mapeado como A–E, mas está em produção:
@@ -368,6 +405,7 @@ Trabalho recente **não** mapeado como A–E, mas está em produção:
 | `3dba8f0` | Plano Gratuito: **1 produto + 1 foto** |
 | `3a60ba7` | Categorias marketplace v2 (migration `056`) |
 | `b5c9471` | Editor de textos (download com helpers completos) |
+| `2a27991` | Admin criar loja: lojista responsável só sem loja |
 
 ---
 
@@ -437,6 +475,8 @@ Referência da época em que o pacote existia (muitos commits **não** estão no
 | 13/07/2026 | Evitar E6/E16; emergência SW = `8bb11b1` |
 | 14/07/2026 | Incluída seção **F** (segurança de senha: F1 senha atual, F2 e-mail, F3 outras sessões) |
 | 14/07/2026 | Plano free = 1 item + 1 foto; categorias marketplace `056`; editor de textos atualizado |
+| 14/07/2026 | Seção **G** (dashboard produtos: G1–G4) — polish, **não urgente** |
+| 14/07/2026 | Deploy `2a27991`: lojista responsável só sem loja no admin |
 
 ---
 
@@ -446,6 +486,8 @@ Referência da época em que o pacote existia (muitos commits **não** estão no
 - Seção **F — Segurança / conta (senha)** adicionada (`F1`, `F2`, `F3`).
 - Contexto: se alguém troca a senha (sessão aberta / e-mail / Auth), senha antiga falha no login; sessão residual e falta de alerta são lacunas a cobrir com F1–F3.
 - Também em produção (fora A–E): engajamento no feed, banner free, free 1+1, categorias v2, editor de textos.
+- Visualizado dashboard de produtos (admin + lojista): funciona; polish → seção **G** (`G1`–`G4`), sem prazo.
+- Deploy: `2a27991` (select lojista responsável só sem loja).
 
 ### 2026-07-13
 - Arquivo atualizado para fluxo **1 código → testar → próximo**.

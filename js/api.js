@@ -27,7 +27,8 @@ import { DEFAULT_THEME_COLOR } from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import { normalizeItemType } from './catalog.js'
 import {
-  planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE, stripStoreBannerIfPlanDisallows,
+  planAllowsStoreBanner, planAllowsStoreLogo,
+  FREE_PLAN_BANNER_MESSAGE, FREE_PLAN_LOGO_MESSAGE, stripStoreBannerIfPlanDisallows,
   getPlanProductLimit, getPlanProductImageLimit,
   planProductLimitMessage, planProductImageLimitMessage, canAddProductImage,
   getPriceCooldownRemaining, formatPriceCooldownRemaining, getPlanById, buildPlanRequestStoreNote,
@@ -90,7 +91,19 @@ async function assertProductImageAllowed(client, storeId, { productHadImage = fa
   }
 }
 
-/** Bloqueia upload de banner no plano Gratuito (logo não passa por aqui). */
+/** Bloqueia upload de logo no plano Gratuito. */
+async function assertStoreLogoAllowed(client, storeId, planIdOverride) {
+  let planId = planIdOverride
+  if (!planId) {
+    const { data } = await client.from('stores').select('plan_id').eq('id', storeId).single()
+    planId = data?.plan_id
+  }
+  if (!planAllowsStoreLogo(planId)) {
+    throw new Error(FREE_PLAN_LOGO_MESSAGE)
+  }
+}
+
+/** Bloqueia upload de banner no plano Gratuito. */
 async function assertStoreBannerAllowed(client, storeId, planIdOverride) {
   let planId = planIdOverride
   if (!planId) {
@@ -656,9 +669,10 @@ export async function updateStore(storeId, form) {
   }
   if (updates.category_id) await assertCategoryExists(client, updates.category_id)
 
-  // Logo: todos os planos. Banner: validado em assertStoreBannerAllowed.
+  // Logo e banner: só planos pagos (assertStoreLogoAllowed / assertStoreBannerAllowed).
   if (form.remove_logo) updates.logo = null
   else if (form.logo instanceof File) {
+    await assertStoreLogoAllowed(client, storeId)
     updates.logo = await uploadImage(STORAGE_BUCKETS.logos, `${storeId}/logo`, form.logo)
   }
 
@@ -699,14 +713,18 @@ export async function updateStoreAsAdmin(storeId, form) {
   }
   if (updates.category_id) await assertCategoryExists(client, updates.category_id)
 
+  // Plano efetivo para validar branding: valor do form se muda o plano, senão o atual no banco.
+  const planIdForBranding = form.plan_id
+
   if (form.remove_logo) updates.logo = null
   else if (form.logo instanceof File) {
+    await assertStoreLogoAllowed(client, storeId, planIdForBranding)
     updates.logo = await uploadImage(STORAGE_BUCKETS.logos, `${storeId}/logo`, form.logo)
   }
 
   if (form.remove_banner) updates.banner = null
   else if (form.banner instanceof File) {
-    await assertStoreBannerAllowed(client, storeId, form.plan_id)
+    await assertStoreBannerAllowed(client, storeId, planIdForBranding)
     updates.banner = await uploadImage(STORAGE_BUCKETS.banners, `${storeId}/banner`, form.banner)
   }
 
@@ -1018,9 +1036,22 @@ export async function updateProduct(productId, form) {
     const newPrice = Number(form.price)
     const oldPrice = Number(existing.price)
     if (newPrice !== oldPrice) {
-      const cooldown = getPriceCooldownRemaining(existing.store?.plan_id ?? 'free', existing.price_changed_at)
-      if (!cooldown.allowed) {
-        throw new Error(t('merchant.priceCooldownWait', { remaining: formatPriceCooldownRemaining(cooldown.remainingMs) }))
+      // Cooldown é regra do lojista por plano. Admin altera preço sem espera.
+      const { data: { user: authUser } } = await client.auth.getUser()
+      let isStaffAdmin = false
+      if (authUser?.id) {
+        const { data: profile } = await client
+          .from('users')
+          .select('role')
+          .eq('id', authUser.id)
+          .maybeSingle()
+        isStaffAdmin = profile?.role === 'admin'
+      }
+      if (!isStaffAdmin) {
+        const cooldown = getPriceCooldownRemaining(existing.store?.plan_id ?? 'free', existing.price_changed_at)
+        if (!cooldown.allowed) {
+          throw new Error(t('merchant.priceCooldownWait', { remaining: formatPriceCooldownRemaining(cooldown.remainingMs) }))
+        }
       }
     }
   }

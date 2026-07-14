@@ -17,7 +17,8 @@ import {
 } from '../utils.js'
 import { STORE_THEME_COLORS } from '../config.js'
 import {
-  planAllowsStoreBanner, FREE_PLAN_BANNER_MESSAGE,
+  planAllowsStoreBanner, planAllowsStoreLogo,
+  FREE_PLAN_BANNER_MESSAGE, FREE_PLAN_LOGO_MESSAGE,
   countProductsWithImages, canAddProductImage, canCreateProduct,
   planProductImageLimitMessage, planProductLimitMessage,
   formatProductLimitHint, formatProductImageLimitHint,
@@ -747,13 +748,18 @@ function renderExtraAdPaymentBanner(main, ads) {
     </div>`
 }
 
-/** Configurações → imagem da loja: logo em qualquer plano; banner só se planAllowsStoreBanner. */
+/** Configurações → logo e banner só em planos pagos. */
 function merchantBrandingSection(store) {
+  const canLogo = planAllowsStoreLogo(store.plan_id)
   const canBanner = planAllowsStoreBanner(store.plan_id)
 
-  return `
-    <section class="merchant-branding">
-      <h2 class="merchant-branding__title">${t('merchant.storeImage')}</h2>
+  const upgradeLink = `
+    <p style="margin-top:0.75rem;font-size:0.875rem">
+      <a href="${merchantHref('planos')}">${t('merchant.viewPlansUpgrade')}</a>
+    </p>`
+
+  const logoBlock = canLogo
+    ? `
       <div class="form-group">
         <label class="form-label">${t('merchant.storeLogo')}</label>
         <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.5rem">${STORE_LOGO_UPLOAD_HINT}</p>
@@ -762,32 +768,48 @@ function merchantBrandingSection(store) {
           <input class="form-input" type="file" name="logo" accept="image/*" />
         </div>
         ${store.logo ? `<label class="admin-check"><input type="checkbox" name="remove_logo" /> ${t('merchant.removeLogo')}</label>` : ''}
-      </div>
-      ${canBanner ? `
-        <div class="form-group">
-          <label class="form-label">${t('merchant.storeBanner')}</label>
-          <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.5rem">${STORE_BANNER_UPLOAD_HINT}</p>
-          <div class="admin-image-field">
-            <div data-preview-banner>${imagePreviewBlock(store.banner, store.name, 'banner')}</div>
-            <input class="form-input" type="file" name="banner" accept="image/*" />
+      </div>`
+    : `
+      <div class="merchant-branding merchant-branding--locked">
+        <h3 class="merchant-branding__title" style="font-size:1rem">${t('merchant.storeLogo')}</h3>
+        <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_LOGO_MESSAGE)}</p>
+        ${upgradeLink}
+        ${store.logo ? `
+          <div class="merchant-branding__readonly" style="margin-top:1rem">
+            <div>${imagePreviewBlock(store.logo, store.name, 'square')}</div>
           </div>
-          ${store.banner ? `<label class="admin-check"><input type="checkbox" name="remove_banner" /> ${t('merchant.removeBanner')}</label>` : ''}
+        ` : ''}
+      </div>`
+
+  const bannerBlock = canBanner
+    ? `
+      <div class="form-group">
+        <label class="form-label">${t('merchant.storeBanner')}</label>
+        <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.5rem">${STORE_BANNER_UPLOAD_HINT}</p>
+        <div class="admin-image-field">
+          <div data-preview-banner>${imagePreviewBlock(store.banner, store.name, 'banner')}</div>
+          <input class="form-input" type="file" name="banner" accept="image/*" />
         </div>
-      ` : `
-        <div class="merchant-branding merchant-branding--locked" style="margin-top:0.5rem">
-          <h3 class="merchant-branding__title" style="font-size:1rem">${t('merchant.storeBanner')}</h3>
-          <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_BANNER_MESSAGE)}</p>
-          <p style="margin-top:0.75rem;font-size:0.875rem">
-            <a href="${merchantHref('planos')}">${t('merchant.viewPlansUpgrade')}</a>
-          </p>
-          ${store.banner ? `
-            <div class="merchant-branding__readonly" style="margin-top:1rem">
-              <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.5rem">${t('merchant.bannerReadonlyHint')}</p>
-              <div>${imagePreviewBlock(store.banner, store.name, 'banner')}</div>
-            </div>
-          ` : ''}
-        </div>
-      `}
+        ${store.banner ? `<label class="admin-check"><input type="checkbox" name="remove_banner" /> ${t('merchant.removeBanner')}</label>` : ''}
+      </div>`
+    : `
+      <div class="merchant-branding merchant-branding--locked" style="margin-top:0.5rem">
+        <h3 class="merchant-branding__title" style="font-size:1rem">${t('merchant.storeBanner')}</h3>
+        <p class="form-hint form-hint--info">${escapeHtml(FREE_PLAN_BANNER_MESSAGE)}</p>
+        ${upgradeLink}
+        ${store.banner ? `
+          <div class="merchant-branding__readonly" style="margin-top:1rem">
+            <p style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.5rem">${t('merchant.bannerReadonlyHint')}</p>
+            <div>${imagePreviewBlock(store.banner, store.name, 'banner')}</div>
+          </div>
+        ` : ''}
+      </div>`
+
+  return `
+    <section class="merchant-branding">
+      <h2 class="merchant-branding__title">${t('merchant.storeImage')}</h2>
+      ${logoBlock}
+      ${bannerBlock}
     </section>`
 }
 
@@ -1138,7 +1160,9 @@ function bindSettingsForm(main, store) {
     })
   })
 
-  bindImagePreview(form.querySelector('input[name="logo"]'), form.querySelector('[data-preview-logo]'))
+  if (planAllowsStoreLogo(store.plan_id)) {
+    bindImagePreview(form.querySelector('input[name="logo"]'), form.querySelector('[data-preview-logo]'))
+  }
   if (planAllowsStoreBanner(store.plan_id)) {
     bindImagePreview(form.querySelector('input[name="banner"]'), form.querySelector('[data-preview-banner]'))
   }
@@ -1170,11 +1194,13 @@ function bindSettingsForm(main, store) {
         payment_methods: paymentMethods,
       }
 
-      const logoFile = f.logo?.files?.[0]
-      const bannerFile = f.banner?.files?.[0]
-      if (logoFile) payload.logo = logoFile
-      if (!logoFile && f.remove_logo?.checked) payload.remove_logo = true
+      if (planAllowsStoreLogo(store.plan_id)) {
+        const logoFile = f.logo?.files?.[0]
+        if (logoFile) payload.logo = logoFile
+        if (!logoFile && f.remove_logo?.checked) payload.remove_logo = true
+      }
       if (planAllowsStoreBanner(store.plan_id)) {
+        const bannerFile = f.banner?.files?.[0]
         if (bannerFile) payload.banner = bannerFile
         if (!bannerFile && f.remove_banner?.checked) payload.remove_banner = true
       }
