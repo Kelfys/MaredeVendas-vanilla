@@ -23,7 +23,12 @@ import { requireClient, isSupabaseConfigured, getSupabase } from './db.js'
 import { generateSlug, sanitizeSearch, getProductEngagementWeight, computeProductLikesCount } from './utils.js'
 import { REPORT_REASON_IDS } from './report-reasons.js'
 import { t } from './strings.js'
-import { DEFAULT_THEME_COLOR, isSeedMultiStoreOwnerEmail } from './config.js'
+import {
+  DEFAULT_THEME_COLOR,
+  isSeedMultiStoreOwnerEmail,
+  isSeedProductsOwnerEmail,
+  SEED_PRODUCTS_STORE_SLUG,
+} from './config.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import { normalizeItemType } from './catalog.js'
 import {
@@ -1000,12 +1005,31 @@ export async function fetchMerchantProducts(storeId) {
   return data ?? []
 }
 
+/** Loja seed de produtosfake@ — sem teto de plano (admin enche a vitrine demo). */
+async function isSeedProductsStoreId(client, storeId) {
+  const { data, error } = await client
+    .from('stores')
+    .select('slug, owner:users(email)')
+    .eq('id', storeId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return false
+  if (data.slug === SEED_PRODUCTS_STORE_SLUG) return true
+  return isSeedProductsOwnerEmail(data.owner?.email)
+}
+
 export async function createProduct(storeId, form) {
   const client = await requireClient()
-  await assertProductCountAllowed(client, storeId)
+  const seedProducts = await isSeedProductsStoreId(client, storeId)
+  // Loja seed: admin pode criar N itens (não aplica limite free/plus/premium)
+  if (!seedProducts) {
+    await assertProductCountAllowed(client, storeId)
+  }
   let imageUrl = null
   if (form.image instanceof File) {
-    await assertProductImageAllowed(client, storeId)
+    if (!seedProducts) {
+      await assertProductImageAllowed(client, storeId)
+    }
     imageUrl = await uploadImage(STORAGE_BUCKETS.products, `${storeId}/${Date.now()}`, form.image)
   }
 

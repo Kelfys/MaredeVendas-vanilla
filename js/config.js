@@ -29,6 +29,26 @@ export function isSeedMultiStoreOwnerEmail(email) {
   return String(email ?? '').trim().toLowerCase() === SEED_MULTI_STORE_OWNER_EMAIL
 }
 
+/**
+ * Conta seed de produtos demo (“órfãos” de lojista real).
+ * Produtos no banco sempre têm store_id — esta conta tem 1 loja vitrine
+ * (slug SEED_PRODUCTS_STORE_SLUG) onde o admin despeja itens de teste.
+ * Apagar o usuário remove loja + produtos (cascade).
+ */
+export const SEED_PRODUCTS_OWNER_EMAIL = 'produtosfake@gmail.com'
+export const SEED_PRODUCTS_STORE_SLUG = 'seed-produtos-fake'
+export const SEED_PRODUCTS_STORE_NAME = 'Vitrine demo (produtos seed)'
+
+export function isSeedProductsOwnerEmail(email) {
+  return String(email ?? '').trim().toLowerCase() === SEED_PRODUCTS_OWNER_EMAIL
+}
+
+export function isSeedProductsStore(store) {
+  if (!store) return false
+  if (store.slug === SEED_PRODUCTS_STORE_SLUG) return true
+  return isSeedProductsOwnerEmail(store.owner?.email ?? store.owner_email)
+}
+
 /** Produção canônica no domínio próprio (Registro.br → GitHub Pages). */
 export const PRODUCTION_SITE_ORIGIN = 'https://maredevendas.com.br'
 export const PRODUCTION_SITE_PATH = '/'

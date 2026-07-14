@@ -15,6 +15,7 @@ function chainable(resolveValue) {
     delete: vi.fn(() => builder),
     order: vi.fn(() => builder),
     single: vi.fn(resolve),
+    maybeSingle: vi.fn(resolve),
     then: (onFulfilled, onRejected) => resolve().then(onFulfilled, onRejected),
   }
   return builder
@@ -29,7 +30,11 @@ function createMockSupabase({
   return {
     from: vi.fn((table) => {
       if (table === 'stores') {
-        return chainable(() => ({ data: { plan_id: planId }, error: null }))
+        // plan_id para limites; slug/owner para isSeedProductsStoreId (não seed nos testes)
+        return chainable(() => ({
+          data: { plan_id: planId, slug: 'loja-normal', owner: { email: 'real@test.com' } },
+          error: null,
+        }))
       }
 
       if (table === 'products') {

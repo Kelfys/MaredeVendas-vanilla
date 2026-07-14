@@ -206,6 +206,29 @@ Para o marketplace parecer cheio sem misturar com usuários reais:
 
 Contas `demo-gratuito@…` / `demo-plus@…` antigas **sem loja** foram removidas na limpeza de órfãos; use admin + e-mail real (1 loja) ou `lojasfake@` (N lojas demo).
 
+### Produtos demo (`produtosfake@gmail.com`)
+
+No banco **não existe produto sem loja** (`store_id` obrigatório). “Produto órfão de lojista real” = item na **vitrine seed**:
+
+| Item | Detalhe |
+|------|---------|
+| **E-mail / senha** | `produtosfake@gmail.com` / `ProdutosFake2026!` |
+| **Loja** | `Vitrine demo (produtos seed)` · slug `seed-produtos-fake` |
+| **Plano da loja** | Premium (UI) + **sem teto** na API para esta loja |
+| **Constantes** | `SEED_PRODUCTS_OWNER_EMAIL`, `SEED_PRODUCTS_STORE_SLUG` em `js/config.js` |
+| **Como usar** | Admin → **Produtos** → loja seed no **topo** da lista → **+ novo item** |
+| **Limpeza** | Excluir o perfil `produtosfake@` → loja + produtos caem em cascade |
+
+```bash
+node scripts/ensure-produtosfake.mjs           # dry-run
+node scripts/ensure-produtosfake.mjs --apply   # cria conta + loja
+```
+
+| Conta seed | Serve para |
+|------------|------------|
+| `lojasfake@gmail.com` | Várias **lojas** fake no feed |
+| `produtosfake@gmail.com` | Vitrine com **muitos produtos** demo (1 loja balde) |
+
 ---
 
 ## Autenticação

@@ -40,7 +40,7 @@ import { renderPaginationHtml, bindPaginatedSortableList } from '../list-utils.j
 
 const ADMIN_STORES_PAGE_SIZE = 20
 const ADMIN_PRODUCTS_PAGE_SIZE = 15
-import { STORE_THEME_COLORS, stringsEditorHref } from '../config.js'
+import { STORE_THEME_COLORS, stringsEditorHref, isSeedProductsStore } from '../config.js'
 import { STAFF_PANELS, staffHref, getStaffMenuItem } from '../staff-nav.js'
 import {
   canAccessPanel, isAdmin, isReadOnlyStaffTab, canApprovePlanChanges,
@@ -1364,7 +1364,11 @@ function storeListSortKey(name) {
 }
 
 function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'admin') {
+  // Loja seed de produtosfake@ no topo da lista
   const sorted = [...stores].sort((a, b) => {
+    const aSeed = isSeedProductsStore(a) ? 0 : 1
+    const bSeed = isSeedProductsStore(b) ? 0 : 1
+    if (aSeed !== bSeed) return aSeed - bSeed
     const ka = storeListSortKey(a.name)
     const kb = storeListSortKey(b.name)
     const cmp = ka.localeCompare(kb, 'pt-BR')
@@ -1391,13 +1395,13 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'ad
           : sorted.map((s) => `
             <a
               href="#${staffProductsPath(panel, s.id)}"
-              class="admin-store-products-nav__item ${s.id === selectedStoreId ? 'active' : ''}"
+              class="admin-store-products-nav__item ${s.id === selectedStoreId ? 'active' : ''}${isSeedProductsStore(s) ? ' admin-store-products-nav__item--seed' : ''}"
               data-store-nav="${s.id}"
-              data-store-search="${escapeHtml(buildStoreSearchKey(s))} ${escapeHtml(storeListSortKey(s.name))}"
+              data-store-search="${escapeHtml(buildStoreSearchKey(s))} ${escapeHtml(storeListSortKey(s.name))} seed produtosfake"
             >
-              <span class="admin-store-products-nav__item-name">${escapeHtml(s.name)}</span>
+              <span class="admin-store-products-nav__item-name">${escapeHtml(s.name)}${isSeedProductsStore(s) ? ` <small class="admin-seed-badge">${t('admin.seedProductsBadge')}</small>` : ''}</span>
               <span class="admin-store-products-nav__item-meta">
-                ${escapeHtml(s.neighborhood?.name ?? s.city ?? '—')}
+                ${isSeedProductsStore(s) ? escapeHtml(t('admin.seedProductsOwnerHint')) : escapeHtml(s.neighborhood?.name ?? s.city ?? '—')}
                 · ${t('admin.productCount', { count: counts[s.id] ?? 0 })}
               </span>
             </a>
@@ -1408,15 +1412,17 @@ function renderStoreProductsSidebar(stores, counts, selectedStoreId, panel = 'ad
 }
 
 function renderStoreProductsPanel({ store, products, categories, readOnly = false, showEngagementControls = false }) {
+  const seedProductsStore = isSeedProductsStore(store)
   const withImages = store ? countProductsWithImages(products) : 0
   const canAddImageOnCreate = store
-    ? canAddProductImage(store.plan_id, withImages)
+    ? (seedProductsStore || canAddProductImage(store.plan_id, withImages))
     : true
+  // Seed: sem teto de plano na UI (API também libera)
   const canCreate = Boolean(
     store
     && store.status === 'approved'
     && !readOnly
-    && canCreateProduct(store.plan_id, products.length),
+    && (seedProductsStore || canCreateProduct(store.plan_id, products.length)),
   )
 
   if (!store) {
@@ -1437,9 +1443,11 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
           <p class="admin-store-products-main__meta">
             ${escapeHtml(store.city)}, ${escapeHtml(store.state)}
             · ${statusBadge(store.status)}
-            · ${escapeHtml(formatProductLimitHint(store.plan_id, products.length))}
-            · ${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}
+            · ${seedProductsStore
+              ? escapeHtml(t('admin.seedProductsUnlimitedHint'))
+              : `${escapeHtml(formatProductLimitHint(store.plan_id, products.length))} · ${escapeHtml(formatProductImageLimitHint(store.plan_id, withImages))}`}
           </p>
+          ${seedProductsStore ? `<p class="form-hint">${t('admin.seedProductsPanelHint')}</p>` : ''}
         </div>
         <div class="admin-store-products-main__actions">
           ${store.status === 'approved' ? `<a href="#/loja/${escapeHtml(store.slug)}" class="btn btn-outline btn-sm">${t('merchant.viewPublicStore')}</a>` : ''}
@@ -1447,7 +1455,7 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
       </div>
 
       ${canCreate ? `
-        <details class="admin-form-panel">
+        <details class="admin-form-panel" ${seedProductsStore ? 'open' : ''}>
           <summary>${t('admin.newItemInStore', { name: escapeHtml(store.name) })}</summary>
           <form id="admin-product-form" class="admin-form-grid">
             <input type="hidden" name="store_id" value="${escapeHtml(store.id)}" />
