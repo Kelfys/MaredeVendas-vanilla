@@ -237,6 +237,7 @@ No schema todo produto tem `store_id`. Solução: 1 loja-balde **oculta ao públ
 | **Público** | Produtos **sim** no feed · loja **não** (sem card de loja, sem `#/loja/seed-produtos-fake`) |
 | **Card no feed** | Nome + preço + **+ Carrinho** (sem link “ver loja”) |
 | **WhatsApp por item** | Campo `products.whatsapp` (migration `058`). Checkout usa o número **do produto**, não o da loja-balde |
+| **Checkout telefone** | Visitante digita (validado BR). Cliente logado: **sem campo** — usa perfil; no chat o lojista vê o WA real |
 | **Admin** | `#/admin/produtos` → loja seed → **WhatsApp do item** obrigatório em cada produto |
 | **Constantes** | `SEED_PRODUCTS_*`, `isSeedProductsStore`, `isPublicMarketplaceStore` em `js/config.js` |
 | **Limpeza** | Excluir `produtosfake@gmail.com` → loja + produtos em cascade |

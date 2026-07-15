@@ -19,7 +19,7 @@ Reaplicação: **com calma, uma por uma**, testando local e em produção antes 
 | **Próximo sugerido** | `C1` (medalhas de plano) — baixo risco, sem banco |
 | **Evitar por ora** | `E6`, `E16` e **vários E de uma vez** |
 | **Não urgente** | Seção **G** (dashboard produtos) — backlog de polish |
-| **Última atualização** | 14/07/2026 (admin loja por e-mail + lojasfake + docs/Obsidian) |
+| **Última atualização** | 14–15/07/2026 (mdv-web, seed produtos, WhatsApp/item, checkout) |
 
 ---
 
@@ -415,6 +415,8 @@ Trabalho recente **não** mapeado como A–E, mas está em produção:
 | `90cdd97` … `6cb8682` | Chips mobile sem corte de botões |
 | `fb04d75` | Sidebar produtos: ordenação sem emoji + scroll à loja ativa |
 | *(dados)* | Dono único seed: `lojasfake@gmail.com` · limpeza órfãos seed · 20 lojas ads |
+| `985adc0`…`d9f80d5` | Repo **mdv-web**; seed produtosfake; WhatsApp/item; DDI; checkout telefone perfil; limpar carrinho; TOKEN_REFRESHED |
+| migration `058` | `products.whatsapp` (contato por item na vitrine seed) |
 
 ---
 
@@ -497,6 +499,13 @@ Referência da época em que o pacote existia (muitos commits **não** estão no
 ---
 
 ## Diário
+
+### 2026-07-15
+- Repo GitHub: **mdv-web** (Pages `/mdv-web/`); secrets em `SECRETS.local.md`.
+- Produtos seed: vitrine oculta; `products.whatsapp` (058); DDI/DDD normalizado.
+- Checkout: visitante digita telefone (validado); **cliente logado** sem campo (perfil).
+- Carrinho: limpar; dashboard não remonta em `TOKEN_REFRESHED`.
+- Testes: **234** OK; migration **058** no Supabase.
 
 ### 2026-07-14
 - Seção **F — Segurança / conta (senha)** adicionada (`F1`, `F2`, `F3`).

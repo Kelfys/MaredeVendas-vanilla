@@ -4,7 +4,10 @@
  * Header: logo, nav-desktop (Criar loja, Entrar, Minha conta), ações (tema, painel, sair)
  * e nav-mobile (hambúrguer).
  *
- * Também: store-card, feed-product-card, cart-drawer e checkout com pagamentos por loja.
+ * Carrinho / checkout:
+ * - clearCart no drawer; WhatsApp do pedido = loja ou product.whatsapp (seed)
+ * - Cliente logado: sem campo telefone (perfil); visitante: digita e valida BR (DDI 55)
+ * - Lojista no WA vê o número da conta WhatsApp do cliente, não só o do formulário
  */
 import {
   APP_NAME, faviconHref, profileIconHref, getStoreThemeColor, storeThemeButtonStyle, storeThemeOnColor,
