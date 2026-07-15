@@ -236,7 +236,8 @@ No schema todo produto tem `store_id`. Solução: 1 loja-balde **oculta ao públ
 | **Loja-balde** | `Vitrine demo (produtos seed)` · slug **`seed-produtos-fake`** |
 | **Público** | Produtos **sim** no feed · loja **não** (sem card de loja, sem `#/loja/seed-produtos-fake`) |
 | **Card no feed** | Nome + preço + **+ Carrinho** (sem link “ver loja”) |
-| **Admin** | `#/admin/produtos` → loja seed no **topo** (badge seed) → criar itens (sem teto de plano) |
+| **WhatsApp por item** | Campo `products.whatsapp` (migration `058`). Checkout usa o número **do produto**, não o da loja-balde |
+| **Admin** | `#/admin/produtos` → loja seed → **WhatsApp do item** obrigatório em cada produto |
 | **Constantes** | `SEED_PRODUCTS_*`, `isSeedProductsStore`, `isPublicMarketplaceStore` em `js/config.js` |
 | **Limpeza** | Excluir `produtosfake@gmail.com` → loja + produtos em cascade |
 

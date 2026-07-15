@@ -23,7 +23,7 @@ import {
 import {
   escapeHtml, rankProductsByEngagement, instagramProfileUrl, formatInstagramDisplay,
 } from '../utils.js'
-import { setStore, addItem, getCartItemCount, getUser } from '../state.js'
+import { setStore, addItem, getCartItemCount, getUser, getProductContactWhatsapp } from '../state.js'
 import { normalizeStorePaymentMethods } from '../payment.js'
 import { navigate } from '../router.js'
 import { showToast } from '../utils.js'
@@ -223,14 +223,16 @@ export async function renderStorePage(main, { slug }) {
           showToast(t('errors.productNotFound'))
           return
         }
-        // Garante loja no carrinho (caso venha de outra loja / estado antigo)
+        // Contato: WhatsApp do produto (seed) ou da loja
+        const productWithStore = { ...product, store }
+        const contact = getProductContactWhatsapp(productWithStore) || store.whatsapp
         setStore(
           store.id,
           store.name,
-          store.whatsapp,
+          contact,
           normalizeStorePaymentMethods(store.payment_methods),
         )
-        addItem(product)
+        addItem(productWithStore)
         openCart()
         paint()
       })

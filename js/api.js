@@ -1044,6 +1044,11 @@ export async function createProduct(storeId, form) {
 
   const itemType = normalizeItemType(form.item_type)
   const stock = itemType === 'service' ? null : Number(form.stock ?? 0)
+  const productWhatsapp = form.whatsapp != null ? String(form.whatsapp).trim() || null : null
+  // Vitrine seed: cada item deve ter contato próprio (senão todos caem no mesmo número da loja)
+  if (seedProducts && !productWhatsapp) {
+    throw new Error(t('errors.productWhatsappRequired'))
+  }
 
   const { data, error } = await client.from('products').insert({
     store_id: storeId,
@@ -1056,6 +1061,7 @@ export async function createProduct(storeId, form) {
     is_used: itemType === 'service' ? false : Boolean(form.is_used),
     active: form.active ?? true,
     image: imageUrl,
+    whatsapp: productWhatsapp,
   }).select().single()
   if (error) throw error
   return data
@@ -1100,6 +1106,20 @@ export async function updateProduct(productId, form) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
   if (form.category_id === '') updates.category_id = null
+  if (form.whatsapp !== undefined) {
+    updates.whatsapp = String(form.whatsapp ?? '').trim() || null
+  }
+  // Seed: ao editar, se limpar o WhatsApp do item, bloqueia
+  if (form.whatsapp !== undefined && updates.whatsapp == null) {
+    const { data: row } = await client
+      .from('products')
+      .select('store_id')
+      .eq('id', productId)
+      .maybeSingle()
+    if (row?.store_id && await isSeedProductsStoreId(client, row.store_id)) {
+      throw new Error(t('errors.productWhatsappRequired'))
+    }
+  }
   if (form.item_type !== undefined) {
     updates.item_type = normalizeItemType(form.item_type)
     if (updates.item_type === 'service') updates.stock = null

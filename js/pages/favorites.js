@@ -9,7 +9,7 @@ import {
   updateCustomerProfile,
   updatePassword,
 } from '../api.js'
-import { getUser, setUser, getCart, getCartItemCount, setStore, addItem, openCart } from '../state.js'
+import { getUser, setUser, getCart, getCartItemCount, setStore, addItem, openCart, getProductContactWhatsapp } from '../state.js'
 import { renderStoreCard, renderFeedProductCard, renderEngagementStats } from '../ui.js'
 import { escapeHtml, formatCurrency, formatDate, showToast } from '../utils.js'
 import { routeHref, navigate } from '../router.js'
@@ -353,11 +353,16 @@ export async function renderFavorites(main) {
       btn.addEventListener('click', () => {
         const product = productMap.get(btn.dataset.feedAddProduct)
         if (!product?.store) return
+        const contact = getProductContactWhatsapp(product)
+        if (!contact) {
+          showToast(t('checkout.storeNoWhatsapp'))
+          return
+        }
 
         setStore(
           product.store.id,
           product.store.name,
-          product.store.whatsapp,
+          contact,
           normalizeStorePaymentMethods(product.store.payment_methods),
         )
         addItem(product)

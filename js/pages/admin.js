@@ -1330,6 +1330,11 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
               <option value="false" ${!p.active ? 'selected' : ''}>${t('common.no')}</option>
             </select>
           </div>
+          <div class="form-group">
+            <label class="form-label">${t('admin.productWhatsapp')}${isSeedProductsStore(store) ? ' *' : ''}</label>
+            <input class="form-input" name="whatsapp" type="tel" inputmode="numeric" value="${escapeHtml(p.whatsapp ?? '')}" placeholder="${t('admin.whatsappPlaceholder')}" ${isSeedProductsStore(store) ? 'required' : ''} autocomplete="off" />
+            <p class="form-hint">${isSeedProductsStore(store) ? t('admin.productWhatsappSeedHint') : t('admin.productWhatsappHint')}</p>
+          </div>
           <div class="form-group admin-form-grid__full">
             <label class="form-label">${t('labels.description')}</label>
             <textarea class="form-input" name="description" rows="2">${escapeHtml(p.description ?? '')}</textarea>
@@ -1478,6 +1483,11 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
                 <option value="">${t('common.noCategory')}</option>
                 ${categories.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}
               </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">${t('admin.productWhatsapp')}${seedProductsStore ? ' *' : ''}</label>
+              <input class="form-input" name="whatsapp" type="tel" inputmode="numeric" placeholder="${t('admin.whatsappPlaceholder')}" ${seedProductsStore ? 'required' : ''} autocomplete="off" />
+              <p class="form-hint">${seedProductsStore ? t('admin.productWhatsappSeedHint') : t('admin.productWhatsappHint')}</p>
             </div>
             <div class="form-group admin-form-grid__full">
               <label class="form-label">${t('labels.description')}</label>
@@ -2954,6 +2964,7 @@ function bindProductForm(main, selectedStoreId = null) {
         stock: catalogFields.stock,
         is_used: readCatalogUsedFromForm(f),
         category_id: f.category_id.value,
+        whatsapp: f.whatsapp?.value?.trim() ?? '',
         active: true,
         image: imageFile,
       })
@@ -3168,6 +3179,7 @@ function bindProductEdits(main, selectedStoreId = null) {
           stock: catalogFields.stock,
           is_used: readCatalogUsedFromForm(form),
           category_id: form.category_id.value,
+          whatsapp: form.whatsapp?.value?.trim() ?? '',
           active: form.active.value === 'true',
           image: imageFile,
         })

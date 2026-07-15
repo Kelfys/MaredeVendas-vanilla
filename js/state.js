@@ -137,18 +137,68 @@ export function getCart() {
   return cart
 }
 
+/**
+ * WhatsApp efetivo para comprar o item:
+ * 1) product.whatsapp (vitrine seed / contato por anúncio)
+ * 2) product.store.whatsapp
+ */
+export function getProductContactWhatsapp(product) {
+  const fromProduct = String(product?.whatsapp ?? '').trim()
+  if (fromProduct) return fromProduct
+  return String(product?.store?.whatsapp ?? '').trim()
+}
+
 export function setStore(storeId, storeName, whatsapp, paymentMethods = DEFAULT_PAYMENT_METHOD_IDS) {
   const methods = [...paymentMethods]
-  if (cart.storeId && cart.storeId !== storeId) {
-    cart = { ...cart, storeId, storeName, storeWhatsapp: whatsapp, storePaymentMethods: methods, items: [] }
+  const phone = String(whatsapp ?? '').trim() || null
+  // Outra loja OU mesmo balde seed com outro número de contato → carrinho novo
+  const switchTarget = cart.storeId && cart.storeId !== storeId
+  const switchPhone = Boolean(
+    cart.items?.length
+    && cart.storeWhatsapp
+    && phone
+    && String(cart.storeWhatsapp).trim() !== phone,
+  )
+  if (switchTarget || switchPhone) {
+    cart = {
+      ...cart,
+      storeId,
+      storeName,
+      storeWhatsapp: phone,
+      storePaymentMethods: methods,
+      items: [],
+    }
   } else {
-    cart = { ...cart, storeId, storeName, storeWhatsapp: whatsapp, storePaymentMethods: methods }
+    cart = {
+      ...cart,
+      storeId,
+      storeName,
+      storeWhatsapp: phone ?? cart.storeWhatsapp,
+      storePaymentMethods: methods,
+    }
   }
   saveCart(cart)
   notifyCart()
 }
 
 export function addItem(product) {
+  // Se o produto tem WhatsApp próprio diferente do carrinho, troca o destino
+  const phone = getProductContactWhatsapp(product)
+  if (phone && cart.storeId === (product.store_id ?? product.store?.id) && cart.items.length) {
+    const current = String(cart.storeWhatsapp ?? '').trim()
+    if (current && current !== phone) {
+      cart = {
+        ...cart,
+        storeWhatsapp: phone,
+        items: [],
+      }
+    } else if (!current) {
+      cart = { ...cart, storeWhatsapp: phone }
+    }
+  } else if (phone && !cart.storeWhatsapp) {
+    cart = { ...cart, storeWhatsapp: phone }
+  }
+
   const existing = cart.items.find((i) => i.product.id === product.id)
   if (existing) {
     cart.items = cart.items.map((i) =>

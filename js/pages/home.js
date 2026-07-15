@@ -10,7 +10,7 @@ import { fetchCategories, fetchStores, fetchNewProducts, fetchTopLikedProducts, 
 import { renderStoreCard, renderFeedProductCard, renderFeedAdCard, openCart } from '../ui.js'
 import { escapeHtml } from '../utils.js'
 import { buildHomeFeed, paginateFeedItems, FEED_PAGE_SIZE } from '../feed.js'
-import { setStore, addItem, getUser } from '../state.js'
+import { setStore, addItem, getUser, getProductContactWhatsapp } from '../state.js'
 import { normalizeStorePaymentMethods } from '../payment.js'
 import { getSelectedNeighborhoodId, setSelectedNeighborhoodId, formatNeighborhoodLabel } from '../neighborhood.js'
 import { t } from '../strings.js'
@@ -198,10 +198,15 @@ export async function renderHome(main) {
           return
         }
 
+        const contact = getProductContactWhatsapp(product)
+        if (!contact) {
+          showToast(t('checkout.storeNoWhatsapp'))
+          return
+        }
         setStore(
           product.store.id,
           product.store.name,
-          product.store.whatsapp,
+          contact,
           normalizeStorePaymentMethods(product.store.payment_methods),
         )
         addItem(product)
