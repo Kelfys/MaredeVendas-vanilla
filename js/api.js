@@ -141,6 +141,7 @@ export async function signUpCustomer({ email, password, name, phone, address, de
   const { validateRegistrationBirthDate } = await import('./utils.js')
   const birthCheck = validateRegistrationBirthDate(birth_date)
   if (!birthCheck.ok) throw new Error(birthCheck.message)
+  const phoneNorm = assertValidBrazilWhatsapp(phone)
 
   const client = await requireClient()
   const { data, error } = await client.auth.signUp({
@@ -149,7 +150,7 @@ export async function signUpCustomer({ email, password, name, phone, address, de
       data: {
         name,
         role: 'customer',
-        phone,
+        phone: phoneNorm,
         address,
         delivery_period,
         birth_date: birthCheck.birthDate,
@@ -1762,19 +1763,18 @@ const DELIVERY_PERIODS = new Set(['manha', 'tarde', 'noite', 'madrugada'])
 
 export async function updateCustomerProfile(userId, { name, phone, address, delivery_period }) {
   const trimmedName = String(name ?? '').trim()
-  const trimmedPhone = String(phone ?? '').trim()
   const trimmedAddress = String(address ?? '').trim()
   if (!trimmedName) throw new Error(t('errors.informName'))
-  if (!trimmedPhone) throw new Error(t('errors.informPhone'))
   if (!trimmedAddress) throw new Error(t('errors.informAddress'))
   if (!DELIVERY_PERIODS.has(delivery_period)) throw new Error(t('errors.selectDeliveryPeriod'))
+  const phoneNorm = assertValidBrazilWhatsapp(phone)
 
   const client = await requireClient()
   const { data, error } = await client
     .from('users')
     .update({
       name: trimmedName,
-      phone: trimmedPhone,
+      phone: phoneNorm,
       address: trimmedAddress,
       delivery_period,
     })
@@ -1787,7 +1787,7 @@ export async function updateCustomerProfile(userId, { name, phone, address, deli
     await client.auth.updateUser({
       data: {
         name: trimmedName,
-        phone: trimmedPhone,
+        phone: phoneNorm,
         address: trimmedAddress,
         delivery_period,
       },

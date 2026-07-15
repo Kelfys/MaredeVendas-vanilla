@@ -856,7 +856,7 @@ export function renderCartDrawer() {
               <div class="form-group">
                 <label class="form-label" for="checkout-phone">${t('labels.phone')}</label>
                 <input class="form-input" id="checkout-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="${t('admin.whatsappPlaceholder')}" required />
-                <p class="form-hint">${t('checkout.phoneHint')}</p>
+                <p class="form-hint" id="checkout-phone-hint">${t('checkout.phoneHint')}</p>
               </div>
               <div class="form-group">
                 <label class="form-label" for="checkout-address">${t('labels.address')}</label>
@@ -931,10 +931,37 @@ function bindCheckoutForm(root, allowedPayments) {
   if (!form) return
 
   const user = getUser()
+  const phoneInput = form.phone
+  const phoneHint = root.querySelector('#checkout-phone-hint')
+
   if (user?.role === 'customer') {
     if (form.name && !form.name.value) form.name.value = user.name ?? ''
-    if (form.phone && !form.phone.value) form.phone.value = user.phone ?? ''
     if (form.address && !form.address.value) form.address.value = user.address ?? ''
+
+    // Segurança: telefone do pedido = telefone do perfil (não editável no checkout)
+    const profilePhone = String(user.phone ?? '').trim()
+    if (phoneInput) {
+      if (profilePhone) {
+        try {
+          phoneInput.value = assertValidBrazilWhatsapp(profilePhone)
+        } catch {
+          phoneInput.value = profilePhone
+        }
+        phoneInput.readOnly = true
+        phoneInput.setAttribute('aria-readonly', 'true')
+        phoneInput.classList.add('form-input--readonly')
+        if (phoneHint) phoneHint.textContent = t('checkout.phoneLockedToProfile')
+      } else {
+        phoneInput.readOnly = false
+        phoneInput.removeAttribute('aria-readonly')
+        phoneInput.classList.remove('form-input--readonly')
+        if (phoneHint) phoneHint.textContent = t('checkout.phoneProfileMissing')
+      }
+    }
+  } else if (phoneInput) {
+    phoneInput.readOnly = false
+    phoneInput.classList.remove('form-input--readonly')
+    if (phoneHint) phoneHint.textContent = t('checkout.phoneHint')
   }
 
   form.querySelectorAll('.checkout-payment__option input').forEach((input) => {
@@ -968,12 +995,11 @@ async function handleCheckout(e, allowedPayments) {
   }
 
   const form = e.target
+  const user = getUser()
   const name = form.name.value.trim()
-  const phoneRaw = form.phone.value.trim()
   const address = form.address.value.trim()
   if (!name) {
     showToast(t('errors.informName'))
-    form.phone?.blur()
     form.name?.focus()
     return
   }
@@ -983,12 +1009,28 @@ async function handleCheckout(e, allowedPayments) {
     return
   }
 
+  // Cliente logado: sempre o telefone do perfil (ignora alteração no form / DevTools)
+  let phoneRaw = form.phone.value.trim()
+  if (user?.role === 'customer') {
+    const profilePhone = String(user.phone ?? '').trim()
+    if (!profilePhone) {
+      showToast(t('checkout.phoneProfileMissing'))
+      form.phone?.focus()
+      return
+    }
+    phoneRaw = profilePhone
+  }
+
   let phone
   try {
     phone = assertValidBrazilWhatsapp(phoneRaw)
   } catch (err) {
     showToast(err.message ?? t('errors.invalidBrazilWhatsapp'))
-    form.phone?.focus()
+    if (user?.role === 'customer') {
+      showToast(t('checkout.phoneProfileInvalid'))
+    } else {
+      form.phone?.focus()
+    }
     return
   }
 
@@ -996,7 +1038,6 @@ async function handleCheckout(e, allowedPayments) {
   const allowed = allowedPayments ?? cart.storePaymentMethods ?? []
   if (!isValidPaymentMethod(paymentMethod, allowed)) return
   const total = getCartTotal()
-  const user = getUser()
 
   const deliveryPeriod = user?.delivery_period ? deliveryPeriodLabel(user.delivery_period) : undefined
 

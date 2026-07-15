@@ -219,7 +219,10 @@ export const STRINGS = {
     "addressPlaceholder": "Rua, número, bairro, complemento",
     "submitting": "Enviando...",
     "storeNoWhatsapp": "Esta loja ainda não recebe pedidos por WhatsApp.",
-    "phoneHint": "DDD + número, ex.: 21912345678 (só dígitos)."
+    "phoneHint": "DDD + número, ex.: 21912345678 (só dígitos).",
+    "phoneLockedToProfile": "Telefone do seu perfil (não editável aqui). Altere em Minha conta se precisar.",
+    "phoneProfileMissing": "Cadastre um telefone válido em Minha conta antes de pedir.",
+    "phoneProfileInvalid": "Telefone do perfil inválido. Atualize em Minha conta (ex.: 21912345678)."
   },
   "customer": {
     "loginRequiredTitle": "Faça login",

@@ -4527,6 +4527,13 @@ tr:last-child td { border-bottom: none; }
   color: var(--text-muted);
 }
 
+.form-input--readonly,
+.form-input[readonly] {
+  background: var(--surface-tertiary, var(--surface-secondary));
+  color: var(--text-secondary);
+  cursor: default;
+}
+
 .form-hint--info {
   padding: 0.625rem 0.75rem;
   border-radius: var(--radius);
