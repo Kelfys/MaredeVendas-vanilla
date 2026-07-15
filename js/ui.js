@@ -821,6 +821,27 @@ export function renderCartDrawer() {
   const count = getCartItemCount()
   const allowedPayments = cart.storePaymentMethods ?? []
   const hasItems = cart.items.length > 0
+  const checkoutUser = getUser()
+  const isLoggedCustomer = checkoutUser?.role === 'customer'
+  // Cliente logado: telefone só do perfil (campo oculto; lojista vê o WA real na conversa)
+  const profilePhoneRaw = isLoggedCustomer ? String(checkoutUser.phone ?? '').trim() : ''
+  let profilePhoneOk = ''
+  if (profilePhoneRaw) {
+    try { profilePhoneOk = assertValidBrazilWhatsapp(profilePhoneRaw) } catch { profilePhoneOk = '' }
+  }
+  const phoneFieldHtml = isLoggedCustomer
+    ? (profilePhoneOk
+      ? `<input type="hidden" name="phone" value="${escapeHtml(profilePhoneOk)}" />
+         <p class="form-hint checkout-phone-profile-note">${t('checkout.phoneFromProfileNote')}</p>`
+      : `<p class="form-hint form-hint--warn" id="checkout-phone-hint">${t('checkout.phoneProfileMissing')}
+           <a href="${routeHref('/favoritos?tab=profile')}">${t('checkout.goToProfile')}</a>
+         </p>
+         <input type="hidden" name="phone" value="" />`)
+    : `<div class="form-group">
+         <label class="form-label" for="checkout-phone">${t('labels.phone')}</label>
+         <input class="form-input" id="checkout-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="${t('admin.whatsappPlaceholder')}" required />
+         <p class="form-hint" id="checkout-phone-hint">${t('checkout.phoneHint')}</p>
+       </div>`
 
   root.innerHTML = `
     <div class="cart-overlay" id="cart-overlay"></div>
@@ -853,11 +874,7 @@ export function renderCartDrawer() {
                 <label class="form-label" for="checkout-name">${t('labels.name')}</label>
                 <input class="form-input" id="checkout-name" name="name" placeholder="${t('checkout.namePlaceholder')}" required />
               </div>
-              <div class="form-group">
-                <label class="form-label" for="checkout-phone">${t('labels.phone')}</label>
-                <input class="form-input" id="checkout-phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="${t('admin.whatsappPlaceholder')}" required />
-                <p class="form-hint" id="checkout-phone-hint">${t('checkout.phoneHint')}</p>
-              </div>
+              ${phoneFieldHtml}
               <div class="form-group">
                 <label class="form-label" for="checkout-address">${t('labels.address')}</label>
                 <textarea class="form-input" id="checkout-address" name="address" placeholder="${t('checkout.addressPlaceholder')}" rows="3" required></textarea>
@@ -931,37 +948,10 @@ function bindCheckoutForm(root, allowedPayments) {
   if (!form) return
 
   const user = getUser()
-  const phoneInput = form.phone
-  const phoneHint = root.querySelector('#checkout-phone-hint')
-
   if (user?.role === 'customer') {
     if (form.name && !form.name.value) form.name.value = user.name ?? ''
     if (form.address && !form.address.value) form.address.value = user.address ?? ''
-
-    // Segurança: telefone do pedido = telefone do perfil (não editável no checkout)
-    const profilePhone = String(user.phone ?? '').trim()
-    if (phoneInput) {
-      if (profilePhone) {
-        try {
-          phoneInput.value = assertValidBrazilWhatsapp(profilePhone)
-        } catch {
-          phoneInput.value = profilePhone
-        }
-        phoneInput.readOnly = true
-        phoneInput.setAttribute('aria-readonly', 'true')
-        phoneInput.classList.add('form-input--readonly')
-        if (phoneHint) phoneHint.textContent = t('checkout.phoneLockedToProfile')
-      } else {
-        phoneInput.readOnly = false
-        phoneInput.removeAttribute('aria-readonly')
-        phoneInput.classList.remove('form-input--readonly')
-        if (phoneHint) phoneHint.textContent = t('checkout.phoneProfileMissing')
-      }
-    }
-  } else if (phoneInput) {
-    phoneInput.readOnly = false
-    phoneInput.classList.remove('form-input--readonly')
-    if (phoneHint) phoneHint.textContent = t('checkout.phoneHint')
+    // Telefone: hidden com valor do perfil (sem campo visível)
   }
 
   form.querySelectorAll('.checkout-payment__option input').forEach((input) => {

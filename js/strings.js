@@ -220,9 +220,11 @@ export const STRINGS = {
     "submitting": "Enviando...",
     "storeNoWhatsapp": "Esta loja ainda não recebe pedidos por WhatsApp.",
     "phoneHint": "DDD + número, ex.: 21912345678 (só dígitos).",
+    "phoneFromProfileNote": "O lojista te contata pelo WhatsApp da conversa. Seu telefone de cadastro fica no pedido (Minha conta).",
     "phoneLockedToProfile": "Telefone do seu perfil (não editável aqui). Altere em Minha conta se precisar.",
     "phoneProfileMissing": "Cadastre um telefone válido em Minha conta antes de pedir.",
-    "phoneProfileInvalid": "Telefone do perfil inválido. Atualize em Minha conta (ex.: 21912345678)."
+    "phoneProfileInvalid": "Telefone do perfil inválido. Atualize em Minha conta (ex.: 21912345678).",
+    "goToProfile": "Ir para Minha conta"
   },
   "customer": {
     "loginRequiredTitle": "Faça login",

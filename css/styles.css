@@ -4534,6 +4534,21 @@ tr:last-child td { border-bottom: none; }
   cursor: default;
 }
 
+.checkout-phone-profile-note {
+  margin: 0 0 0.75rem;
+}
+
+.form-hint--warn {
+  color: var(--amber-600, #b45309);
+  margin-bottom: 0.75rem;
+}
+
+.form-hint--warn a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .form-hint--info {
   padding: 0.625rem 0.75rem;
   border-radius: var(--radius);
