@@ -2915,6 +2915,10 @@ body.report-modal-open {
   box-shadow: 0 -4px 24px rgb(0 0 0 / 0.04);
 }
 
+.cart-clear-btn {
+  margin-top: 0.5rem;
+}
+
 .cart-drawer__footer--checkout {
   padding-top: 0.875rem;
 }

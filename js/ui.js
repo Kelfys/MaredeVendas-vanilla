@@ -799,6 +799,9 @@ function renderCheckoutSummary(cart, total, count) {
     <button type="button" class="btn btn-green btn-block cart-checkout-btn" id="checkout-start">
       ${t('checkout.finalizeOrder')}
     </button>
+    <button type="button" class="btn btn-outline btn-block cart-clear-btn" id="cart-clear">
+      ${t('cart.clearCart')}
+    </button>
     <p class="cart-checkout-hint">${t('cart.checkoutHint')}</p>
   `
 }
@@ -910,6 +913,14 @@ export function renderCartDrawer() {
   })
 
   document.getElementById('checkout-start')?.addEventListener('click', showCheckoutForm)
+
+  document.getElementById('cart-clear')?.addEventListener('click', () => {
+    if (!confirm(t('cart.confirmClearCart'))) return
+    cartCheckoutOpen = false
+    clearCart()
+    // clearCart esvazia itens mas mantém isOpen false no defaultCart — reabre vazio ou fecha
+    openCart()
+  })
 
   if (cartCheckoutOpen) bindCheckoutForm(root, allowedPayments)
 }

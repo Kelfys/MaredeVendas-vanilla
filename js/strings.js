@@ -196,7 +196,9 @@ export const STRINGS = {
     "emptyBody": "Adicione produtos de uma loja para começar seu pedido.",
     "itemsCount": "Itens ({count})",
     "total": "Total",
-    "checkoutHint": "Pagamento combinado com a loja via WhatsApp"
+    "checkoutHint": "Pagamento combinado com a loja via WhatsApp",
+    "clearCart": "Limpar carrinho",
+    "confirmClearCart": "Remover todos os itens do carrinho?"
   },
   "checkout": {
     "finalizeOrder": "Finalizar pedido",
