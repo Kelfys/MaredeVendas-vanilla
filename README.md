@@ -176,15 +176,23 @@ npm test
 
 ## Contas demo / seed
 
-| Papel | Email | Senha | Plano / notas |
-|-------|-------|-------|----------------|
-| Cliente | `cliente@maredevendas.com` | `DemoCliente2026!` | — |
-| Admin | `brunopdaraujo@gmail.com` | `MarecAdmin2026!` | global |
-| Moderador | `moderador@maredevendas.com` | `DemoModerador2026!` | bairro ativo (ex.: Baixa do sapateiro) |
-| **Lojas fake (seed)** | `lojasfake@gmail.com` | `LojasFake2026!` | dono de **todas** as lojas ads/seed; **pode ter N lojas** |
-| **Produtos fake (seed)** | `produtosfake@gmail.com` | `ProdutosFake2026!` | vitrine **oculta**; produtos só no **feed** |
+**Senhas e secrets não ficam neste README** (repo público).  
+No seu PC: copie o modelo e preencha localmente:
 
-O moderador demo: login em `#/moderador/entrar`.
+```bash
+cp SECRETS.local.example.md SECRETS.local.md
+# edite SECRETS.local.md  →  está no .gitignore
+```
+
+| Papel | Email (público) | Senha | Notas |
+|-------|-----------------|-------|--------|
+| Cliente | `cliente@maredevendas.com` | ver `SECRETS.local.md` | demo |
+| Admin | (conta real no Auth) | **só** em `SECRETS.local.md` | nunca no Git |
+| Moderador | `moderador@maredevendas.com` | ver `SECRETS.local.md` | bairro ativo |
+| **Lojas fake (seed)** | `lojasfake@gmail.com` | ver `SECRETS.local.md` | N lojas ads/seed |
+| **Produtos fake (seed)** | `produtosfake@gmail.com` | ver `SECRETS.local.md` | vitrine oculta; produtos no feed |
+
+Login moderador: `#/moderador/entrar`.
 
 ### Resumo das contas seed
 
@@ -201,7 +209,7 @@ Para o marketplace parecer cheio sem misturar com usuários reais:
 
 | Item | Detalhe |
 |------|---------|
-| **E-mail / senha** | `lojasfake@gmail.com` / `LojasFake2026!` |
+| **E-mail** | `lojasfake@gmail.com` (senha em `SECRETS.local.md`) |
 | **Papel** | merchant |
 | **Constante no código** | `SEED_MULTI_STORE_OWNER_EMAIL` em `js/config.js` (`isSeedMultiStoreOwnerEmail`) |
 | **Regra especial** | Este e-mail **pode ter várias lojas** (exceção admin). Demais lojistas: **1 loja = 1 dono** |
@@ -224,7 +232,7 @@ No schema todo produto tem `store_id`. Solução: 1 loja-balde **oculta ao públ
 
 | Item | Detalhe |
 |------|---------|
-| **E-mail / senha** | `produtosfake@gmail.com` / `ProdutosFake2026!` |
+| **E-mail** | `produtosfake@gmail.com` (senha em `SECRETS.local.md`) |
 | **Loja-balde** | `Vitrine demo (produtos seed)` · slug **`seed-produtos-fake`** |
 | **Público** | Produtos **sim** no feed · loja **não** (sem card de loja, sem `#/loja/seed-produtos-fake`) |
 | **Card no feed** | Nome + preço + **+ Carrinho** (sem link “ver loja”) |

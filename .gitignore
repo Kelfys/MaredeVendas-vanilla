@@ -7,3 +7,8 @@ terminals/
 .env
 .env.*
 !.env.example
+# Senhas e secrets locais (nunca no GitHub)
+SECRETS.local.md
+*.secrets.md
+*.local.md
+!SECRETS.local.example.md
