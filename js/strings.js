@@ -755,6 +755,7 @@ export const STRINGS = {
     "productWhatsapp": "WhatsApp do item",
     "productWhatsappHint": "Opcional. Se vazio, o pedido vai para o WhatsApp da loja.",
     "productWhatsappSeedHint": "Obrigatório na vitrine seed. Ex.: 21912345678 (DDD+número) ou 5521912345678 (com 55). Cada produto pode ter um número diferente.",
+    "productDescriptionPasteHint": "confirme preços com o numero da conversa.",
     "storeCreatedNamed": "Loja \"{name}\" criada!",
     "storeUpdated": "Loja atualizada!",
     "itemCreated": "Item criado!",

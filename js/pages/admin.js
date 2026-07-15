@@ -1336,7 +1336,10 @@ function renderProductTableRows(products, categories, store = null, { readOnly =
             <p class="form-hint">${isSeedProductsStore(store) ? t('admin.productWhatsappSeedHint') : t('admin.productWhatsappHint')}</p>
           </div>
           <div class="form-group admin-form-grid__full">
-            <label class="form-label">${t('labels.description')}</label>
+            <label class="form-label">
+              ${t('labels.description')}
+              ${isSeedProductsStore(store) ? `<span class="form-label__paste-hint" title="${escapeHtml(t('admin.productDescriptionPasteHint'))}">${escapeHtml(t('admin.productDescriptionPasteHint'))}</span>` : ''}
+            </label>
             <textarea class="form-input" name="description" rows="2">${escapeHtml(p.description ?? '')}</textarea>
           </div>
           <div class="form-group admin-form-grid__full">
@@ -1490,7 +1493,10 @@ function renderStoreProductsPanel({ store, products, categories, readOnly = fals
               <p class="form-hint">${seedProductsStore ? t('admin.productWhatsappSeedHint') : t('admin.productWhatsappHint')}</p>
             </div>
             <div class="form-group admin-form-grid__full">
-              <label class="form-label">${t('labels.description')}</label>
+              <label class="form-label">
+                ${t('labels.description')}
+                ${seedProductsStore ? `<span class="form-label__paste-hint" title="${escapeHtml(t('admin.productDescriptionPasteHint'))}">${escapeHtml(t('admin.productDescriptionPasteHint'))}</span>` : ''}
+              </label>
               <textarea class="form-input" name="description" rows="2"></textarea>
             </div>
             <div class="form-group admin-form-grid__full">

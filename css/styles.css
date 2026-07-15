@@ -3204,6 +3204,19 @@ body.report-modal-open {
   color: var(--text-secondary);
 }
 
+/* Texto colável ao lado do label (ex.: frase padrão na descrição seed) */
+.form-label__paste-hint {
+  display: inline;
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text-muted);
+  user-select: all;
+  -webkit-user-select: all;
+  cursor: text;
+}
+
 /* Auth & dashboard */
 .auth-page {
   max-width: 24rem;
