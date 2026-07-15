@@ -599,7 +599,7 @@ export function renderFeedProductCard(product, options = {}) {
           ${product.description ? `<p class="feed-product-card__desc">${escapeHtml(product.description)}</p>` : ''}
           <div class="feed-product-card__footer">
             <div class="feed-product-card__meta">
-              <span class="feed-product-card__price">${formatCurrency(product.price)}</span>
+              ${Number(product.price) > 0 ? `<span class="feed-product-card__price">${formatCurrency(product.price)}</span>` : ''}
               ${likesCount > 0 ? `<span class="feed-product-card__likes">❤️ ${likesCount}</span>` : ''}
             </div>
             <div class="feed-product-card__actions">
@@ -714,7 +714,7 @@ export function renderProductCard(product, options = {}) {
           </div>
         ` : ''}
         <div class="product-card__footer">
-          <span class="product-card__price">${formatCurrency(product.price)}</span>
+          ${Number(product.price) > 0 ? `<span class="product-card__price">${formatCurrency(product.price)}</span>` : ''}
           <div class="product-card__footer-actions">
             <button type="button" class="btn btn-sm" style="${btnStyle}" data-add-product="${product.id}" ${oos ? 'disabled' : ''}>${t('store.addProduct')}</button>
           </div>
@@ -727,7 +727,8 @@ export function renderProductCard(product, options = {}) {
 let cartCheckoutOpen = false
 
 function renderCartItem(item) {
-  const subtotal = item.product.price * item.quantity
+  const unitPrice = Number(item.product.price)
+  const subtotal = unitPrice * item.quantity
   return `
     <li class="cart-item">
       <div class="cart-item__media">
@@ -740,14 +741,14 @@ function renderCartItem(item) {
           <h4 class="cart-item__name">${escapeHtml(item.product.name)}</h4>
           <button type="button" class="cart-item__remove" data-remove="${item.product.id}" aria-label="${t('common.removeItem')}">✕</button>
         </div>
-        <p class="cart-item__unit">${t('common.priceEach', { price: formatCurrency(item.product.price) })}</p>
+        ${unitPrice > 0 ? `<p class="cart-item__unit">${t('common.priceEach', { price: formatCurrency(unitPrice) })}</p>` : ''}
         <div class="cart-item__bottom">
           <div class="cart-qty">
             <button type="button" class="cart-qty__btn" data-qty-minus="${item.product.id}" aria-label="${t('common.decreaseQty')}">−</button>
             <span class="cart-qty__value">${item.quantity}</span>
             <button type="button" class="cart-qty__btn" data-qty-plus="${item.product.id}" aria-label="${t('common.increaseQty')}">+</button>
           </div>
-          <span class="cart-item__subtotal">${formatCurrency(subtotal)}</span>
+          ${subtotal > 0 ? `<span class="cart-item__subtotal">${formatCurrency(subtotal)}</span>` : ''}
         </div>
       </div>
     </li>
@@ -788,16 +789,19 @@ function renderPaymentOptions(allowedIds, selected) {
 }
 
 function renderCheckoutSummary(cart, total, count) {
+  const showMoney = Number(total) > 0
   return `
     <div class="cart-summary">
       <div class="cart-summary__row">
         <span>${t('cart.itemsCount', { count })}</span>
-        <span>${formatCurrency(total)}</span>
+        ${showMoney ? `<span>${formatCurrency(total)}</span>` : ''}
       </div>
+      ${showMoney ? `
       <div class="cart-summary__row cart-summary__row--total">
         <span>${t('cart.total')}</span>
         <span class="cart-summary__total">${formatCurrency(total)}</span>
       </div>
+      ` : ''}
     </div>
     <button type="button" class="btn btn-green btn-block cart-checkout-btn" id="checkout-start">
       ${t('checkout.finalizeOrder')}
@@ -886,10 +890,12 @@ export function renderCartDrawer() {
           </form>
         </div>
         <div class="cart-drawer__footer cart-drawer__footer--checkout">
+          ${Number(total) > 0 ? `
           <div class="cart-checkout-total">
             <span>${t('checkout.orderTotal')}</span>
             <strong>${formatCurrency(total)}</strong>
           </div>
+          ` : ''}
           <div class="cart-checkout-actions">
             <button type="button" class="btn btn-outline" id="checkout-back">${t('checkout.back')}</button>
             <button type="submit" form="checkout-form" class="btn btn-green" id="checkout-submit">

@@ -96,13 +96,20 @@ export function buildOrderMessage({
 }) {
   const lines = items.map((item) => {
     const kind = isService(item.product) ? t('catalog.service') : t('catalog.product')
-    return t('whatsapp.lineItem', {
-      kind,
-      name: item.product.name,
-      qty: item.quantity,
-      price: formatCurrency(item.product.price * item.quantity),
-    })
+    const lineTotal = Number(item.product.price) * item.quantity
+    if (lineTotal > 0) {
+      return t('whatsapp.lineItem', {
+        kind,
+        name: item.product.name,
+        qty: item.quantity,
+        price: formatCurrency(lineTotal),
+      })
+    }
+    // Preço 0: sem valor na linha (evita "R$ 0,00")
+    return `${kind}: ${item.product.name} (${item.quantity}x)`
   })
+
+  const showTotal = Number(total) > 0
 
   return [
     t('whatsapp.greeting'),
@@ -110,8 +117,7 @@ export function buildOrderMessage({
     t('whatsapp.orderIntro'),
     '',
     ...lines,
-    '',
-    t('whatsapp.total', { amount: formatCurrency(total) }),
+    ...(showTotal ? ['', t('whatsapp.total', { amount: formatCurrency(total) })] : []),
     ...(paymentMethod ? ['', t('whatsapp.paymentMethod', { method: getPaymentMethodLabel(paymentMethod) })] : []),
     '',
     t('whatsapp.customerName', { name: customerName }),
