@@ -31,6 +31,7 @@ import {
   isPublicMarketplaceStore,
   SEED_PRODUCTS_STORE_SLUG,
 } from './config.js'
+import { assertValidBrazilWhatsapp } from './whatsapp.js'
 import { STORAGE_BUCKETS, uploadImage } from './uploads.js'
 import { normalizeItemType } from './catalog.js'
 import {
@@ -640,8 +641,7 @@ export async function createStore(ownerId, form) {
   if (!ownerId) throw new Error(t('errors.sessionExpired'))
   const name = String(form.name ?? '').trim()
   if (!name) throw new Error(t('errors.informStoreName'))
-  const whatsapp = String(form.whatsapp ?? '').trim()
-  if (!whatsapp) throw new Error(t('errors.informPhone'))
+  const whatsapp = assertValidBrazilWhatsapp(form.whatsapp)
 
   const neighborhood = await resolveActiveNeighborhoodLocation(client, form.neighborhood_id)
   await assertCategoryExists(client, form.category_id)
@@ -680,6 +680,9 @@ export async function updateStore(storeId, form) {
   for (const key of ['name', 'description', 'whatsapp', 'address', 'city', 'state', 'opening_hours', 'instagram', 'category_id', 'theme_color', 'payment_methods', 'neighborhood_id']) {
     if (form[key] !== undefined) updates[key] = form[key]
   }
+  if (updates.whatsapp != null) {
+    updates.whatsapp = assertValidBrazilWhatsapp(updates.whatsapp)
+  }
 
   if (updates.neighborhood_id) {
     const neighborhood = await resolveActiveNeighborhoodLocation(client, updates.neighborhood_id)
@@ -716,6 +719,9 @@ export async function updateStoreAsAdmin(storeId, form) {
   const updates = {}
   for (const key of ['name', 'description', 'whatsapp', 'address', 'city', 'state', 'opening_hours', 'instagram', 'category_id', 'theme_color', 'plan_id', 'status', 'neighborhood_id']) {
     if (form[key] !== undefined) updates[key] = form[key]
+  }
+  if (updates.whatsapp != null) {
+    updates.whatsapp = assertValidBrazilWhatsapp(updates.whatsapp)
   }
 
   if (updates.neighborhood_id) {
@@ -1044,10 +1050,13 @@ export async function createProduct(storeId, form) {
 
   const itemType = normalizeItemType(form.item_type)
   const stock = itemType === 'service' ? null : Number(form.stock ?? 0)
-  const productWhatsapp = form.whatsapp != null ? String(form.whatsapp).trim() || null : null
+  let productWhatsapp = form.whatsapp != null ? String(form.whatsapp).trim() || null : null
   // Vitrine seed: cada item deve ter contato próprio (senão todos caem no mesmo número da loja)
   if (seedProducts && !productWhatsapp) {
     throw new Error(t('errors.productWhatsappRequired'))
+  }
+  if (productWhatsapp) {
+    productWhatsapp = assertValidBrazilWhatsapp(productWhatsapp)
   }
 
   const { data, error } = await client.from('products').insert({
@@ -1107,7 +1116,12 @@ export async function updateProduct(productId, form) {
   }
   if (form.category_id === '') updates.category_id = null
   if (form.whatsapp !== undefined) {
-    updates.whatsapp = String(form.whatsapp ?? '').trim() || null
+    const raw = String(form.whatsapp ?? '').trim() || null
+    if (!raw) {
+      updates.whatsapp = null
+    } else {
+      updates.whatsapp = assertValidBrazilWhatsapp(raw)
+    }
   }
   // Seed: ao editar, se limpar o WhatsApp do item, bloqueia
   if (form.whatsapp !== undefined && updates.whatsapp == null) {
@@ -2446,12 +2460,13 @@ export async function createStoreAsAdmin(form) {
 
   const approvedAt = approved ? new Date().toISOString() : null
   const planId = form.plan_id ?? 'free'
+  const storeWhatsapp = assertValidBrazilWhatsapp(form.whatsapp)
   const { data, error } = await client.from('stores').insert({
     owner_id: ownerId,
     name: form.name,
     slug,
     description: form.description ?? '',
-    whatsapp: form.whatsapp,
+    whatsapp: storeWhatsapp,
     address: form.address ?? '',
     city: neighborhood.city,
     state: neighborhood.state,
